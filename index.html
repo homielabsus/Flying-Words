@@ -79,7 +79,7 @@ body {
   padding: 0 22px; background: #fff; color: var(--ink); outline: none; outline-offset: 3px; -webkit-appearance: none; appearance: none;
   box-shadow: 0 4px 0 rgba(27, 27, 58, .12);
 }
-#txt::placeholder { color: #9a98b5; opacity: 1; }
+#txt::placeholder { color: #6f6d90; opacity: 1; }
 #txt:focus { outline: 4px solid var(--accent); }
 #go {
   flex: none; height: 64px; min-width: 100px; padding: 0 22px; background: var(--sun); color: var(--ink); border: 4px solid var(--ink);
@@ -88,7 +88,11 @@ body {
 }
 #go:hover { filter: brightness(1.06); }
 #go:active { transform: translateY(5px); box-shadow: 0 1px 0 var(--ink); }
-button:focus-visible { outline: 4px solid var(--accent); outline-offset: 3px; }
+/* focus rings must never be the same colour as whatever is behind them: dock buttons sit on --paper (ink reads),
+   stage buttons sit on the candy gradient / the dark neon stage (white ring + ink halo reads on both). */
+button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
+#badge:focus-visible { outline: 4px solid #fff; outline-offset: 2px; box-shadow: 4px 4px 0 var(--ink), 0 0 0 9px var(--ink); }
+.rbtn:focus-visible { outline: 4px solid #fff; outline-offset: 2px; box-shadow: 3px 3px 0 var(--ink), 0 0 0 9px var(--ink); }
 #chips {
   display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; scrollbar-width: none;
   padding: 10px 2px 6px; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
@@ -109,6 +113,11 @@ button:focus-visible { outline: 4px solid var(--accent); outline-offset: 3px; }
   .corner { flex-direction: column; }
   #badge { max-width: calc(100% - 88px); padding: 6px 12px; }
 }
+/* phone with the soft keyboard open: a 148px tall button column would eat the short stage, so keep it a row */
+@media (max-width: 480px) and (max-height: 560px) {
+  .corner { flex-direction: row; gap: 6px; }
+  #badge { max-width: calc(100% - 172px); }
+}
 
 /* ---------- The word ---------- */
 .line {
@@ -127,8 +136,10 @@ button:focus-visible { outline: 4px solid var(--accent); outline-offset: 3px; }
 .line.nofx { animation: fadein 500ms ease-out both; }
 @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
 .sweep { position: absolute; inset-block: 0; left: 0; width: 2em; opacity: 0; pointer-events: none; mix-blend-mode: screen; background: linear-gradient(90deg, transparent, #fff, transparent); }
-.sweep.v { inset-inline: 0; left: auto; width: auto; top: 0; height: 1em; background: linear-gradient(180deg, transparent, #fff, transparent); }
-.line.typing::after { content: '▍'; color: var(--ink); -webkit-text-fill-color: var(--ink); animation: blink 900ms steps(2, jump-none) infinite; }
+.sweep.v { left: 0; right: 0; width: auto; top: 0; bottom: auto; height: 2em; background: linear-gradient(180deg, transparent, #fff, transparent); }
+/* the caret is absolutely positioned so it adds no width: an inline ::after would re-centre the whole
+   (centred) line the moment the class is removed, snapping the finished word sideways */
+.line.typing::after { content: '▍'; position: absolute; inset-inline-start: 100%; bottom: .3em; color: var(--ink); -webkit-text-fill-color: var(--ink); animation: blink 900ms steps(2, jump-none) infinite; }
 .dark .line.typing::after { color: #fff; -webkit-text-fill-color: #fff; }
 @keyframes blink { from { opacity: 1; } to { opacity: 0; } }
 
@@ -148,15 +159,18 @@ button:focus-visible { outline: 4px solid var(--accent); outline-offset: 3px; }
   -webkit-text-stroke: var(--strokeW, .12em) hsl(var(--h, 0) 90% 42%); paint-order: stroke fill;
 }
 .look-bubble .g { filter: drop-shadow(0 .09em 0 hsl(var(--h, 0) 80% 35%)) drop-shadow(0 .16em .1em rgba(0, 0, 0, .25)); }
+/* -webkit-text-fill-color is NOT transitionable in Chromium (it snaps at t=0) and it wins over color,
+   so the pour is driven by `color` alone and text-fill-color is left at its initial `currentcolor`. */
 .look-outline .t {
-  color: transparent; -webkit-text-fill-color: transparent; -webkit-text-stroke: max(2px, .07em) var(--ink); paint-order: stroke fill;
-  transition: color 450ms ease var(--pd, 0ms), -webkit-text-fill-color 450ms ease var(--pd, 0ms);
+  color: transparent; -webkit-text-stroke: max(2px, .07em) var(--ink); paint-order: stroke fill;
+  transition: color 450ms ease var(--pd, 0ms);
 }
-.look-outline.filled .t { color: hsl(var(--h, 0) 95% 55%); -webkit-text-fill-color: hsl(var(--h, 0) 95% 55%); }
 .look-outline.nostroke .t {
-  -webkit-text-stroke: 0; color: var(--paper); -webkit-text-fill-color: var(--paper);
+  -webkit-text-stroke: 0; color: var(--paper);
   text-shadow: 2px 0 0 var(--ink), -2px 0 0 var(--ink), 0 2px 0 var(--ink), 0 -2px 0 var(--ink), 2px 2px 0 var(--ink), -2px -2px 0 var(--ink), 2px -2px 0 var(--ink), -2px 2px 0 var(--ink);
 }
+/* declared last so the pour also wins in the no-text-stroke fallback (equal specificity) */
+.look-outline.filled .t, .look-outline.nostroke.filled .t { color: hsl(var(--h, 0) 95% 55%); }
 .look-neon .t { color: #fff; -webkit-text-fill-color: #fff; text-shadow: var(--neon, none); }
 .look-metal .t {
   background-image: linear-gradient(180deg, #fff 0%, #dcdcdc 34%, #6f6f6f 50%, #f0f0f0 56%, #9c9c9c 78%, #fff 100%);
@@ -173,7 +187,10 @@ button:focus-visible { outline: 4px solid var(--accent); outline-offset: 3px; }
 /* browsers without background-clip:text get solid fills instead of gradients */
 .line.nobg .t { background-image: none !important; color: var(--fb, #fff) !important; -webkit-text-fill-color: var(--fb, #fff) !important; }
 /* the single emoji override: emoji keep their real colours, depth/glow comes from the .g filter */
-.ch.emo .t { background: none !important; color: initial !important; -webkit-text-fill-color: initial !important; -webkit-text-stroke: 0 !important; text-shadow: none !important; }
+.ch.emo .t { background: none !important; color: var(--emoInk, initial) !important; -webkit-text-fill-color: var(--emoInk, initial) !important; -webkit-text-stroke: 0 !important; text-shadow: none !important; }
+/* Colour emoji ignore `color`, but text-presentation pictographs (© ™ ® ⚠ ✈ ♥) honour it,
+   so on the dark neon stage they need light ink or they vanish. */
+#stage.dark .line { --emoInk: #fff; }
 .ch.emo .g { filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .35)) drop-shadow(0 0 var(--glowR, 0px) var(--glow, transparent)); }
 @media (prefers-reduced-motion: reduce) {
   #badge.pop { animation-duration: 200ms; }
@@ -210,7 +227,7 @@ button:focus-visible { outline: 4px solid var(--accent); outline-offset: 3px; }
 const $ = (s) => document.querySelector(s);
 const stage = $('#stage'), host = $('#host'), badgeEl = $('#badge'), lookBtn = $('#lookBtn'), soundBtn = $('#soundBtn'),
   calmBtn = $('#calmBtn'), announceEl = $('#announce'), form = $('#f'), input = $('#txt'), chipsEl = $('#chips'),
-  ringEl = $('#ring'), flashEl = $('#flash'), root = document.documentElement;
+  ringEl = $('#ring'), flashEl = $('#flash'), cornerEl = $('.corner'), root = document.documentElement;
 
 /* ---------- feature detection ---------- */
 const sup = (p, v) => { try { return !!(window.CSS && CSS.supports && CSS.supports(p, v)); } catch (e) { return false; } };
@@ -247,6 +264,9 @@ const RX = {
   emoji: rx('\\p{Extended_Pictographic}|\\p{Regional_Indicator}|\\u20E3', 'u',
     /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u20E3\u2B50\u2B55\u2934\u2935\u3030\u303D\u3297\u3299\u00A9\u00AE\u2122\u2139\u2194-\u2199\u21A9\u21AA\u231A\u231B\u2328\u23CF\u23E9-\u23F3\u23F8-\u23FA\u24C2\u25AA\u25AB\u25B6\u25C0\u25FB-\u25FE]/u),
   ignorable: rx('^[\\p{Cf}\\s]+$', 'u', /^[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF\s]+$/),
+  rtlStrong: rx('[\\p{Script=Hebrew}\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thaana}\\p{Script=Nko}\\p{Script=Samaritan}\\p{Script=Mandaic}]', 'u',
+    /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/),
+  letter: rx('\\p{L}', 'u', /[A-Za-z\u00C0-\u02AF\u0370-\u058F\u0900-\u1FFF\u2C00-\uD7FF\uF900-\uFDCF]/),
   wordUnits: rx('[\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thai}\\p{Script=Khmer}\\p{Script=Myanmar}\\p{Script=Devanagari}\\p{Script=Bengali}\\p{Script=Tamil}\\p{Script=Telugu}\\p{Script=Kannada}\\p{Script=Malayalam}\\p{Script=Gujarati}\\p{Script=Gurmukhi}\\p{Script=Sinhala}\\p{Script=Tibetan}\\p{Script=Mongolian}\\p{Script=Nko}\\p{Script=Lao}]', 'u',
     /[\u0600-\u06FF\u0700-\u074F\u0750-\u077F\u07C0-\u07FF\u0900-\u0DFF\u0E00-\u0EFF\u0F00-\u0FFF\u1000-\u109F\u1780-\u17FF\u1800-\u18AF]/)
 };
@@ -277,13 +297,31 @@ function graphemes(s) {
   return out;
 }
 function isEmoji(g) { try { return RX.emoji.test(String(g)); } catch (e) { return false; } }
+/* RX.emoji is a substring test, and in word-unit mode (Arabic, Thai, …) a unit is a whole word:
+   'مرحبا🎉' must NOT be treated as an emoji unit or the emoji override would strip the word's look. */
+function unitIsEmoji(u) {
+  if (!u || !isEmoji(u)) return false;
+  const gs = graphemes(String(u));
+  return gs.length <= 1 || gs.every(isEmoji);
+}
 function split(text) {
   const t = normalize(text);
   if (!t) return [];
   let units;
   if (RX.wordUnits.test(t)) {
     units = [];
-    t.split(' ').forEach((w, k) => { if (k) units.push(' '); units.push(w); });
+    /* Each whitespace word is one shaping unit, EXCEPT that emoji are cut out into their own
+       units: an emoji glued to a word ('مرحبا🎉') would otherwise miss the .emo override and be
+       painted as a gradient silhouette. Emoji are Script=Common and break the shaping run anyway. */
+    t.split(' ').forEach((w, k) => {
+      if (k) units.push(' ');
+      let run = '';
+      for (const g of graphemes(w)) {
+        if (isEmoji(g)) { if (run) { units.push(run); run = ''; } units.push(g); }
+        else run += g;
+      }
+      if (run) units.push(run);
+    });
   } else {
     units = graphemes(t).filter((g) => g === ' ' || !RX.ignorable.test(g));
   }
@@ -425,9 +463,11 @@ const confetti = (() => {
   }
   function shower(ms, colors) { showerColors = (colors && colors.length ? colors : PALETTES[0]).concat(CONFETTI_EXTRA); showerUntil = performance.now() + ms; sound.tada(); kick(); }
   function stopShower() { showerUntil = 0; }
+  /* extend a running shower to cover the stage that is about to start (no second ta-da) */
+  function keepShower(ms) { if (!showerColors) return; showerUntil = Math.max(showerUntil, performance.now() + ms); kick(); }
   function clear() { parts.length = 0; showerUntil = 0; if (raf) { cancelAnimationFrame(raf); raf = 0; } last = 0; cx.clearRect(0, 0, w, h); }
   resize();
-  return { resize, burst, celebrate, shower, stopShower, clear };
+  return { resize, burst, celebrate, shower, keepShower, stopShower, clear };
 })();
 
 /* ---------- layout helpers ---------- */
@@ -488,7 +528,7 @@ defLook({ id: 'outline', name: 'Outline', emoji: '✏️',
     const mid = (ctx.n - 1) / 2;
     for (const c of ctx.chars) c.el.style.setProperty('--pd', Math.round(Math.abs(c.i - mid) * 40) + 'ms');
   },
-  afterMove(ctx) { ctx.line.classList.add('filled'); } });
+  afterEntrance(ctx) { ctx.line.classList.add('filled'); } });
 defLook({ id: 'neon', name: 'Neon Sign', emoji: '🌃', glow: true,
   apply(ctx) {
     const line = ctx.line; line.classList.add('look-neon'); stage.classList.add('dark');
@@ -496,12 +536,18 @@ defLook({ id: 'neon', name: 'Neon Sign', emoji: '🌃', glow: true,
     line.style.setProperty('--glow', glow); line.style.setProperty('--glowR', '14px');
     line.style.setProperty('--neon', ctx.n > 40 ? '0 0 2px #fff, 0 0 14px ' + glow : '0 0 2px #fff, 0 0 8px ' + glow + ', 0 0 18px ' + glow + ', 0 0 36px ' + glow + ', 0 0 70px ' + glow);
   },
-  afterMove(ctx) {
+  /* the sign flickers ON: inside the first 900 ms after the word appears, not after the motion.
+     Each flicker is created when its delay elapses so it sits ABOVE the entrance's own opacity
+     animation in composite order (a pre-created one would simply be overridden by fill:'both'). */
+  onAppear(ctx) {
     if (ctx.reduced || !FEAT.animate) return;
     const pool = ctx.letters.filter((c) => !c.isEmoji); const k = Math.min(pool.length, 2 + ctx.rng.int(2));
     for (let j = 0; j < k; j++) {
       const c = pool.splice(ctx.rng.int(pool.length), 1)[0];
-      ctx.anim(c.g, [{ opacity: 1 }, { opacity: .3 }, { opacity: 1 }, { opacity: .6 }, { opacity: 1 }], { duration: 220, easing: 'steps(4)', delay: ctx.rng.int(600), fill: 'none' });
+      ctx.hold(ctx.rng.int(600)).then(() => {
+        if (!ctx.alive()) return;
+        ctx.anim(c.g, [{ opacity: 1 }, { opacity: .3 }, { opacity: 1 }, { opacity: .6 }, { opacity: 1 }], { duration: 220, easing: 'steps(4)', fill: 'none' });
+      });
     }
   } });
 const METAL_SHADOW = 'drop-shadow(2px 3px 2px rgba(0,0,0,.45))';
@@ -511,7 +557,7 @@ defLook({ id: 'metal', name: 'Chrome', emoji: '🪙',
     if (ctx.h >= 30 && ctx.h <= 60) line.classList.add('gold');
     if (!FEAT.clipText) { line.classList.add('nobg'); line.style.setProperty('--fb', '#bdbdbd'); }
   },
-  afterMove(ctx) {
+  afterEntrance(ctx) {
     if (!FEAT.animate) return;
     const peak = ctx.reduced ? 1.35 : 1.8;
     for (const c of ctx.letters) {
@@ -558,25 +604,52 @@ function layoutPass(ctx, fs) {
   if (ctx.look.afterLayout) ctx.look.afterLayout(ctx);
 }
 function swapLook(ctx, look) {
-  clearLook(ctx); ctx.look = look; ctx.combo.look = look.id; look.apply(ctx);
+  /* NOTE: never writes ctx.combo — that object is state.lastCombo, and a temporary arch→wavy
+     fallback at one viewport size must not rewrite what "again" / the next replay will use. */
+  clearLook(ctx); ctx.look = look; look.apply(ctx);
   ctx.line.classList.toggle('oneline', !!look.oneLine);
 }
 const START_FS = () => Math.min(150, Math.max(40, window.innerWidth * 0.16));
 const MIN_FS = 22, WRAP_FS = 40;
+/* the badge (top-left) and the round buttons (top-right) sit 12px inside the stage; the word is
+   centred, so the same band has to stay clear top AND bottom or a short stage (phone + soft
+   keyboard) draws the last letters underneath the buttons. */
+function furnitureBand() {
+  let b = 44;
+  try { b = Math.max(badgeEl.offsetHeight || 0, cornerEl ? (cornerEl.offsetHeight || 0) : 0) || 44; } catch (e) { b = 44; }
+  return 12 + b + 8;
+}
 function fit(ctx) {
   const line = ctx.line;
+  if (ctx.wantLook && ctx.look !== ctx.wantLook) swapLook(ctx, ctx.wantLook); /* retry the requested look at the new size */
   const W = stage.clientWidth || 300, H = stage.clientHeight || 200; ctx.stage = { w: W, h: H };
-  const maxW = W * .92, maxH = H * .82;
+  const band = furnitureBand();
+  const maxW = Math.floor(W * .92), maxH = Math.max(H * .35, Math.min(H * .82, H - band * 2));
   let fs = START_FS(), breakany = false, swapped = false;
   line.classList.remove('breakany'); line.classList.toggle('oneline', !!ctx.look.oneLine);
+  /* Clamp the line to the width budget so a WRAPPED line can actually satisfy the width test, and
+     measure overflow from the UNTRANSFORMED unit boxes. scrollWidth cannot do this job: once the
+     text wraps it is pinned to the clamped line width (so `scrollWidth > .92*W` was permanently
+     true and every phrase was shrunk onto one tiny row), and it also counts arch's rotated letters. */
+  line.style.maxWidth = maxW + 'px';
+  const extent = () => {
+    let lo = Infinity, hi = -Infinity;
+    for (const c of ctx.letters) { const l = c.el.offsetLeft, r = l + c.el.offsetWidth; if (l < lo) lo = l; if (r > hi) hi = r; }
+    return hi > lo ? hi - lo : 0;
+  };
   for (let k = 0; k < 80; k++) {
     layoutPass(ctx, fs);
-    const tooWide = line.scrollWidth > maxW || (ctx.extraW || 0) > maxW, tooTall = line.scrollHeight > maxH;
+    const avail = maxW - fs * .7; /* .line carries .35em of padding on each side */
+    const wordTooWide = () => Array.prototype.some.call(line.querySelectorAll('.word'), (w) => w.offsetWidth > avail + 1);
+    const tooWide = extent() > avail + 1 || (ctx.extraW || 0) > maxW;
+    const tooTall = line.scrollHeight > maxH;
     if (!tooWide && !tooTall) break;
-    const wordTooWide = () => Array.prototype.some.call(line.querySelectorAll('.word'), (w) => w.offsetWidth > maxW);
     if (ctx.look.oneLine) {
       if (fs <= MIN_FS) { if (swapped) break; swapped = true; swapLook(ctx, LOOKS.wavy); fs = START_FS(); continue; }
-    } else if (!breakany && tooWide && fs <= WRAP_FS && wordTooWide()) { breakany = true; line.classList.add('breakany'); continue; }
+    } else if (!breakany && tooWide && fs <= WRAP_FS && wordTooWide()) {
+      /* a single token is unbreakably wide: let it wrap between graphemes and retry BIG */
+      breakany = true; line.classList.add('breakany'); fs = START_FS(); continue;
+    }
     if (fs <= MIN_FS) break;
     fs = Math.max(MIN_FS, fs * .85);
   }
@@ -590,7 +663,8 @@ const defMove = (o) => { MOVES[o.id] = o; MOVE_ORDER.push(o.id); };
 const done = (anims) => Promise.all(anims.map((a) => a.finished.catch(() => {}))).then(() => undefined);
 const OVERSHOOT = 'cubic-bezier(.34,1.56,.64,1)';
 function popIn(ctx) {
-  return done([ctx.anim(ctx.line, [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: ctx.T(200), easing: OVERSHOOT })]);
+  /* the entrance of every emphasis / exit move: post-entrance look effects are due right after it */
+  return done([ctx.anim(ctx.line, [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: ctx.T(200), easing: OVERSHOOT })]).then(() => { ctx.entered(); });
 }
 function baseFilter(el) { const f = getComputedStyle(el).filter; return f && f !== 'none' ? f + ' ' : ''; }
 function setOrigin(ctx, o) { for (const c of ctx.letters) c.g.style.transformOrigin = o; }
@@ -700,6 +774,7 @@ defMove({ id: 'floatin', name: 'Balloon Float', emoji: '🎈', kind: 'enter', ce
       { transform: 'translate(' + (10 * a) + 'px,' + (20 * a) + 'px) rotate(' + (4 * a) + 'deg)', opacity: .7, offset: .55 }, { transform: 'none', opacity: 1 }],
       { duration: ctx.T(1100), easing: 'ease-out', delay: c.i * ctx.stagger(70) }));
     await done(anims); if (!ctx.alive()) return;
+    ctx.entered(); /* the balloon has arrived; the bob loop that follows is not part of the entrance */
     const bobs = ctx.letters.map((c) => ctx.anim(c.g, [{ transform: 'none' }, { transform: 'translateY(' + (-8 * a) + 'px) rotate(' + (2 * a) + 'deg)', offset: .5 }, { transform: 'translateY(0) rotate(' + (-2 * a) + 'deg)', offset: .8 }, { transform: 'none' }],
       { duration: ctx.T(2200), iterations: ctx.reduced ? 2 : 3, easing: 'ease-in-out', delay: -c.i * 150 }));
     await done(bobs); if (!ctx.alive()) return;
@@ -733,6 +808,7 @@ defMove({ id: 'typewriter', name: 'Type-Type', emoji: '⌨️', kind: 'enter', c
       if (state.sound) ctx.hold(d + step).then(() => sound.tick());
     }
     await done(anims); if (!ctx.alive()) return;
+    ctx.entered(); /* every letter is typed; the trailing caret blink is not part of the entrance */
     await ctx.hold(700); if (!ctx.alive()) return;
     line.classList.remove('typing');
   } });
@@ -766,8 +842,16 @@ defMove({ id: 'teeter', name: 'Teeter', emoji: '🎢', kind: 'emph', celebrate: 
     await popIn(ctx); if (!ctx.alive()) return;
     const r = ctx.reduced ? 2 : 7, x = ctx.reduced ? 1 : 3;
     setOrigin(ctx, '50% 100%');
-    const kf = [{ transform: 'none' }, { transform: 'rotate(' + (-r) + 'deg) translateX(' + (-x) + 'px)', offset: .25 }, { transform: 'rotate(' + r + 'deg) translateX(' + x + 'px)', offset: .75 }, { transform: 'none' }];
-    await done(ctx.letters.map((c) => ctx.anim(c.g, kf, { duration: ctx.T(600), iterations: ctx.reduced ? 2 : 6, easing: 'ease-in-out', delay: -c.i * 60 })));
+    /* one 600 ms half-swing per iteration (direction:'alternate'), NOT a whole cycle — a 4-keyframe
+       list with direction:'normal' wobbles at twice the specified tempo. */
+    const from = 'rotate(' + (-r) + 'deg) translateX(' + (-x) + 'px)';
+    const kf = [{ transform: from }, { transform: 'rotate(' + r + 'deg) translateX(' + x + 'px)' }];
+    const d = ctx.T(600), it = ctx.reduced ? 2 : 6;
+    const anims = ctx.letters.map((c) => ctx.anim(c.g, kf, { duration: d, iterations: it, direction: 'alternate', easing: 'ease-in-out', delay: -c.i * 60, fill: 'none' }));
+    /* an even alternate count ends on the FIRST keyframe, so settle each letter upright as it finishes */
+    ctx.letters.forEach((c) => anims.push(ctx.anim(c.g, [{ transform: from }, { transform: 'none' }],
+      { duration: ctx.T(180), delay: d * it - c.i * 60, easing: 'ease-out', fill: 'forwards' })));
+    await done(anims);
     if (!ctx.alive()) return;
   } });
 defMove({ id: 'wave', name: 'The Wave', emoji: '🌊', kind: 'emph', celebrate: false,
@@ -869,11 +953,17 @@ defMove({ id: 'fallapart', name: 'Fall Apart', emoji: '🍂', kind: 'exit', cele
 defMove({ id: 'party', name: 'EVERYTHING!', emoji: '🎆', kind: 'combo', celebrate: true,
   async run(ctx) {
     if (!ctx.reduced) ctx.anim(flashEl, [{ opacity: .9 }, { opacity: 0 }], { duration: 200, fill: 'none' });
-    const est = ctx.T(1100 + ctx.stagger(60) * ctx.n + 2700 + 800 + ctx.stagger(60) * ctx.n) + 800;
-    confetti.shower(est, ctx.palette);
+    const iter = ctx.reduced ? 2 : 3;
+    /* The shower is extended stage by stage so it covers the whole run. One up-front estimate
+       under-budgets the middle leg: wave (900ms x iter) and disco (1800ms x iter) run together,
+       so the longer one decides, and the shower used to die before the finish. */
+    confetti.shower(ctx.T(1100 + ctx.stagger(60) * ctx.n) + 600, ctx.palette);
     await bounceRun(ctx); if (!ctx.alive()) return;
-    const anims = discoRun(ctx, ctx.reduced ? 2 : 3);
-    await Promise.all([waveRun(ctx, ctx.reduced ? 2 : 3), done(anims)]); if (!ctx.alive()) return;
+    ctx.entered(); /* the bounce is party's entrance */
+    confetti.keepShower(ctx.T(Math.max(900, 1800) * iter) + 600);
+    const anims = discoRun(ctx, iter);
+    await Promise.all([waveRun(ctx, iter), done(anims)]); if (!ctx.alive()) return;
+    confetti.keepShower(ctx.T(800 + ctx.stagger(60) * ctx.n * .5) + 400);
     await jellyRun(ctx, 1); if (!ctx.alive()) return;
   } });
 
@@ -890,6 +980,7 @@ function pickCombo(text, opts) {
   if (!explicitMove && (milestone || /party|🎉|🥳|🎂/iu.test(text))) move = 'party';
   if (!move) move = moveBag.next();
   let look = explicitLook ? o.look : (o.api ? null : state.pinnedLook);
+  if (move === 'party' && !explicitLook) look = null; /* party's look is always the rng's — not the bag's, not the pin's */
   if (!look && !explicitLook && /rainbow/i.test(text)) look = 'arch';
   if (!look && move !== 'party') look = lookBag.next();
   return { look: look || null, move, seed, milestone };
@@ -915,16 +1006,23 @@ function build(text, combo) {
     const t = document.createElement('span'); t.className = 't'; t.appendChild(document.createTextNode(u));
     g.appendChild(t); ch.appendChild(g);
     ch.style.setProperty('--i', String(i)); ch.dataset.i = String(i);
-    const isSpace = u === ' ', emo = !isSpace && isEmoji(u);
+    const isSpace = u === ' ', emo = !isSpace && unitIsEmoji(u);
     if (isSpace) { ch.classList.add('space'); line.appendChild(ch); word = null; }
     else { if (!word) { word = document.createElement('span'); word.className = 'word'; line.appendChild(word); } if (emo) ch.classList.add('emo'); word.appendChild(ch); }
     chars.push({ el: ch, g, t, isEmoji: emo, isSpace, i });
   });
   const ctx = {
     line, chars, letters: chars.filter((c) => !c.isSpace), n, fs: 0, stage: { w: stage.clientWidth, h: stage.clientHeight }, rtl: false,
-    amp: reduced ? .35 : 1, speed: reduced ? .7 : 1, reduced, rng, h, look, move, combo, token: state.seq, anims: [], cleanups: [],
-    accent: pal[0], palette: pal, extraW: 0,
+    amp: reduced ? .35 : 1, speed: reduced ? .7 : 1, reduced, rng, h, look, wantLook: look, move, combo, token: state.seq, anims: [], cleanups: [],
+    accent: pal[0], palette: pal, extraW: 0, _entered: false,
     alive: () => ctx.token === state.seq,
+    /* the entrance segment is over (for emphasis/exit moves that is the 200 ms pop-in, not the
+       whole run) — this is when the outline pour and the chrome glint are due. Idempotent. */
+    entered: () => {
+      if (ctx._entered) return; ctx._entered = true;
+      if (!ctx.alive()) return;
+      try { if (ctx.look.afterEntrance) ctx.look.afterEntrance(ctx); } catch (e) { /* ignore */ }
+    },
     T: (ms) => ms * ctx.speed,
     stagger: (base) => (n <= 1 ? 0 : Math.min(base, 2000 / n)),
     hold: (ms) => new Promise((res) => { const t = setTimeout(() => { if (ctx.alive()) res(); }, Math.max(0, ms)); ctx.cleanups.push(() => clearTimeout(t)); }),
@@ -936,6 +1034,47 @@ function build(text, combo) {
   };
   look.apply(ctx);
   return ctx;
+}
+
+/* ---------- bidi ----------
+   Every .ch and .word is an inline-block, i.e. an ATOMIC inline, which the bidi algorithm always
+   treats as one neutral object (U+FFFC) no matter what is inside it. So a whole .line resolves to a
+   single direction and any run of the other script is laid out backwards ('abc שלום' rendered the
+   Hebrew mirrored). Fix in two steps:
+     1. freeze the paragraph direction that dir="auto" just resolved on .line, then give every .word
+        its own dir so each word orders its letters by its own script (dir="auto" ignores descendants
+        that already carry a dir, hence the order: read first, then stamp);
+     2. a word whose direction differs from the paragraph's keeps its edge punctuation on the wrong
+        side (the '!' of 'hi עולם!'), because those neutrals are inside the word's own direction —
+        split them off into sibling .word blocks that follow the paragraph instead. */
+function strongDir(s) {
+  try { if (RX.rtlStrong.test(s)) return 'rtl'; if (RX.letter.test(s)) return 'ltr'; } catch (e) { /* ignore */ }
+  return '';
+}
+function applyBidi(ctx) {
+  const line = ctx.line;
+  const rtl = getComputedStyle(line).direction === 'rtl', para = rtl ? 'rtl' : 'ltr';
+  line.setAttribute('dir', para);
+  const words = Array.prototype.slice.call(line.querySelectorAll('.word'));
+  for (const w of words) {
+    const chs = Array.prototype.slice.call(w.children);
+    const dirs = chs.map((c) => strongDir(c.textContent));
+    let lo = -1, hi = -1;
+    for (let i = 0; i < dirs.length; i++) { if (dirs[i]) { if (lo < 0) lo = i; hi = i; } }
+    const wdir = lo < 0 ? 'ltr' : dirs[lo]; /* what dir="auto" resolves to (no strong char → ltr) */
+    if (lo >= 0 && wdir !== para && (lo > 0 || hi < chs.length - 1)) {
+      const edge = (nodes, before) => {
+        if (!nodes.length) return;
+        const e = document.createElement('span'); e.className = 'word'; e.setAttribute('dir', para);
+        nodes.forEach((c) => e.appendChild(c));
+        w.parentNode.insertBefore(e, before ? w : w.nextSibling);
+      };
+      edge(chs.slice(hi + 1), false); /* insert after first: w.nextSibling is still correct here */
+      edge(chs.slice(0, lo), true);
+    }
+    w.setAttribute('dir', wdir);
+  }
+  return rtl;
 }
 
 /* ---------- runner ---------- */
@@ -971,27 +1110,34 @@ async function play(text, combo) {
     ctx = build(text, combo);
     state.ctx = ctx;
     host.replaceChildren(ctx.line);
-    ctx.rtl = getComputedStyle(ctx.line).direction === 'rtl';
+    ctx.rtl = applyBidi(ctx);
+    setBadge(ctx); /* before fit: the sticker's height is part of the band fit() keeps clear */
+    const wanted = ctx.look;
     fit(ctx);
     void ctx.line.offsetWidth;
-    setBadge(ctx);
+    if (ctx.look !== wanted) setBadge(ctx); /* arch fell back to wavy at this size */
     announceEl.textContent = text + ' — ' + ctx.look.name + ', ' + ctx.move.name;
     document.title = '✨ ' + text;
     if (!FEAT.animate) { ctx.line.classList.add('nofx'); return; }
+    if (ctx.look.onAppear) { try { ctx.look.onAppear(ctx); } catch (e) { /* ignore */ } }
     const superseded = new Promise((res) => ctx.cleanups.push(res));
     await Promise.race([ctx.move.run(ctx), superseded]);
   } catch (e) { /* AbortError and friends: the show must go on */ }
   if (id !== state.seq || !ctx) return;
   try {
-    if (ctx.look.afterMove) ctx.look.afterMove(ctx);
+    ctx.entered(); /* no-op if the move already announced the end of its entrance */
     if (isParty) { confetti.stopShower(); confetti.celebrate(ctx.palette, true); if (combo.milestone) confetti.shower(3000, ctx.palette); }
     else if (ctx.move.celebrate) confetti.celebrate(ctx.palette, false);
     startBreathe(ctx);
   } catch (e) { /* ignore */ }
 }
-function currentText() { return normalize(input.value) || state.lastText || DEMO_WORDS[Math.floor(Math.random() * DEMO_WORDS.length)]; }
+/* '' when the text has no renderable units — a string of format characters (a lone ZWJ, ZWSP, RLM …)
+   survives normalize() but split() drops it, and rendering it would mount an empty line and poison
+   lastText/title. Spec §8: "if after segmentation the array is empty, treat as empty input". */
+function usableText(s) { const t = normalize(s); return (t && split(t).length) ? t : ''; }
+function currentText() { return usableText(input.value) || state.lastText || DEMO_WORDS[Math.floor(Math.random() * DEMO_WORDS.length)]; }
 function go(text, opts) {
-  const t = normalize(text); if (!t) return;
+  const t = usableText(text); if (!t) return;
   state.lastText = t;
   const combo = pickCombo(t, opts); state.lastCombo = combo;
   play(t, combo).catch(() => {});
@@ -999,16 +1145,20 @@ function go(text, opts) {
 function again() { if (state.lastText && state.lastCombo) play(state.lastText, state.lastCombo).catch(() => {}); else go(currentText()); }
 function refit() {
   const ctx = state.ctx; if (!ctx || !ctx.alive() || !ctx.line.isConnected) return;
+  const before = ctx.look;
   try { fit(ctx); } catch (e) { /* ignore */ }
+  /* a resize can push arch below its one-line floor (→ wavy) or free it again: keep the sticker honest */
+  if (ctx.look !== before) { try { setBadge(ctx); } catch (e) { /* ignore */ } }
 }
 function relook(look) {
   const ctx = state.ctx;
   if (!ctx || !ctx.alive() || !ctx.line.isConnected) { go(currentText()); return; }
   try {
-    swapLook(ctx, look); fit(ctx); void ctx.line.offsetWidth;
+    ctx.wantLook = look; swapLook(ctx, look); fit(ctx); void ctx.line.offsetWidth;
     if (state.lastCombo) state.lastCombo.look = look.id;
     setBadge(ctx);
-    if (look.afterMove) look.afterMove(ctx);
+    if (ctx.look.onAppear) ctx.look.onAppear(ctx);
+    if (ctx.look.afterEntrance) ctx.look.afterEntrance(ctx);
     if (FEAT.animate) ctx.anim(ctx.line, [{ transform: 'scale(.9)' }, { transform: 'scale(1)' }], { duration: 250, easing: OVERSHOOT, composite: 'add', fill: 'none' });
   } catch (e) { /* ignore */ }
 }
@@ -1050,7 +1200,7 @@ function shakeInput() {
   setTimeout(() => { if (input.value === '') input.placeholder = PH[phI]; }, 1500);
 }
 function submit() {
-  const t = normalize(input.value);
+  const t = usableText(input.value);
   if (!t) { if (state.lastText) go(state.lastText); else shakeInput(); }
   else go(t);
   keepFocus();
@@ -1071,13 +1221,13 @@ badgeEl.addEventListener('click', () => { clearPins(); markChip('surprise'); go(
 function clearPins() { state.pinnedMove = null; state.pinnedLook = null; lookCycle = -1; lookBtn.classList.remove('pinned'); }
 lookBtn.addEventListener('click', () => {
   const order = LOOK_ORDER.concat([null]);
-  const i = lookCycle >= 0 ? lookCycle : order.indexOf(state.ctx ? state.ctx.look.id : LOOK_ORDER[0]);
+  const i = lookCycle >= 0 ? lookCycle : order.indexOf(state.ctx ? (state.ctx.wantLook || state.ctx.look).id : LOOK_ORDER[0]);
   lookCycle = (i + 1) % order.length;
   const next = order[lookCycle];
   state.pinnedLook = next; lookBtn.classList.toggle('pinned', !!next);
   const look = LOOKS[next || lookBag.next()];
   relook(look);
-  lookBtn.textContent = look.emoji;
+  lookBtn.textContent = (state.ctx ? state.ctx.look : look).emoji; /* the look actually on stage (arch can fall back) */
   lookBtn.classList.remove('pop'); void lookBtn.offsetWidth; lookBtn.classList.add('pop');
   refocus();
 });
@@ -1140,7 +1290,7 @@ window.FW = {
   split, isEmoji, state,
   play(text, opts) {
     try {
-      const t = normalize(text); if (!t) return Promise.resolve();
+      const t = usableText(text); if (!t) return Promise.resolve();
       const o = opts && typeof opts === 'object' ? opts : {};
       const combo = pickCombo(t, { look: o.look, move: o.move, seed: o.seed, api: true });
       state.lastText = t; state.lastCombo = combo;
