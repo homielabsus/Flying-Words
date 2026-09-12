@@ -98,6 +98,18 @@ button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
   padding: 10px 2px 6px; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
 }
 #chips::-webkit-scrollbar { display: none; }
+/* Both strips hide their scrollbar, so grabbing them has to work: makeStrip() adds drag-to-slide
+   and wheel-to-slide, and the faded edge says there is more this way. */
+#chips, #show { cursor: grab; user-select: none; -webkit-user-select: none; }
+#chips.dragging, #show.dragging { cursor: grabbing; scroll-snap-type: none; scroll-behavior: auto; }
+#chips.more-l, #show.more-l { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 40px); mask-image: linear-gradient(90deg, transparent 0, #000 40px); }
+#chips.more-r, #show.more-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent 100%); mask-image: linear-gradient(90deg, #000 calc(100% - 40px), transparent 100%); }
+#chips.more-l.more-r, #show.more-l.more-r {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+}
+/* never fade a focus ring out of sight */
+#chips:focus-within, #show:focus-within { -webkit-mask-image: none; mask-image: none; }
 .chip {
   flex: none; min-height: 48px; padding: 0 16px; border-radius: 999px; background: var(--c, #fff); color: var(--ink);
   border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); font: 800 16px/1 var(--font); white-space: nowrap; cursor: pointer;
@@ -1050,10 +1062,14 @@ function pickCombo(text, opts) {
   const seed = Number.isFinite(o.seed) ? (o.seed >>> 0) : (Math.random() * 4294967296) >>> 0;
   const nextRun = state.runCount + 1;
   const milestone = !explicitMove && (nextRun === 10 || nextRun === 25 || nextRun === 50);
-  let move = explicitMove ? o.move : (o.api ? null : state.pinnedMove);
+  /* Shuffle means shuffle EVERYTHING: while it is on, a pin cannot hold the move or the style
+     still. Pinning from the UI switches the toggle to In Order (see selectMove and the 🌈
+     button), so the two controls never claim different things. */
+  const pinsHold = !state.autoShuffle;
+  let move = explicitMove ? o.move : (o.api || !pinsHold ? null : state.pinnedMove);
   if (!explicitMove && (milestone || /party|🎉|🥳|🎂/iu.test(text))) move = 'party';
   if (!move) move = moveBag.next();
-  let look = explicitLook ? o.look : (o.api ? null : state.pinnedLook);
+  let look = explicitLook ? o.look : (o.api || !pinsHold ? null : state.pinnedLook);
   if (move === 'party' && !explicitLook) look = null; /* party's look is always the rng's — not the bag's, not the pin's */
   if (!look && !explicitLook && /rainbow/i.test(text)) look = 'arch';
   if (!look && move !== 'party') look = nextStyle();
@@ -1272,6 +1288,8 @@ function setAuto(on) {
 }
 function setShuffle(on) {
   state.autoShuffle = !!on;
+  /* turning it on drops every pin, so "shuffle everything" is what the screen shows too */
+  if (state.autoShuffle && (state.pinnedMove || state.pinnedLook)) { clearPins(); markChip('surprise'); }
   shufBtn.setAttribute('aria-pressed', String(state.autoShuffle));
   shufBtn.classList.toggle('on', state.autoShuffle);
   shufBtn.querySelector('.ico').textContent = state.autoShuffle ? '🔀' : '➡️';
@@ -1306,6 +1324,64 @@ function relook(look) {
 }
 
 /* ---------- UI: chips, buttons, input, gestures ---------- */
+/* A strip you can grab. Its scrollbar is hidden, so without this a mouse has no way at all to
+   reach the chips past the right edge: a plain vertical wheel does nothing to a horizontal
+   scroller, and dragging a scroll container is not something the browser does by itself.
+   Touch is left alone — native panning is already better than anything we would simulate. */
+function makeStrip(el) {
+  let down = false, dragging = false, pid = -1, startX = 0, startLeft = 0;
+  const end = () => {
+    if (!down) return;
+    down = false; el.classList.remove('dragging');
+    try { if (el.hasPointerCapture(pid)) el.releasePointerCapture(pid); } catch (e) { /* ignore */ }
+    /* the click that ends a drag fires before this, so the flag can only be cleared afterwards —
+       otherwise a drag that ended off the strip would swallow the next real tap */
+    setTimeout(() => { dragging = false; }, 0);
+  };
+  el.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || (e.button !== undefined && e.button !== 0)) return;
+    down = true; dragging = false; pid = e.pointerId; startX = e.clientX; startLeft = el.scrollLeft;
+    /* deliberately NOT capturing here: capture retargets the click to this strip, and the chip
+       under the finger would never hear it. Capture starts below, once it is really a drag. */
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!down || e.pointerId !== pid) return;
+    const dx = e.clientX - startX;
+    if (!dragging) {
+      if (Math.abs(dx) < 4) return; /* a wobble is still a click */
+      dragging = true; el.classList.add('dragging');
+      try { el.setPointerCapture(pid); } catch (err) { /* ignore */ }
+    }
+    el.scrollLeft = startLeft - dx;
+    e.preventDefault();
+  });
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('lostpointercapture', end);
+  window.addEventListener('pointerup', end); /* a press released off the strip still ends the drag */
+  window.addEventListener('pointercancel', end);
+  el.addEventListener('dragstart', (e) => e.preventDefault());
+  /* a drag must not also fire the chip it happened to start on */
+  el.addEventListener('click', (e) => { if (dragging) { e.stopPropagation(); e.preventDefault(); } }, true);
+  el.addEventListener('wheel', (e) => {
+    const max = el.scrollWidth - el.clientWidth;
+    if (max <= 0) return;
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY; /* a plain wheel slides it sideways */
+    if (!d) return;
+    const before = el.scrollLeft;
+    el.scrollLeft = Math.max(0, Math.min(max, before + d));
+    if (el.scrollLeft !== before) e.preventDefault();
+  }, { passive: false });
+  const edges = () => {
+    const max = el.scrollWidth - el.clientWidth;
+    el.classList.toggle('more-l', el.scrollLeft > 4);
+    el.classList.toggle('more-r', max > 4 && el.scrollLeft < max - 4);
+  };
+  el.addEventListener('scroll', edges, { passive: true });
+  if (FEAT.ro) { try { new ResizeObserver(edges).observe(el); } catch (e) { /* ignore */ } }
+  edges();
+  return edges;
+}
 function buildChips() {
   const mk = (id, emoji, name, idx) => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.dataset.move = id; b.dataset.emoji = emoji;
@@ -1330,7 +1406,12 @@ function keepFocus() {
 let lookCycle = -1; /* position in the look-button cycle; -1 = derive from the look on stage */
 function selectMove(id) {
   if (id === 'surprise') clearPins();
-  else if (MOVES[id]) state.pinnedMove = id; else return;
+  else if (MOVES[id]) {
+    /* asking for one particular move is the opposite of "shuffle everything": honour the ask and
+       let the toggle say so, rather than pinning something the picker would ignore */
+    if (state.autoShuffle) setShuffle(false);
+    state.pinnedMove = id;
+  } else return;
   markChip(id);
   go(currentText());
 }
@@ -1382,6 +1463,7 @@ lookBtn.addEventListener('click', () => {
   const i = lookCycle >= 0 ? lookCycle : order.indexOf(state.ctx ? (state.ctx.wantLook || state.ctx.look).id : LOOK_ORDER[0]);
   lookCycle = (i + 1) % order.length;
   const next = order[lookCycle];
+  if (next && state.autoShuffle) setShuffle(false); /* a pinned style and "shuffle everything" cannot both be true */
   state.pinnedLook = next; lookBtn.classList.toggle('pinned', !!next);
   const look = LOOKS[next || nextStyle()];
   relook(look);
@@ -1451,7 +1533,8 @@ function setVH() {
   const h = (FEAT.vv && visualViewport.height) || window.innerHeight;
   if (h) root.style.setProperty('--vh', (h / 100) + 'px');
 }
-function onViewport() { if (vhRaf) return; vhRaf = requestAnimationFrame(() => { vhRaf = 0; setVH(); confetti.resize(); refit(); }); }
+let stripEdges = [];
+function onViewport() { if (vhRaf) return; vhRaf = requestAnimationFrame(() => { vhRaf = 0; setVH(); confetti.resize(); refit(); stripEdges.forEach((f) => f()); }); }
 setVH();
 window.addEventListener('resize', onViewport);
 if (FEAT.vv) { visualViewport.addEventListener('resize', onViewport); visualViewport.addEventListener('scroll', setVH); }
@@ -1494,6 +1577,7 @@ function buildEvery() {
 }
 buildChips();
 buildEvery();
+stripEdges = [makeStrip(chipsEl), makeStrip($('#show'))]; /* after the chips and options exist, so the widths are real */
 setShuffle(load('fw.shuffle', true) !== false);
 setEvery(load('fw.every', 2000)); /* the show itself always starts off: nothing moves until a kid asks */
 setCalm(load('fw.calm', false) === true);

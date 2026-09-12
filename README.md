@@ -28,14 +28,14 @@ The 🌈 button in the corner cycles through the looks (and pins the one you pic
 - **Exit and return:** 🧨 Blast Off · 💥 Shatter · 🍂 Fall Apart
 - **Everything at once:** 🎆 EVERYTHING! (also appears on runs 10, 25 and 50, and for words like `party`, `🎉`, `🥳`, `🎂`)
 
-The chip strip under the text box picks a move; 🎲 Surprise goes back to random.
+The chip strip under the text box picks a move; 🎲 Surprise goes back to random. Both strips slide: drag them with a finger or the mouse, or roll the wheel over them. A faded edge means there is more that way.
 
 ## Style show (auto play)
 
 Under the move chips there is a second row that runs the show for you:
 
 - **▶️ Auto Play** — keeps replaying your word, moving to the next style each time. Press it again (it reads **⏸ Stop**) to stop. It always starts off, so nothing moves until you ask.
-- **🔀 Shuffle / ➡️ In Order** — whether the next style is picked at random or taken straight down the list. This also decides how styles are chosen on an ordinary Enter press.
+- **🔀 Shuffle / ➡️ In Order** — 🔀 shuffles *everything*: every press gets a random style **and** a random move, and a pinned chip cannot hold it still (turning Shuffle on releases the pins). ➡️ In Order walks the styles down the list instead and keeps whatever you pinned. Picking a chip or a style while shuffling switches the toggle to In Order, so the two never disagree.
 - **⏱ menu** — how long to wait between styles: 1s, 2s, 3s, 5s, 8s or 15s. The wait starts when the current show finishes, so a long animation is never cut short.
 
 Type a new word while the show is running and it carries on with the new word. The 🌈 corner button jumps straight to the next style without stopping the show. Starting the show releases a pinned look, so the styles really do keep changing — the move you pinned on the chip strip is kept. Shuffle and the interval are remembered next time; auto play is not.
