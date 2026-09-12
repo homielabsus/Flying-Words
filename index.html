@@ -107,16 +107,69 @@ button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
 .chip:active { transform: translateY(3px); box-shadow: none; }
 .chip.on { background: var(--ink); color: #fff; box-shadow: 0 3px 0 var(--accent); }
 .chip.on:not([data-move="surprise"])::after { content: '📌'; font-size: 13px; }
+
+/* ---------- Style show: auto play, shuffle, interval ---------- */
+/* never wrap: a second row costs the stage ~53px, and on a short phone that is enough to push the
+   word under the corner buttons. Too narrow to fit, the strip scrolls sideways like #chips instead.
+   The side padding leaves room for the pills' drop shadow and focus ring, which overflow clips. */
+#show {
+  display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; padding: 6px 2px 7px;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+}
+#show::-webkit-scrollbar { display: none; }
+.pill {
+  flex: none; min-height: 48px; padding: 0 16px; border-radius: 999px; background: #fff; color: var(--ink);
+  border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); font: 800 16px/1 var(--font); white-space: nowrap;
+  cursor: pointer; touch-action: manipulation; display: inline-flex; align-items: center; gap: 7px; position: relative;
+  transition: transform 70ms, box-shadow 70ms, background 120ms;
+}
+.pill:active { transform: translateY(3px); box-shadow: none; }
+#playBtn.on { background: var(--sun); }
+#shufBtn.on { background: #b6f36b; }
+/* the dot blinks while the show is running so it is obvious the page is driving itself */
+#playBtn.on .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); animation: blip 1.1s ease-in-out infinite; }
+#playBtn .dot { display: none; }
+@keyframes blip { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .25; transform: scale(.7); } }
+/* the dot is the one animation the page drives from CSS, so Calm mode needs a CSS hook of its own
+   (setCalm puts .calm on <html>) as well as the OS reduced-motion block further down */
+html.calm #playBtn.on .dot { animation: none; opacity: 1; }
+/* the whole ⏱ pill must open the menu: the <select> is the only in-flow child and carries all the
+   padding, with the clock and the ▾ painted on top of it, taking no pointer events */
+.pill.sel { padding: 0; gap: 0; }
+.pill.sel .ico { position: absolute; left: 12px; pointer-events: none; }
+.pill.sel::after { content: '▾'; position: absolute; right: 12px; pointer-events: none; font-size: 15px; }
+#every {
+  appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: inherit;
+  align-self: stretch; min-height: 44px; border-radius: 999px;
+  font: 800 16px/1 var(--font); padding: 0 28px 0 36px; margin: -3px; cursor: pointer;
+}
+/* the UA's square hairline would be drawn straight across the round pill: light the whole pill up
+   in the house style instead, the way every sibling control does */
+#every:focus-visible { outline: 4px solid var(--ink); outline-offset: 2px; }
+@supports selector(:has(*)) {
+  #every:focus-visible { outline: none; }
+  .pill.sel:has(#every:focus-visible) { outline: 4px solid var(--ink); outline-offset: 3px; }
+}
 @media (max-width: 480px) {
   #txt { height: 56px; font-size: 22px; padding: 0 16px; }
   #go { height: 56px; font-size: 22px; padding: 0 16px; }
   .corner { flex-direction: column; }
   #badge { max-width: calc(100% - 88px); padding: 6px 12px; }
+  #show { gap: 5px; }
+  .pill { padding: 0 10px; font-size: 15px; gap: 5px; }
+  #every { font-size: 15px; padding: 0 24px 0 33px; }
+  .pill.sel .ico { left: 10px; }
+  .pill.sel::after { right: 10px; }
 }
-/* phone with the soft keyboard open: a 148px tall button column would eat the short stage, so keep it a row */
-@media (max-width: 480px) and (max-height: 560px) {
+/* Short phone stage — the soft keyboard is open, or the dock's three strips leave under ~490px of
+   stage: a 148px tall button column reaches into where the centred word sits, and fit()'s
+   minimum-size floor (maxH never drops below .35 of the stage) stops the word shrinking out of its
+   way. Keep the corner a row there; above this height the stage is tall enough for the column. */
+@media (max-width: 480px) and (max-height: 720px) {
   .corner { flex-direction: row; gap: 6px; }
   #badge { max-width: calc(100% - 172px); }
+  #chips { padding-block: 6px 4px; }
+  #show { padding-top: 2px; }
 }
 
 /* ---------- The word ---------- */
@@ -195,6 +248,8 @@ button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   #badge.pop { animation-duration: 200ms; }
   .line.typing::after { animation: none; }
+  /* a still dot still reads as "the show is on" next to the ⏸ Stop label */
+  #playBtn.on .dot { animation: none; opacity: 1; }
 }
 </style>
 </head>
@@ -219,6 +274,15 @@ button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
       <button id="go" type="submit">GO!</button>
     </form>
     <div id="chips" role="group" aria-label="Moves"></div>
+    <div id="show" role="group" aria-label="Style show">
+      <button id="playBtn" class="pill" type="button" aria-pressed="false" aria-label="Auto play: keep showing the next style">
+        <span class="ico" aria-hidden="true">▶️</span><span class="lbl">Auto Play</span><span class="dot" aria-hidden="true"></span>
+      </button>
+      <button id="shufBtn" class="pill" type="button" aria-pressed="true" aria-label="Style order: shuffle or in order">
+        <span class="ico" aria-hidden="true">🔀</span><span class="lbl">Shuffle</span>
+      </button>
+      <label class="pill sel" for="every"><span class="ico" aria-hidden="true">⏱</span><select id="every" aria-label="Time between styles"></select></label>
+    </div>
   </div>
 </div>
 <script>
@@ -227,7 +291,8 @@ button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
 const $ = (s) => document.querySelector(s);
 const stage = $('#stage'), host = $('#host'), badgeEl = $('#badge'), lookBtn = $('#lookBtn'), soundBtn = $('#soundBtn'),
   calmBtn = $('#calmBtn'), announceEl = $('#announce'), form = $('#f'), input = $('#txt'), chipsEl = $('#chips'),
-  ringEl = $('#ring'), flashEl = $('#flash'), cornerEl = $('.corner'), root = document.documentElement;
+  ringEl = $('#ring'), flashEl = $('#flash'), cornerEl = $('.corner'), root = document.documentElement,
+  playBtn = $('#playBtn'), shufBtn = $('#shufBtn'), everySel = $('#every');
 
 /* ---------- feature detection ---------- */
 const sup = (p, v) => { try { return !!(window.CSS && CSS.supports && CSS.supports(p, v)); } catch (e) { return false; } };
@@ -333,7 +398,8 @@ function split(text) {
 }
 
 /* ---------- state, bags, rng, palettes ---------- */
-const state = { seq: 0, lastText: '', lastCombo: null, pinnedMove: null, pinnedLook: null, runCount: 0, calm: false, sound: false, ctx: null, breathe: null, paletteIdx: -1 };
+const state = { seq: 0, lastText: '', lastCombo: null, pinnedMove: null, pinnedLook: null, runCount: 0, calm: false, sound: false, ctx: null, breathe: null, paletteIdx: -1,
+  autoplay: false, autoShuffle: true, autoEvery: 2000 };
 const isReduced = () => !!(mq.matches || state.calm);
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 function makeBag(ids) {
@@ -970,6 +1036,14 @@ defMove({ id: 'party', name: 'EVERYTHING!', emoji: '🎆', kind: 'combo', celebr
 /* ---------- picking (shuffle bags, overrides, seed) ---------- */
 const BAG_MOVES = MOVE_ORDER.filter((m) => m !== 'party');
 const moveBag = makeBag(BAG_MOVES), lookBag = makeBag(LOOK_ORDER);
+/* Every unpinned style choice — a plain Enter press and each tick of the auto show alike — comes
+   from here, so the 🔀 toggle means the same thing everywhere: shuffled, or straight down the list. */
+let styleIdx = -1;
+function nextStyle() {
+  if (state.autoShuffle) { const id = lookBag.next(); styleIdx = LOOK_ORDER.indexOf(id); return id; }
+  styleIdx = (styleIdx + 1) % LOOK_ORDER.length;
+  return LOOK_ORDER[styleIdx];
+}
 function pickCombo(text, opts) {
   const o = opts || {};
   const explicitMove = !!(o.move && MOVES[o.move]), explicitLook = !!(o.look && LOOKS[o.look]);
@@ -982,7 +1056,7 @@ function pickCombo(text, opts) {
   let look = explicitLook ? o.look : (o.api ? null : state.pinnedLook);
   if (move === 'party' && !explicitLook) look = null; /* party's look is always the rng's — not the bag's, not the pin's */
   if (!look && !explicitLook && /rainbow/i.test(text)) look = 'arch';
-  if (!look && move !== 'party') look = lookBag.next();
+  if (!look && move !== 'party') look = nextStyle();
   return { look: look || null, move, seed, milestone };
 }
 
@@ -1100,6 +1174,10 @@ function startBreathe(ctx) {
   if (ctx.reduced || !FEAT.animate) return;
   state.breathe = ctx.anim(ctx.line, [{ transform: 'translateY(0)' }, { transform: 'translateY(-6px)' }, { transform: 'translateY(0)' }], { duration: 3000, iterations: Infinity, easing: 'ease-in-out', fill: 'none' });
 }
+/* setAuto parks its start message here instead of writing it: play() runs synchronously inside that
+   same click and silences the live region, so a message written before go() would be wiped in the
+   same task and never reach a screen reader. Letting play() make the one write fixes the order. */
+let showMsg = '';
 async function play(text, combo) {
   const id = ++state.seq;
   state.runCount++;
@@ -1116,7 +1194,10 @@ async function play(text, combo) {
     fit(ctx);
     void ctx.line.offsetWidth;
     if (ctx.look !== wanted) setBadge(ctx); /* arch fell back to wavy at this size */
-    announceEl.textContent = text + ' — ' + ctx.look.name + ', ' + ctx.move.name;
+    /* the auto show would otherwise narrate a new line every few seconds, forever: it says only
+       what setAuto parked in showMsg (the start message), then nothing until the show stops */
+    announceEl.textContent = state.autoplay ? showMsg : text + ' — ' + ctx.look.name + ', ' + ctx.move.name;
+    showMsg = '';
     document.title = '✨ ' + text;
     if (!FEAT.animate) { ctx.line.classList.add('nofx'); return; }
     if (ctx.look.onAppear) { try { ctx.look.onAppear(ctx); } catch (e) { /* ignore */ } }
@@ -1136,13 +1217,74 @@ async function play(text, combo) {
    lastText/title. Spec §8: "if after segmentation the array is empty, treat as empty input". */
 function usableText(s) { const t = normalize(s); return (t && split(t).length) ? t : ''; }
 function currentText() { return usableText(input.value) || state.lastText || DEMO_WORDS[Math.floor(Math.random() * DEMO_WORDS.length)]; }
+/* Runs one show and, when the auto show is on, queues the next style once this one has finished.
+   play() bumps state.seq synchronously, so the id captured here identifies exactly this run: if a
+   newer run (a kid typing, a chip, another tick) started meanwhile, this tail does not schedule. */
+function runAndChain(t, combo) {
+  clearAuto();
+  const p = play(t, combo).catch(() => {});
+  const id = state.seq;
+  return p.then(() => { scheduleAuto(id); });
+}
 function go(text, opts) {
-  const t = usableText(text); if (!t) return;
+  const t = usableText(text); if (!t) return Promise.resolve();
   state.lastText = t;
   const combo = pickCombo(t, opts); state.lastCombo = combo;
-  play(t, combo).catch(() => {});
+  return runAndChain(t, combo);
 }
-function again() { if (state.lastText && state.lastCombo) play(state.lastText, state.lastCombo).catch(() => {}); else go(currentText()); }
+function again() { if (state.lastText && state.lastCombo) runAndChain(state.lastText, state.lastCombo); else go(currentText()); }
+
+/* ---------- the auto style show ---------- */
+const AUTO_EVERY = [1000, 2000, 3000, 5000, 8000, 15000];
+let autoTimer = 0;
+function clearAuto() { if (autoTimer) { clearTimeout(autoTimer); autoTimer = 0; } }
+function scheduleAuto(runId) {
+  clearAuto();
+  if (!state.autoplay || document.hidden) return;
+  autoTimer = setTimeout(() => {
+    autoTimer = 0;
+    if (!state.autoplay || runId !== state.seq) return; /* something newer is on stage; it owns the chain */
+    go(state.lastText || currentText(), { look: nextStyle() });
+  }, state.autoEvery);
+}
+function setAuto(on) {
+  state.autoplay = !!on;
+  playBtn.setAttribute('aria-pressed', String(state.autoplay));
+  playBtn.classList.toggle('on', state.autoplay);
+  playBtn.querySelector('.ico').textContent = state.autoplay ? '⏸️' : '▶️';
+  playBtn.querySelector('.lbl').textContent = state.autoplay ? 'Stop' : 'Auto Play';
+  /* the accessible name has to follow the visible label: a voice-control user reading "Stop" off
+     the button needs something matching to say (WCAG 2.5.3 Label in Name) */
+  playBtn.setAttribute('aria-label', state.autoplay ? 'Stop the style show' : 'Auto Play: keep showing the next style');
+  if (state.autoplay) {
+    /* the show owns the look for as long as it runs. A pin left over from before would survive it,
+       keep the 🌈 button lit with a pin nothing can clear, and snap every run the kid starts by
+       hand (a chip tap, Enter) back onto that one style while the ticks kept cycling past it. */
+    clearLookPin();
+    showMsg = 'Style show playing'; /* play() writes it: see showMsg */
+    /* start the show immediately with the next style rather than waiting out one silent gap */
+    go(currentText(), { look: nextStyle() });
+    if (showMsg) { announceEl.textContent = showMsg; showMsg = ''; } /* no run started: say it here */
+  } else {
+    clearAuto();
+    announceEl.textContent = 'Style show stopped';
+  }
+}
+function setShuffle(on) {
+  state.autoShuffle = !!on;
+  shufBtn.setAttribute('aria-pressed', String(state.autoShuffle));
+  shufBtn.classList.toggle('on', state.autoShuffle);
+  shufBtn.querySelector('.ico').textContent = state.autoShuffle ? '🔀' : '➡️';
+  shufBtn.querySelector('.lbl').textContent = state.autoShuffle ? 'Shuffle' : 'In Order';
+  shufBtn.setAttribute('aria-label', state.autoShuffle ? 'Shuffle: styles in a random order' : 'In Order: styles one after another');
+  save('fw.shuffle', state.autoShuffle);
+}
+function setEvery(ms) {
+  const v = AUTO_EVERY.indexOf(Number(ms)) >= 0 ? Number(ms) : 2000;
+  state.autoEvery = v; everySel.value = String(v);
+  save('fw.every', v);
+  if (state.autoplay && autoTimer) scheduleAuto(state.seq); /* apply the new gap to the pending tick */
+}
 function refit() {
   const ctx = state.ctx; if (!ctx || !ctx.alive() || !ctx.line.isConnected) return;
   const before = ctx.look;
@@ -1218,14 +1360,30 @@ input.addEventListener('keydown', (e) => {
 });
 chipsEl.addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; selectMove(b.dataset.move); refocus(); });
 badgeEl.addEventListener('click', () => { clearPins(); markChip('surprise'); go(currentText()); refocus(); });
-function clearPins() { state.pinnedMove = null; state.pinnedLook = null; lookCycle = -1; lookBtn.classList.remove('pinned'); }
+function clearLookPin() { state.pinnedLook = null; lookCycle = -1; lookBtn.classList.remove('pinned'); }
+function clearPins() { state.pinnedMove = null; clearLookPin(); }
 lookBtn.addEventListener('click', () => {
+  /* during the auto show the button steers the show instead of pinning: jump to the next style,
+     let the show carry on from there (a pin would freeze the very thing that is meant to change) */
+  if (state.autoplay) {
+    styleIdx = (styleIdx + 1) % LOOK_ORDER.length;
+    const jump = LOOKS[LOOK_ORDER[styleIdx]];
+    relook(jump);
+    lookBtn.textContent = (state.ctx ? state.ctx.look : jump).emoji;
+    lookBtn.classList.remove('pop'); void lookBtn.offsetWidth; lookBtn.classList.add('pop');
+    /* restart the gap so the jump gets its full turn on stage — but only if a gap is what is
+       actually running: cutting into a live run would end the jumped-to style part-way through,
+       and that run's own tail already schedules the next tick the moment it finishes */
+    if (autoTimer) scheduleAuto(state.seq);
+    refocus();
+    return;
+  }
   const order = LOOK_ORDER.concat([null]);
   const i = lookCycle >= 0 ? lookCycle : order.indexOf(state.ctx ? (state.ctx.wantLook || state.ctx.look).id : LOOK_ORDER[0]);
   lookCycle = (i + 1) % order.length;
   const next = order[lookCycle];
   state.pinnedLook = next; lookBtn.classList.toggle('pinned', !!next);
-  const look = LOOKS[next || lookBag.next()];
+  const look = LOOKS[next || nextStyle()];
   relook(look);
   lookBtn.textContent = (state.ctx ? state.ctx.look : look).emoji; /* the look actually on stage (arch can fall back) */
   lookBtn.classList.remove('pop'); void lookBtn.offsetWidth; lookBtn.classList.add('pop');
@@ -1233,6 +1391,7 @@ lookBtn.addEventListener('click', () => {
 });
 function setCalm(on) {
   state.calm = !!on; calmBtn.setAttribute('aria-pressed', String(state.calm)); calmBtn.classList.toggle('on', state.calm);
+  root.classList.toggle('calm', state.calm); /* the CSS-driven bits (the show's blinking dot) need a hook too */
   if (state.calm && state.breathe) { try { state.breathe.cancel(); } catch (e) { /* ignore */ } state.breathe = null; }
   save('fw.calm', state.calm);
 }
@@ -1244,6 +1403,25 @@ function setSound(on) {
 }
 calmBtn.addEventListener('click', () => { setCalm(!state.calm); refocus(); });
 soundBtn.addEventListener('click', () => { setSound(!state.sound); refocus(); });
+/* e.detail is 0 for the click a Space/Enter press synthesises: hand focus back to the word box
+   after a tap or a mouse click (so typing carries on), but leave a keyboard user on the toggle —
+   otherwise their second Space types into the word box instead of stopping the show. */
+playBtn.addEventListener('click', (e) => { setAuto(!state.autoplay); if (e.detail > 0) refocus(); });
+shufBtn.addEventListener('click', (e) => { setShuffle(!state.autoShuffle); if (e.detail > 0) refocus(); });
+/* A <select> is not a fire-and-forget button like its two neighbours: on a closed select Chromium
+   commits and fires `change` on every single arrow key, so refocusing on `change` would eject a
+   keyboard user after one notch and hand the rest of their arrow presses to the word box, which
+   cycles (and pins) moves. Only a pointer pick, which is terminal, hands focus back to the input. */
+let everyByPointer = false;
+everySel.parentElement.addEventListener('pointerdown', () => { everyByPointer = true; });
+everySel.addEventListener('keydown', () => { everyByPointer = false; });
+everySel.addEventListener('blur', () => { everyByPointer = false; });
+everySel.addEventListener('change', () => { setEvery(everySel.value); if (everyByPointer) { everyByPointer = false; refocus(); } });
+/* a background tab should not queue shows nobody can see */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearAuto();
+  else if (state.autoplay && !autoTimer) scheduleAuto(state.seq);
+});
 let lastTap = 0;
 stage.addEventListener('pointerup', (e) => {
   if (e.target.closest('button')) return;
@@ -1294,15 +1472,30 @@ window.FW = {
       const o = opts && typeof opts === 'object' ? opts : {};
       const combo = pickCombo(t, { look: o.look, move: o.move, seed: o.seed, api: true });
       state.lastText = t; state.lastCombo = combo;
-      return play(t, combo).catch(() => {});
+      return runAndChain(t, combo);
     } catch (e) { return Promise.resolve(); }
   },
   setReduced(b) { setCalm(!!b); },
+  setAuto(b) { setAuto(!!b); },
+  autoArmed() { return !!autoTimer; },
+  setShuffle(b) { setShuffle(!!b); },
+  setEvery(ms) { setEvery(ms); },
+  intervals: AUTO_EVERY.slice(),
   durations: { min: 900, max: 9800 }
 };
 
 /* ---------- init ---------- */
+function buildEvery() {
+  for (const ms of AUTO_EVERY) {
+    const o = document.createElement('option');
+    o.value = String(ms); o.textContent = (ms / 1000) + 's';
+    everySel.append(o);
+  }
+}
 buildChips();
+buildEvery();
+setShuffle(load('fw.shuffle', true) !== false);
+setEvery(load('fw.every', 2000)); /* the show itself always starts off: nothing moves until a kid asks */
 setCalm(load('fw.calm', false) === true);
 if (load('fw.sound', false) === true) { state.sound = true; soundBtn.textContent = '🔊'; soundBtn.setAttribute('aria-pressed', 'true'); soundBtn.classList.add('on'); }
 if (hoverable()) { try { input.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
