@@ -52,32 +52,45 @@ body {
 
 /* sticker badge: what is playing right now */
 #badge {
-  position: absolute; top: 12px; left: 12px; z-index: 5; min-height: 44px; min-width: 44px; max-width: calc(100% - 170px);
+  position: absolute; top: 12px; left: 12px; z-index: 5; min-height: 44px; min-width: 44px; max-width: calc(100% - var(--starsW, 160px) - 46px);
   padding: 8px 16px; border-radius: 999px; background: var(--sun); color: var(--ink); border: 3px solid var(--ink);
   box-shadow: 4px 4px 0 var(--ink); font: 800 clamp(14px, 2.4vw, 20px)/1.15 var(--font); letter-spacing: .01em; text-align: left;
-  transform: rotate(-5deg); transform-origin: 50% 50%; cursor: pointer; touch-action: manipulation; white-space: normal;
+  transform: rotate(var(--tilt, -5deg)); transform-origin: 50% 50%; cursor: pointer; touch-action: manipulation; white-space: normal;
 }
 #badge.pop { animation: badgePop 350ms cubic-bezier(.34, 1.56, .64, 1); }
-@keyframes badgePop { 0% { transform: scale(.6) rotate(-12deg); } 60% { transform: scale(1.08); } 100% { transform: scale(1) rotate(-5deg); } }
+#badge .bp { display: inline-block; }
+/* the halves need two lines: each takes its own and the dot between them goes */
+#badge.stacked .bp { display: block; }
+#badge.stacked .sep { display: none; }
+#badge .sep { margin: 0 .05em; }
+#badge .bp.fresh::after {
+  content: 'NEW'; margin-left: .35em; padding: 1px 5px 0; border-radius: 7px; background: #ff4fa3; color: var(--ink);
+  border: 2px solid var(--ink); font: 900 11px/1 var(--font); letter-spacing: .04em; vertical-align: .2em; white-space: nowrap;
+  animation: newTag 500ms ease-out;
+}
+@keyframes newTag { 0%, 30% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes badgePop { 0% { transform: scale(.6) rotate(-12deg); } 60% { transform: scale(1.08); } 100% { transform: scale(1) rotate(var(--tilt, -5deg)); } }
 
 /* ⭐ tricks found: the game's score, top-right of the stage */
 #stars {
   position: absolute; top: 12px; right: 12px; z-index: 5; min-height: 44px; padding: 6px 12px 6px 9px;
   display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; background: #fff; color: var(--ink);
   border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); font: 800 18px/1 var(--font); transform: rotate(3deg);
-  user-select: none; -webkit-user-select: none; pointer-events: none;
+  user-select: none; -webkit-user-select: none; cursor: pointer; touch-action: manipulation; margin: 0;
 }
+#stars:active { box-shadow: 1px 1px 0 var(--ink); translate: 2px 2px; }
+#stars:focus-visible { outline: 4px solid #fff; outline-offset: 2px; box-shadow: 4px 4px 0 var(--ink), 0 0 0 9px var(--ink); }
 #stars .st { font-size: 21px; line-height: 1; }
 #stars .bar { width: 46px; height: 10px; border-radius: 99px; background: #efe9f7; border: 2px solid var(--ink); overflow: hidden; }
 #stars .bar i { display: block; height: 100%; width: var(--p, 0%); background: linear-gradient(90deg, #ffd23f, #ff7ac6, #8b5cf6); transition: width 600ms cubic-bezier(.34, 1.56, .64, 1); }
 #stars.pop { animation: starPop 650ms cubic-bezier(.34, 1.56, .64, 1); }
 @keyframes starPop { 0% { transform: rotate(3deg) scale(1); } 30% { transform: rotate(-8deg) scale(1.28); } 100% { transform: rotate(3deg) scale(1); } }
 #stars.done { background: var(--sun); }
-/* a new discovery says its own name, so kids learn what they just found */
+/* the trophy's moment. It sits in the bottom band that fit() keeps clear, so it never covers the word */
 #toast {
-  position: absolute; top: 70px; right: 12px; z-index: 6; max-width: min(320px, calc(100% - 24px)); padding: 7px 12px;
-  border-radius: 14px; background: #ff4fa3; color: #fff; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
-  font: 800 15px/1.2 var(--font); pointer-events: none; opacity: 0; text-align: center;
+  position: absolute; left: 50%; bottom: 14px; translate: -50% 0; z-index: 6; width: max-content; max-width: calc(100% - 24px);
+  padding: 8px 14px; border-radius: 14px; background: #ff4fa3; color: var(--ink); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  font: 900 17px/1.2 var(--font); pointer-events: none; opacity: 0; text-align: center;
 }
 #toast.show { animation: toastIn 2400ms ease both; }
 @keyframes toastIn {
@@ -95,7 +108,7 @@ body {
   box-shadow: 0 4px 0 rgba(27, 27, 58, .12);
 }
 #txt::placeholder { color: #6f6d90; opacity: 1; }
-#txt:focus { outline: 4px solid var(--accent); }
+#txt:focus { outline: 4px solid var(--ink); }
 #txt.pulse { animation: txtPulse 260ms ease; }
 @keyframes txtPulse { 50% { transform: scale(1.03); } }
 #dice {
@@ -147,7 +160,7 @@ button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
 /* how many NEW things wait behind a tab: a nudge to go and look */
 .tab .cnt {
   position: absolute; top: -9px; right: -5px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 99px; background: #ff4fa3;
-  color: #fff; border: 2px solid var(--ink); font: 900 12px/18px var(--font); text-align: center;
+  color: var(--ink); border: 2px solid var(--ink); font: 900 12px/18px var(--font); text-align: center;
 }
 .tab .cnt:empty { display: none; }
 
@@ -155,11 +168,12 @@ button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
 #toybox[data-tab="styles"] #pane-styles, #toybox[data-tab="moves"] #chips, #toybox[data-tab="show"] #show { display: flex; }
 /* emoji are small: two rows of them, flowing sideways */
 #toybox[data-tab="emoji"] #pane-emoji {
-  display: grid; grid-template-rows: repeat(2, 50px); grid-auto-flow: column; grid-auto-columns: 50px; gap: 8px; align-content: center;
+  display: grid; grid-template-rows: repeat(2, 46px); grid-auto-flow: column; grid-auto-columns: 46px; gap: 6px 8px; align-content: center;
+  padding-block: 8px;
 }
 .tiles {
-  gap: 10px; overflow-x: auto; overflow-y: hidden; padding: 11px 6px 9px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain; scroll-snap-type: x proximity; scroll-padding-inline: 6px; flex: none;
+  gap: 10px; overflow-x: auto; overflow-y: hidden; padding: 11px 8px 9px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; scroll-snap-type: x proximity; scroll-padding-inline: 8px; flex: none;
   height: var(--paneH); align-items: center;
 }
 .tiles::-webkit-scrollbar, #show::-webkit-scrollbar { display: none; }
@@ -197,13 +211,15 @@ button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
 /* chosen (pinned): ink tile, the pin says it stays */
 .tile.on { background: var(--ink); color: #fff; box-shadow: 0 4px 0 var(--accent); }
 .tile.on:not(.mix)::after { content: '📌'; position: absolute; top: -10px; right: -8px; font-size: 17px; }
-/* on stage right now: a sunshine ring, so a surprise teaches its own name */
-.tile.now { box-shadow: 0 0 0 4px var(--sun), 0 4px 0 4px var(--ink); }
-.tile.on.now { box-shadow: 0 0 0 4px var(--sun), 0 4px 0 4px var(--accent); }
+/* on stage right now: sunshine inside an ink ring, readable on white and on paper, so a surprise
+   teaches its own name */
+.tile.now { box-shadow: 0 0 0 3px var(--sun), 0 0 0 6px var(--ink); }
+.tile.wiggle { animation: tileWiggle 650ms ease-in-out 2; }
+@keyframes tileWiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-7deg) scale(1.07); } 75% { transform: rotate(7deg) scale(1.07); } }
 /* not found yet */
 .tile.new::before {
-  content: 'NEW'; position: absolute; top: -10px; left: -8px; z-index: 1; padding: 3px 6px; border-radius: 8px; background: #ff4fa3;
-  color: #fff; border: 2px solid var(--ink); font: 900 10px/1 var(--font); letter-spacing: .04em; transform: rotate(-10deg);
+  content: 'NEW'; position: absolute; top: -10px; left: -8px; z-index: 1; padding: 3px 7px; border-radius: 8px; background: #ff4fa3;
+  color: var(--ink); border: 2px solid var(--ink); font: 900 12px/1 var(--font); letter-spacing: .04em; transform: rotate(-10deg);
 }
 /* style swatch: the tile draws "Wow" with the real look's own CSS */
 .sw {
@@ -221,9 +237,16 @@ button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
 .pv.look-wavy .ch:nth-child(3) { translate: 0 .1em; }
 .tile.mix .sw { background: repeating-linear-gradient(45deg, #fff 0 10px, #fff3fb 10px 20px); }
 .tile.mix .emo { font-size: 30px; }
-.tile.on.mix .sw { background: #2c2c55; border-color: #fff; }
+/* Mix is a mode, not a pick: when it is on it stays a normal tile with a green tick, so the ink
+   "you chose this" tile and the sunshine "on stage now" ring are never out-shouted by it */
+.tile.mix.on { background: var(--c, #fff); color: var(--ink); box-shadow: 0 4px 0 var(--ink); }
+.tile.mix.on .sw { border-color: rgba(27, 27, 58, .16); }
+.tile.mix.on::after {
+  content: '✓'; position: absolute; top: -10px; right: -8px; width: 26px; height: 26px; border-radius: 50%; background: #b6f36b;
+  color: var(--ink); border: 2px solid var(--ink); font: 900 15px/22px var(--font); text-align: center;
+}
 /* emoji to add to the word */
-.tile.em { width: 50px; height: 50px; border-radius: 14px; padding: 0; gap: 0; box-shadow: 0 3px 0 var(--ink); }
+.tile.em { width: 46px; height: 46px; border-radius: 14px; padding: 0; gap: 0; box-shadow: 0 3px 0 var(--ink); }
 .tile.em .emo { font-size: 26px; }
 .tile.em.key { background: #eef4ff; }
 .tile.em.key .emo { font-size: 22px; }
@@ -258,7 +281,7 @@ html.calm .tile .emo { animation: none !important; }
 
 /* ---------- The show: auto play, shuffle, interval, sound, calm ---------- */
 #show {
-  gap: 8px; align-items: center; align-content: center; flex-wrap: wrap; padding: 4px 4px; flex: none; height: var(--paneH);
+  gap: 8px; align-items: center; align-content: center; flex-wrap: wrap; padding: 4px 8px; flex: none; height: var(--paneH);
   overflow-x: hidden; overflow-y: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
 }
 .pill {
@@ -299,10 +322,16 @@ html.calm #playBtn.on .dot { animation: none; opacity: 1; }
   #go { height: 56px; min-width: 84px; font-size: 22px; padding: 0 14px; }
   #dice { width: 56px; height: 56px; font-size: 26px; }
   #hint { bottom: 70px; font-size: 16px; }
-  #badge { max-width: calc(100% - 132px); padding: 6px 12px; }
-  #stars { padding: 6px 10px 6px 8px; gap: 5px; font-size: 16px; }
+  #badge { max-width: calc(100% - var(--starsW, 100px) - 40px); padding: 6px 12px; }
+  #stars { padding: 5px 10px 5px 6px; gap: 5px; font-size: 16px; }
   #stars .bar { display: none; }
-  #toast { top: 64px; font-size: 14px; }
+  /* no room for the bar: the star wears its progress as a ring instead */
+  #stars .st {
+    display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; font-size: 16px;
+    background: radial-gradient(closest-side, #fff 70%, transparent 72%), conic-gradient(#ffb300 var(--p, 0%), #e6ddf5 0);
+  }
+  #toast { font-size: 15px; }
+  #txt::placeholder { font-size: 18px; }
   .tab { font-size: 13px; padding: 0 4px; gap: 3px; }
   .tab .ti { font-size: 17px; }
   #show { gap: 6px; }
@@ -311,21 +340,32 @@ html.calm #playBtn.on .dot { animation: none; opacity: 1; }
   .pill.sel .ico { left: 10px; }
   .pill.sel::after { right: 10px; }
 }
-@media (max-width: 360px) { .tab .tl { display: none; } .tab .ti { font-size: 21px; } }
-/* short screens (a phone with its keyboard open): keep the stage, shrink the box */
-@media (max-height: 600px) and (max-width: 899px) {
-  #toybox { --paneH: 88px; }
-  #toybox[data-tab="emoji"] #pane-emoji { grid-template-rows: 54px; grid-auto-columns: 54px; }
-  #show { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
-  .tile { width: 70px; height: 70px; padding: 4px; }
-  .tile .nm { display: none; }
-  .tile .emo { font-size: 30px; }
-  .tile.em { width: 54px; height: 54px; }
-  .tab { min-height: 44px; }
-  .tiles { padding-block: 9px 7px; }
-  #show { padding-block: 8px 6px; }
-  #hint { display: none; }
+@media (max-width: 360px) {
+  .tab { flex-direction: column; gap: 1px; font-size: 11px; min-height: 52px; padding: 2px; }
+  .tab .ti { font-size: 19px; }
 }
+/* tablets standing up: two rows of tiles, so most of the toys are in view at once */
+@media (min-width: 600px) and (max-width: 899px) and (min-height: 800px) {
+  #toybox { --paneH: 224px; }
+  #toybox[data-tab="styles"] #pane-styles, #toybox[data-tab="moves"] #chips {
+    display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, 94px); grid-auto-columns: 88px; align-content: center; gap: 12px 10px;
+  }
+  #toybox[data-tab="emoji"] #pane-emoji { grid-template-rows: repeat(3, 50px); grid-auto-columns: 50px; gap: 10px; }
+  .tile.em { width: 50px; height: 50px; }
+}
+/* short visible screens (a phone with its keyboard open): keep the stage, shrink the box. html.short
+   is set from the VISUAL viewport in setVH(): phones that open a keyboard over the page leave the
+   layout viewport alone, so a max-height media query would never notice. */
+html.short #toybox { --paneH: 88px; }
+html.short #toybox[data-tab="styles"] #pane-styles, html.short #toybox[data-tab="moves"] #chips { display: flex; }
+html.short #toybox[data-tab="emoji"] #pane-emoji { grid-template-rows: 54px; grid-auto-columns: 54px; padding-block: 9px 7px; }
+html.short #show { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding-block: 8px 6px; }
+html.short .tile { width: 70px; height: 70px; padding: 4px; }
+html.short .tile .nm { display: none; }
+html.short .tile .emo { font-size: 30px; }
+html.short .tile.em { width: 54px; height: 54px; }
+html.short .tiles { padding-block: 9px 7px; }
+html.short #hint { display: none; }
 
 /* ---------- Wide screens: the toy box becomes a side panel of grids ---------- */
 @media (min-width: 900px) and (min-height: 540px) {
@@ -353,6 +393,8 @@ html.calm #playBtn.on .dot { animation: none; opacity: 1; }
   .tile .emo { font-size: 38px; }
   .tile.em { width: auto; height: auto; aspect-ratio: 1; border-radius: 16px; }
   .tile.em .emo { font-size: 30px; }
+  .tile.chip { aspect-ratio: auto; min-height: 96px; container-type: inline-size; }
+  .tile.chip .nm { font-size: clamp(11px, 17cqi, 13.5px); }
   #hint { bottom: 86px; }
 }
 @media (min-width: 900px) and (min-height: 540px) and (max-width: 1100px) {
@@ -367,7 +409,13 @@ html.calm #playBtn.on .dot { animation: none; opacity: 1; }
   .tile .emo { animation: none !important; }
   #toast.show { animation-duration: 3200ms; }
   #dice.roll span { animation: none; }
+  .tile.wiggle, #badge .bp.fresh::after { animation: none; }
 }
+/* 🐢 Calm is the same promise as the system's reduce-motion setting, so it stills the same things */
+html.calm #badge.pop, html.calm #stars.pop { animation-duration: 200ms; }
+html.calm #toast.show { animation-duration: 3200ms; }
+html.calm #hint, html.calm #dice.roll span, html.calm .tile.wiggle, html.calm #badge .bp.fresh::after,
+html.calm #soundBtn.wiggle .ico, html.calm .line.typing::after { animation: none; }
 
 /* ---------- The word ---------- */
 .line {
@@ -459,11 +507,11 @@ html.calm #playBtn.on .dot { animation: none; opacity: 1; }
       <div id="ring" aria-hidden="true"></div>
       <div id="flash" aria-hidden="true"></div>
       <button id="badge" type="button" aria-label="Current trick, tap for a surprise">✨ Flying Words</button>
-      <div id="stars" role="img" aria-label="Tricks found"><span class="st" aria-hidden="true">⭐</span><span class="num" aria-hidden="true">0/31</span><span class="bar" aria-hidden="true"><i></i></span></div>
+      <button id="stars" type="button" aria-label="Tricks found"><span class="st" aria-hidden="true">⭐</span><span class="num" aria-hidden="true">0/31</span><span class="bar" aria-hidden="true"><i></i></span></button>
       <div id="toast" aria-hidden="true"></div>
       <div id="announce" class="sr-only" aria-live="polite"></div>
     </div>
-    <div id="hint" hidden>👇 Type any word, then press <b>GO!</b></div>
+    <div id="hint" hidden>👇 Type a word and press <b>GO!</b></div>
     <form id="f" autocomplete="off">
       <input id="txt" type="text" maxlength="200" placeholder="Type a word…" dir="auto" enterkeyhint="go" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Your word">
       <button id="dice" type="button" aria-label="Surprise me: a random style and move"><span aria-hidden="true">🎲</span></button>
@@ -476,7 +524,7 @@ html.calm #playBtn.on .dot { animation: none; opacity: 1; }
       <button class="tab" role="tab" type="button" id="tab-styles" data-tab="styles" aria-controls="pane-styles" aria-selected="true"><span class="ti" aria-hidden="true">🎨</span><span class="tl">Styles</span><span class="cnt" aria-hidden="true"></span></button>
       <button class="tab" role="tab" type="button" id="tab-moves" data-tab="moves" aria-controls="chips" aria-selected="false" tabindex="-1"><span class="ti" aria-hidden="true">🎬</span><span class="tl">Moves</span><span class="cnt" aria-hidden="true"></span></button>
       <button class="tab" role="tab" type="button" id="tab-emoji" data-tab="emoji" aria-controls="pane-emoji" aria-selected="false" tabindex="-1"><span class="ti" aria-hidden="true">😀</span><span class="tl">Emoji</span><span class="cnt" aria-hidden="true"></span></button>
-      <button class="tab" role="tab" type="button" id="tab-show" data-tab="show" aria-controls="show" aria-selected="false" tabindex="-1"><span class="ti" aria-hidden="true">▶️</span><span class="tl">Show</span><span class="cnt" aria-hidden="true"></span></button>
+      <button class="tab" role="tab" type="button" id="tab-show" data-tab="show" aria-controls="show" aria-selected="false" tabindex="-1"><span class="ti" aria-hidden="true">🎛️</span><span class="tl">Show</span><span class="cnt" aria-hidden="true"></span></button>
     </div>
     <div id="pane-styles" class="pane tiles" role="tabpanel" aria-labelledby="tab-styles"></div>
     <div id="chips" class="pane tiles" role="tabpanel" aria-labelledby="tab-moves"></div>
@@ -906,7 +954,7 @@ function fit(ctx) {
   const line = ctx.line;
   if (ctx.wantLook && ctx.look !== ctx.wantLook) swapLook(ctx, ctx.wantLook); /* retry the requested look at the new size */
   const W = stage.clientWidth || 300, H = stage.clientHeight || 200; ctx.stage = { w: W, h: H };
-  const band = furnitureBand();
+  const band = furnitureBand(); ctx.band = band;
   const maxW = Math.floor(W * .92), maxH = Math.max(H * .35, Math.min(H * .82, H - band * 2));
   let fs = START_FS(), breakany = false, swapped = false;
   line.classList.remove('breakany'); line.classList.toggle('oneline', !!ctx.look.oneLine);
@@ -1233,7 +1281,7 @@ defMove({ id: 'fallapart', name: 'Fall Apart', emoji: '🍂', kind: 'exit', cele
   } });
 
 /* Combo */
-defMove({ id: 'party', name: 'EVERYTHING!', emoji: '🎆', kind: 'combo', celebrate: true,
+defMove({ id: 'party', name: 'Party!', emoji: '🎆', kind: 'combo', celebrate: true,
   async run(ctx) {
     if (!ctx.reduced) ctx.anim(flashEl, [{ opacity: .9 }, { opacity: 0 }], { duration: 200, fill: 'none' });
     const iter = ctx.reduced ? 2 : 3;
@@ -1272,13 +1320,14 @@ function pickCombo(text, opts) {
      button), so the two controls never claim different things. */
   const pinsHold = !state.autoShuffle;
   let move = explicitMove ? o.move : (o.api || !pinsHold ? null : state.pinnedMove);
-  if (!explicitMove && (milestone || /party|🎉|🥳|🎂/iu.test(text))) move = 'party';
-  if (!move) move = moveBag.next();
+  /* party words and runs 10, 25 and 50 throw a party, but never over a move the kid pinned: the
+     pinned tile keeps its promise */
+  if (!move && (milestone || /party|🎉|🥳|🎂/iu.test(text))) move = 'party';
+  if (!move) { move = moveBag.next(); if (move === o.avoidMove) move = moveBag.next(); }
   let look = explicitLook ? o.look : (o.api || !pinsHold ? null : state.pinnedLook);
-  if (move === 'party' && !explicitLook) look = null; /* party's look is always the rng's — not the bag's, not the pin's */
   if (!look && !explicitLook && /rainbow/i.test(text)) look = 'arch';
-  if (!look && move !== 'party') look = nextStyle();
-  return { look: look || null, move, seed, milestone };
+  if (!look && move !== 'party') look = nextStyle(); /* an unpinned party's look is the rng's, not the bag's */
+  return { look: look || null, move, seed, milestone: milestone && move === 'party' };
 }
 
 /* ---------- build the DOM for one run ---------- */
@@ -1385,9 +1434,28 @@ function teardown(keepConfetti) {
   host.replaceChildren();
   stage.classList.remove('dark');
 }
+function badgePart(kind, emoji, name, fresh) {
+  const s = document.createElement('span'); s.className = fresh ? 'bp fresh' : 'bp'; s.dataset.k = kind; s.textContent = emoji + '\u00a0' + name; return s;
+}
+/* "style · move" on one line; when the halves need two lines the dot would dangle, so it goes */
+function stackBadge() {
+  const parts = badgeEl.querySelectorAll('.bp');
+  badgeEl.classList.remove('stacked');
+  if (parts.length === 2 && parts[1].offsetTop > parts[0].offsetTop + 4) badgeEl.classList.add('stacked');
+  const half = badgeEl.offsetWidth / 2; /* a long sticker tilts less: its raised end stays on the stage */
+  if (half > 0) badgeEl.style.setProperty('--tilt', (-Math.min(5, Math.asin(Math.min(1, 9 / half)) * 180 / Math.PI)).toFixed(2) + 'deg');
+}
+/* The NEW tags are drawn here, not added after the fit: the sticker's height is part of the band
+   fit() keeps the word out of, so it has to be final before the word is measured. */
 function setBadge(ctx) {
   const c = ctx.combo;
-  badgeEl.textContent = c.move === 'party' ? (c.milestone ? '🎆 PARTY MODE!!!' : '🎆 EVERYTHING!') : ctx.look.emoji + ' ' + ctx.look.name + ' · ' + ctx.move.emoji + ' ' + ctx.move.name;
+  const newLook = !!(ctx.counts || ctx.lookCounts) && !seen.looks.has(ctx.look.id), newMove = !!ctx.counts && !seen.moves.has(ctx.move.id);
+  if (c.move === 'party') badgeEl.replaceChildren(badgePart('move', '🎆', c.milestone ? 'PARTY MODE!!!' : 'Party!', newLook || newMove));
+  else {
+    const sep = document.createElement('span'); sep.className = 'sep'; sep.setAttribute('aria-hidden', 'true'); sep.textContent = '·';
+    badgeEl.replaceChildren(badgePart('look', ctx.look.emoji, ctx.look.name, newLook), ' ', sep, ' ', badgePart('move', ctx.move.emoji, ctx.move.name, newMove));
+  }
+  stackBadge();
   badgeEl.classList.remove('pop'); void badgeEl.offsetWidth; badgeEl.classList.add('pop');
   markNow(ctx);
 }
@@ -1407,6 +1475,7 @@ async function play(text, combo) {
   let ctx = null;
   try {
     ctx = build(text, combo);
+    ctx.counts = combo.by !== 'auto' && combo.by !== 'demo'; /* the game counts what a kid made happen */
     state.ctx = ctx;
     host.replaceChildren(ctx.line);
     ctx.rtl = applyBidi(ctx);
@@ -1416,6 +1485,7 @@ async function play(text, combo) {
     void ctx.line.offsetWidth;
     if (ctx.look !== wanted) setBadge(ctx); /* arch fell back to wavy at this size */
     markSeen(ctx); /* after fit: count the look that is really on stage, not the one that fell back */
+    if (furnitureBand() > ctx.band) refit(); /* the score grew a digit and pushed the sticker onto two lines */
     /* the auto show would otherwise narrate a new line every few seconds, forever: it says only
        what setAuto parked in showMsg (the start message), then nothing until the show stops */
     announceEl.textContent = state.autoplay ? showMsg : text + ' — ' + ctx.look.name + ', ' + ctx.move.name;
@@ -1451,10 +1521,11 @@ function runAndChain(t, combo) {
 function go(text, opts) {
   const t = usableText(text); if (!t) return Promise.resolve();
   state.lastText = t;
-  const combo = pickCombo(t, opts); state.lastCombo = combo;
+  const combo = pickCombo(t, opts); combo.by = (opts && opts.by) || 'kid'; state.lastCombo = combo;
   return runAndChain(t, combo);
 }
-function again() { if (state.lastText && state.lastCombo) runAndChain(state.lastText, state.lastCombo); else go(currentText()); }
+/* a double-tap replay is the kid's own doing, whoever started the run it repeats */
+function again() { if (state.lastText && state.lastCombo) runAndChain(state.lastText, Object.assign({}, state.lastCombo, { by: 'kid' })); else go(currentText()); }
 
 /* ---------- the auto style show ---------- */
 const AUTO_EVERY = [1000, 2000, 3000, 5000, 8000, 15000];
@@ -1466,7 +1537,7 @@ function scheduleAuto(runId) {
   autoTimer = setTimeout(() => {
     autoTimer = 0;
     if (!state.autoplay || runId !== state.seq) return; /* something newer is on stage; it owns the chain */
-    go(state.lastText || currentText(), { look: nextStyle() });
+    go(state.lastText || currentText(), { look: nextStyle(), by: 'auto' });
   }, state.autoEvery);
 }
 function setAuto(on) {
@@ -1485,7 +1556,7 @@ function setAuto(on) {
     clearLookPin();
     showMsg = 'Style show playing'; /* play() writes it: see showMsg */
     /* start the show immediately with the next style rather than waiting out one silent gap */
-    go(currentText(), { look: nextStyle() });
+    go(currentText(), { look: nextStyle(), by: 'auto' });
     if (showMsg) { announceEl.textContent = showMsg; showMsg = ''; } /* no run started: say it here */
   } else {
     clearAuto();
@@ -1518,11 +1589,16 @@ function refit() {
 }
 function relook(look) {
   const ctx = state.ctx;
-  if (!ctx || !ctx.alive() || !ctx.line.isConnected) { go(currentText()); return; }
+  if (!ctx || !ctx.alive() || !ctx.line.isConnected) { go(currentText(), { look: look.id }); return; }
   try {
-    ctx.wantLook = look; swapLook(ctx, look); fit(ctx); void ctx.line.offsetWidth;
-    if (state.lastCombo) state.lastCombo.look = look.id;
-    setBadge(ctx); markSeen(ctx);
+    ctx.wantLook = look; swapLook(ctx, look);
+    ctx.lookCounts = true; /* a kid tapped this style, whoever started the run it lands on */
+    setBadge(ctx); /* before fit, as in play(): the new sticker's height is part of the band */
+    fit(ctx); void ctx.line.offsetWidth;
+    if (ctx.look !== look) setBadge(ctx); /* arch fell back to wavy at this size */
+    if (state.lastCombo) state.lastCombo.look = ctx.wantLook.id;
+    markSeen(ctx);
+    if (furnitureBand() > ctx.band) refit();
     if (ctx.look.onAppear) ctx.look.onAppear(ctx);
     if (ctx.look.afterEntrance) ctx.look.afterEntrance(ctx);
     if (FEAT.animate) ctx.anim(ctx.line, [{ transform: 'scale(.9)' }, { transform: 'scale(1)' }], { duration: 250, easing: OVERSHOOT, composite: 'add', fill: 'none' });
@@ -1546,7 +1622,11 @@ function makeStrip(el) {
        otherwise a drag that ended off the strip would swallow the next real tap */
     setTimeout(() => { dragging = false; }, 0);
   };
+  const touched = () => { el.touchedAt = performance.now(); }; /* markNow leaves a strip alone while a kid browses it */
+  el.addEventListener('touchstart', touched, { passive: true });
+  el.addEventListener('wheel', touched, { passive: true });
   el.addEventListener('pointerdown', (e) => {
+    touched();
     if (e.pointerType === 'touch' || (e.button !== undefined && e.button !== 0)) return;
     if (e.target.closest('select')) return; /* the ⏱ menu has to open like a menu */
     down = true; dragging = false; pid = e.pointerId; sx = e.clientX; sy = e.clientY; sl = el.scrollLeft; st = el.scrollTop;
@@ -1576,7 +1656,7 @@ function makeStrip(el) {
   el.addEventListener('click', (e) => { if (dragging) { e.stopPropagation(); e.preventDefault(); } }, true);
   el.addEventListener('wheel', (e) => {
     /* only a sideways row needs help; a vertical grid already scrolls with the wheel */
-    const x = overX(); if (x <= 0 || overY() > 0) return;
+    const x = overX(); if (x <= 0 || (overY() > 0 && /auto|scroll/.test(getComputedStyle(el).overflowY))) return;
     const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
     if (!d) return;
     const before = el.scrollLeft;
@@ -1689,6 +1769,10 @@ function markNow(ctx) {
   for (const t of toyEl.querySelectorAll('.tile.now')) t.classList.remove('now');
   const s = styleEl.querySelector('.tile[data-look="' + ctx.look.id + '"]'); if (s) s.classList.add('now');
   const m = chipsEl.querySelector('.tile[data-move="' + ctx.move.id + '"]'); if (m) m.classList.add('now');
+  const tab = toyEl.dataset.tab, pane = tab === 'moves' ? chipsEl : (tab === 'styles' ? styleEl : null), tile = pane === chipsEl ? m : s;
+  if (tile && pane && performance.now() - (pane.touchedAt || -1e9) > 2500) {
+    try { tile.scrollIntoView({ inline: 'center', block: 'nearest', behavior: isReduced() ? 'auto' : 'smooth' }); } catch (e) { /* ignore */ }
+  }
 }
 function bump(el, cls) { const c = cls || 'pop'; el.classList.remove(c); void el.offsetWidth; el.classList.add(c); }
 
@@ -1709,7 +1793,7 @@ function setTab(name, focusIt) {
   save('fw.tab', name);
   requestAnimationFrame(() => stripEdges.forEach((f) => f()));
 }
-tabBtns.forEach((t) => t.addEventListener('click', () => setTab(t.dataset.tab)));
+tabBtns.forEach((t) => t.addEventListener('click', (e) => { setTab(t.dataset.tab); if (e.detail > 0) refocus(); }));
 toyEl.querySelector('.tabs').addEventListener('keydown', (e) => {
   if (['ArrowRight', 'ArrowLeft', 'Home', 'End'].indexOf(e.key) < 0) return;
   const vis = tabBtns.filter((t) => t.offsetParent !== null); /* the Show tab is hidden on wide screens */
@@ -1733,6 +1817,10 @@ function toast(text, ms) {
   toastEl.style.animationDuration = ms ? ms + 'ms' : '';
   bump(toastEl, 'show');
 }
+function sizeBadge() {
+  const w = starsEl.offsetWidth; if (!w || w === sizeBadge.w) return;
+  sizeBadge.w = w; badgeEl.style.setProperty('--starsW', w + 'px'); stackBadge();
+}
 function renderSeen() {
   const n = seen.looks.size + seen.moves.size, all = n >= TOTAL;
   starsEl.querySelector('.num').textContent = n + '/' + TOTAL;
@@ -1750,21 +1838,38 @@ function renderSeen() {
   }
   setTabCount('styles', LOOK_ORDER.filter((id) => !seen.looks.has(id)).length, 'Styles');
   setTabCount('moves', MOVE_ORDER.filter((id) => !seen.moves.has(id)).length, 'Moves');
+  sizeBadge();
 }
+/* A find counts only when a kid made it happen (GO, a tile, 🎲, a double-tap): the page's own demo
+   and the auto show do not, or the trophy could be won by nobody touching anything. The news goes
+   on the sticker (setBadge draws a NEW tag on the half that is new) rather than in a toast over the word. */
 function markSeen(ctx) {
   if (!ctx || !ctx.look || !ctx.move) return;
-  const fresh = [];
-  if (!seen.looks.has(ctx.look.id)) { seen.looks.add(ctx.look.id); fresh.push(ctx.look); }
-  if (!seen.moves.has(ctx.move.id)) { seen.moves.add(ctx.move.id); fresh.push(ctx.move); }
-  if (!fresh.length) return;
+  let newLook = false, newMove = false;
+  if ((ctx.counts || ctx.lookCounts) && !seen.looks.has(ctx.look.id)) { seen.looks.add(ctx.look.id); newLook = true; }
+  if (ctx.counts && !seen.moves.has(ctx.move.id)) { seen.moves.add(ctx.move.id); newMove = true; }
+  if (!newLook && !newMove) return;
   save('fw.seenLooks', Array.from(seen.looks)); save('fw.seenMoves', Array.from(seen.moves));
   renderSeen(); bump(starsEl);
   if (seen.looks.size + seen.moves.size >= TOTAL && !load('fw.trophy', false)) {
     save('fw.trophy', true);
     toast('🏆 You found ALL ' + TOTAL + ' tricks!', 4200);
     try { confetti.shower(3200, ctx.palette); } catch (e) { /* ignore */ }
-  } else toast('NEW! ' + fresh.map((f) => f.emoji + ' ' + f.name).join('  +  '));
+  }
   sound.tick();
+}
+/* tap the score: go to where the most NEW tiles are and point at one */
+function showSomethingNew() {
+  const lookLeft = LOOK_ORDER.filter((id) => !seen.looks.has(id)).length, moveLeft = MOVE_ORDER.filter((id) => !seen.moves.has(id)).length;
+  if (!lookLeft && !moveLeft) { try { confetti.celebrate(state.ctx ? state.ctx.palette : PALETTES[0], false); } catch (e) { /* ignore */ } sound.tada(); return; }
+  const tab = lookLeft >= moveLeft ? 'styles' : 'moves';
+  setTab(tab);
+  const pane = tab === 'styles' ? styleEl : chipsEl, t = pane.querySelector('.tile.new');
+  if (!t) return;
+  requestAnimationFrame(() => {
+    try { t.scrollIntoView({ inline: 'center', block: 'nearest', behavior: isReduced() ? 'auto' : 'smooth' }); } catch (e) { /* ignore */ }
+    bump(t, 'wiggle');
+  });
 }
 
 /* ---------- first visit: point at the one thing to do ---------- */
@@ -1773,7 +1878,10 @@ function hideHint() { if (!hintEl.hidden) { hintEl.hidden = true; save('fw.hinte
 /* ---------- the word box ---------- */
 function refocus() { if (finePointer()) { try { input.focus({ preventScroll: true }); } catch (e) { /* ignore */ } } }
 function keepFocus() {
-  try { input.focus({ preventScroll: true }); if (finePointer()) input.select(); } catch (e) { /* ignore */ }
+  try {
+    if (!finePointer()) { input.blur(); return; } /* a phone keyboard left up would shrink the show to a strip */
+    input.focus({ preventScroll: true }); input.select();
+  } catch (e) { /* ignore */ }
 }
 /* After GO the whole word is selected (so typing replaces it). An emoji tile ADDS to the word, so a
    select-all is read as "the caret is at the end", not as "replace everything with this dino". */
@@ -1795,6 +1903,7 @@ function backspaceInput() {
   input.setRangeText('', r[0] - last.length, r[0], 'end');
 }
 function selectMove(id) {
+  const was = state.ctx && state.ctx.move ? state.ctx.move.id : null;
   if (id === 'surprise') state.pinnedMove = null;
   else if (MOVES[id]) {
     /* asking for one particular move is the opposite of "shuffle everything": honour the ask and
@@ -1803,7 +1912,7 @@ function selectMove(id) {
     state.pinnedMove = id;
   } else return;
   markChip(id);
-  go(currentText());
+  go(currentText(), id === 'surprise' ? { avoidMove: was } : undefined); /* Mix always changes the move */
 }
 let phHold = 0;
 function shakeInput() {
@@ -1813,8 +1922,9 @@ function shakeInput() {
   setTimeout(() => { if (input.value === '') input.placeholder = PH[phI]; }, 1500);
 }
 function submit() {
-  const t = usableText(input.value);
-  if (!t) { if (state.lastText) go(state.lastText); else shakeInput(); }
+  const t = usableText(input.value), ex = PH[phI];
+  if (!t && input.value === '' && performance.now() >= phHold && PH_EXAMPLE(ex)) { input.value = ex; hideHint(); go(ex); }
+  else if (!t) { if (state.lastText) go(state.lastText); else shakeInput(); }
   else { hideHint(); go(t); }
   keepFocus();
 }
@@ -1846,7 +1956,12 @@ styleEl.addEventListener('click', (e) => {
   const b = e.target.closest('.tile'); if (!b) return;
   hideHint();
   const id = b.dataset.look;
-  if (id === 'mix') { clearLookPin(); relook(LOOKS[nextStyle()]); }
+  if (id === 'mix') {
+    clearLookPin();
+    let pick = nextStyle(); if (state.ctx && state.ctx.look && pick === state.ctx.look.id) pick = nextStyle(); /* always a change */
+    relook(LOOKS[pick]);
+    if (autoTimer) scheduleAuto(state.seq); /* like a named style: the pick gets a whole gap on stage */
+  }
   else if (LOOKS[id]) {
     if (state.autoplay) {
       /* the show owns the style while it runs: jump to this one and carry on from here, no pin */
@@ -1858,7 +1973,7 @@ styleEl.addEventListener('click', (e) => {
     } else {
       const repeat = state.pinnedLook === id;
       if (state.autoShuffle) setShuffle(false); /* a pinned style and "shuffle everything" cannot both be true */
-      state.pinnedLook = id; markStyle(id);
+      state.pinnedLook = id; markStyle(id); styleIdx = LOOK_ORDER.indexOf(id);
       if (repeat) go(currentText()); else relook(LOOKS[id]); /* a second tap on the same style plays the word again */
     }
   }
@@ -1874,6 +1989,7 @@ emojiEl.addEventListener('click', (e) => {
   if (e.detail > 0) refocus();
 });
 badgeEl.addEventListener('click', (e) => { surprise(); if (e.detail > 0) refocus(); });
+starsEl.addEventListener('click', () => { hideHint(); showSomethingNew(); });
 diceBtn.addEventListener('click', (e) => { surprise(); if (e.detail > 0) refocus(); });
 function clearLookPin() { state.pinnedLook = null; markStyle('mix'); }
 function clearPins() { state.pinnedMove = null; clearLookPin(); }
@@ -1892,8 +2008,8 @@ function setSound(on) {
   save('fw.sound', state.sound);
   if (state.sound) { sound.enable(); sound.pop(); }
 }
-calmBtn.addEventListener('click', () => { setCalm(!state.calm); refocus(); });
-soundBtn.addEventListener('click', () => { setSound(!state.sound); refocus(); });
+calmBtn.addEventListener('click', (e) => { setCalm(!state.calm); if (e.detail > 0) refocus(); });
+soundBtn.addEventListener('click', (e) => { setSound(!state.sound); if (e.detail > 0) refocus(); });
 /* e.detail is 0 for the click a Space/Enter press synthesises: hand focus back to the word box
    after a tap or a mouse click (so typing carries on), but leave a keyboard user on the toggle —
    otherwise their second Space types into the word box instead of stopping the show. */
@@ -1932,7 +2048,8 @@ stage.addEventListener('pointerup', (e) => {
 stage.addEventListener('mousedown', (e) => { if (!e.target.closest('button')) e.preventDefault(); });
 
 /* placeholder rotation */
-const PH = ['Type a word…', 'your name?', '🦖🦖🦖', 'pizza', 'こんにちは', '#1 BEST!'];
+const PH = ['Type a word…', '🦖🦖🦖', 'your name?', 'pizza', 'こんにちは', '#1 BEST!'];
+const PH_EXAMPLE = (p) => !/…$|\?$/.test(p); /* prompts end in … or ?; the rest are examples GO will play */
 let phI = 0;
 setInterval(() => { if (input.value !== '' || performance.now() < phHold) return; phI = (phI + 1) % PH.length; input.placeholder = PH[phI]; }, 3000);
 
@@ -1941,8 +2058,9 @@ let vhRaf = 0;
 function setVH() {
   const h = (FEAT.vv && visualViewport.height) || window.innerHeight;
   if (h) root.style.setProperty('--vh', (h / 100) + 'px');
+  root.classList.toggle('short', !!h && h < 600 && window.innerWidth < 900); /* see html.short in the CSS */
 }
-function onViewport() { if (vhRaf) return; vhRaf = requestAnimationFrame(() => { vhRaf = 0; setVH(); confetti.resize(); refit(); stripEdges.forEach((f) => f()); }); }
+function onViewport() { if (vhRaf) return; vhRaf = requestAnimationFrame(() => { vhRaf = 0; setVH(); confetti.resize(); sizeBadge(); stackBadge(); refit(); stripEdges.forEach((f) => f()); }); }
 setVH();
 window.addEventListener('resize', onViewport);
 if (FEAT.vv) { visualViewport.addEventListener('resize', onViewport); visualViewport.addEventListener('scroll', setVH); }
@@ -1961,7 +2079,7 @@ window.FW = {
     try {
       const t = usableText(text); if (!t) return Promise.resolve();
       const o = opts && typeof opts === 'object' ? opts : {};
-      const combo = pickCombo(t, { look: o.look, move: o.move, seed: o.seed, api: true });
+      const combo = pickCombo(t, { look: o.look, move: o.move, seed: o.seed, api: true }); combo.by = 'api';
       state.lastText = t; state.lastCombo = combo;
       return runAndChain(t, combo);
     } catch (e) { return Promise.resolve(); }
@@ -1972,6 +2090,7 @@ window.FW = {
   setShuffle(b) { setShuffle(!!b); },
   setEvery(ms) { setEvery(ms); },
   setTab(name) { setTab(name); },
+  setPlaceholder(i) { phI = ((Number(i) || 0) % PH.length + PH.length) % PH.length; phHold = 0; input.placeholder = PH[phI]; },
   seen() { return { looks: Array.from(seen.looks), moves: Array.from(seen.moves), found: seen.looks.size + seen.moves.size, total: TOTAL }; },
   resetSeen() { seen.looks.clear(); seen.moves.clear(); save('fw.seenLooks', []); save('fw.seenMoves', []); save('fw.trophy', false); renderSeen(); },
   intervals: AUTO_EVERY.slice(),
@@ -1994,7 +2113,7 @@ buildEvery();
 /* after the tiles and options exist, so the widths are real */
 stripEdges = [styleEl, chipsEl, emojiEl, showEl].map(makeStrip);
 setTab(load('fw.tab', 'styles'));
-try { const onWide = () => { if (wideMq.matches && toyEl.dataset.tab === 'show') setTab('styles'); }; if (wideMq.addEventListener) wideMq.addEventListener('change', onWide); else if (wideMq.addListener) wideMq.addListener(onWide); } catch (e) { /* ignore */ }
+try { const onWide = () => { if (wideMq.matches && toyEl.dataset.tab === 'show') setTab('styles', document.activeElement === $('#tab-show')); }; if (wideMq.addEventListener) wideMq.addEventListener('change', onWide); else if (wideMq.addListener) wideMq.addListener(onWide); } catch (e) { /* ignore */ }
 renderSeen();
 setShuffle(load('fw.shuffle', true) !== false);
 setEvery(load('fw.every', 2000)); /* the show itself always starts off: nothing moves until a kid asks */
@@ -2002,7 +2121,7 @@ setCalm(load('fw.calm', false) === true);
 if (load('fw.sound', false) === true) { state.sound = true; showSound(); }
 if (!load('fw.hinted', false)) hintEl.hidden = false;
 if (hoverable()) { try { input.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
-setTimeout(() => { if (state.seq === 0) go('Hello!'); }, 400);
+setTimeout(() => { if (state.seq === 0) go('Hello!', { by: 'demo' }); }, 400);
 })();
 </script>
 </body>
