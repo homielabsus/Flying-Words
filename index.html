@@ -3799,7 +3799,7 @@ async function makeIt() {
     if (/^video\//.test(out.blob.type)) { kpVid.src = K.url; kpVid.hidden = false; try { const p = kpVid.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ } }
     else { kpImg.src = K.url; kpImg.alt = 'Your ' + FORMATS[K.fmt].name + ': ' + K.spec.text; kpImg.hidden = false; }
     kpMake.hidden = true; kpDone.hidden = false;
-    kpShare.hidden = finePointer() || !KEEP.canShare(out.blob, K.result.name);
+    kpShare.hidden = finePointer() || KEEP.inViewer || !KEEP.canShare(out.blob, K.result.name); /* claude.ai refuses the share sheet */
     kpMsg.textContent = 'Ta-da! Tap Save to keep it.' + (out.ext === 'webm' ? ' (Your browser made a WebM video.)' : '');
     sound.tada();
     try { kpSave.focus(); } catch (e) { /* ignore */ }
