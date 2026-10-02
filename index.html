@@ -580,6 +580,60 @@ html.calm #soundBtn.wiggle .ico, html.calm .line.typing::after { animation: none
 .tile.scene .scv { width: 100%; height: 100%; display: block; object-fit: cover; }
 .tile.scene.demo { animation: tileWiggle 450ms ease-in-out 1; }
 html.calm .tile.scene.demo { animation: none; }
+/* 📷 Camera and 🖼️ Add Photo make a scene; a photo tile carries a ✕ while it is the scene */
+.tile.act .sw { background: repeating-linear-gradient(45deg, #fff 0 10px, #eef6ff 10px 20px); }
+.tile.add .sw { position: relative; }
+.tile.add .sw::after {
+  content: '+'; position: absolute; right: 4px; bottom: 3px; width: 20px; height: 20px; border-radius: 50%; background: #b6f36b; color: var(--ink);
+  border: 2px solid var(--ink); font: 900 16px/16px var(--font); text-align: center;
+}
+.tile.cam.on { background: #ff4d6d; color: #fff; box-shadow: 0 4px 0 var(--ink); }
+.tile.cam.on::after { content: '●'; color: #ff4d6d; background: #fff; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink); font: 900 14px/18px var(--font); top: -9px; right: -7px; }
+/* one grid cell: a strip tile keeps its own size, a grid tile fills its column */
+.tile-wrap { position: relative; flex: none; display: grid; }
+.tile-del {
+  position: absolute; top: -9px; left: -7px; z-index: 2; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: #fff; color: var(--ink);
+  border: 2px solid var(--ink); box-shadow: 0 2px 0 var(--ink); font: 900 14px/1 var(--font); cursor: pointer; display: grid; place-items: center; touch-action: manipulation;
+}
+.tile-del:hover { background: #ffe1e8; }
+.tile-del:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+#stage.drop { outline: 6px dashed #fff; outline-offset: -14px; }
+#stage.drop::after { content: '🖼️ Drop your photo!'; position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(27, 27, 58, .45); color: #fff; font: 900 28px/1.2 var(--font); pointer-events: none; }
+
+/* ---------- 📷 the live camera behind the word ---------- */
+#camVid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 42%; display: none; pointer-events: none; background: #1b1b3a; }
+#stage.cam #camVid { display: block; }
+#stage.cam #scene, #stage.cam::before { display: none; }
+#stage.mirror #camVid { transform: scaleX(-1); }
+#stage.cam #keepBtn { display: none; }
+#stage.cam #toast { bottom: 88px; }
+#camBar { position: absolute; left: 50%; bottom: 12px; translate: -50% 0; z-index: 6; display: flex; align-items: center; gap: 14px; }
+#camSnap {
+  height: 62px; padding: 0 24px 0 18px; border-radius: 999px; background: var(--sun); color: var(--ink); border: 4px solid var(--ink);
+  box-shadow: 0 6px 0 var(--ink); font: 900 22px/1 var(--font); display: flex; align-items: center; gap: 8px; cursor: pointer; touch-action: manipulation; white-space: nowrap;
+}
+#camSnap span:first-child { font-size: 26px; }
+#camSnap:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
+#camSnap:disabled { opacity: .6; cursor: progress; }
+.cam-b {
+  flex: none; width: 50px; height: 50px; padding: 0; border-radius: 50%; background: #fff; color: var(--ink); border: 3px solid var(--ink);
+  box-shadow: 0 4px 0 var(--ink); font: 800 20px/1 var(--font); display: grid; place-items: center; cursor: pointer; touch-action: manipulation;
+}
+.cam-b:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+#camSnap:focus-visible, .cam-b:focus-visible { outline: 4px solid #fff; outline-offset: 2px; }
+#camCount {
+  position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; pointer-events: none; color: #fff;
+  font: 900 clamp(90px, 34vmin, 230px)/1 var(--font); -webkit-text-stroke: 8px var(--ink); paint-order: stroke fill; text-shadow: 6px 8px 0 var(--ink);
+}
+#camCount:empty { display: none; }
+#camCount.go { animation: camPop 800ms ease-out both; }
+@keyframes camPop { 0% { transform: scale(.3); opacity: 0; } 25% { transform: scale(1.15); opacity: 1; } 45% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: .2; transform: scale(.92); } }
+html.calm #camCount.go { animation: none; }
+@media (prefers-reduced-motion: reduce) { #camCount.go { animation: none; } }
+html.short #camSnap { height: 46px; font-size: 18px; padding: 0 16px 0 12px; }
+html.short .cam-b { width: 42px; height: 42px; font-size: 17px; }
+html.short #stage.cam #toast { bottom: 66px; }
+
 .pv.look-comic .ch:nth-child(odd) { rotate: -4deg; }
 .pv.look-comic .ch:nth-child(even) { rotate: 4deg; }
 
@@ -631,17 +685,20 @@ html.short #keepBtn { width: 44px; height: 44px; font-size: 21px; right: 10px; b
 #kpTxt:focus { outline: 4px solid var(--ink); outline-offset: 3px; }
 .kp-what { margin: 0; font: 800 15px/1.35 var(--font); color: #4b4870; }
 .kp-row { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.kp-row.kp-shapes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .kp-row legend { padding: 0 0 8px; font: 800 15px/1 var(--font); }
 .kp-opt {
   position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 76px;
   padding: 8px 4px; border-radius: 16px; background: #fff; color: var(--ink); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink);
   cursor: pointer; text-align: center; -webkit-user-select: none; user-select: none;
 }
-.kp-shapes .kp-opt { min-height: 58px; flex-direction: row; gap: 6px; }
+.kp-shapes .kp-opt { min-height: 72px; gap: 2px; }
+/* each shape draws itself: a little box in its own proportions, centred in the same 26px square */
+.kr {
+  --m: max(var(--w), var(--h)); box-sizing: border-box; flex: none; width: calc(26px * var(--w) / var(--m)); height: calc(26px * var(--h) / var(--m));
+  margin: calc(13px - 13px * var(--h) / var(--m)) 0 calc(15px - 13px * var(--h) / var(--m)); border: 3px solid currentColor; border-radius: 4px;
+}
 .kp-opt input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .kp-opt .ki { font-size: 26px; line-height: 1; }
-.kp-shapes .kp-opt .ki { font-size: 20px; }
 .kp-opt .kl { font: 800 14px/1.1 var(--font); }
 .kp-opt .ks { font: 700 11px/1 var(--font); color: #6f6d90; letter-spacing: .04em; }
 .kp-opt.on { background: var(--ink); color: #fff; box-shadow: 0 3px 0 var(--accent); }
@@ -673,7 +730,8 @@ html.calm .kp-make.pop { animation: none; }
   .kp-view img, .kp-view video { max-height: 32dvh; }
   .kp-ctrl { gap: 11px; }
   .kp-opt { min-height: 62px; padding: 6px 2px; }
-  .kp-shapes .kp-opt { min-height: 50px; }
+  .kp-shapes .kp-opt { min-height: 60px; }
+  .kp-shapes .kp-opt .kl { font-size: 12px; }
   .kp-opt .ki { font-size: 22px; }
   .kp-opt .kl { font-size: 13px; }
   .kp-make { min-height: 56px; font-size: 20px; }
@@ -698,6 +756,7 @@ html.short .tab .ti { font-size: 21px; }
   <main class="play">
     <div id="stage">
       <canvas id="scene" aria-hidden="true"></canvas>
+      <video id="camVid" muted playsinline aria-hidden="true"></video>
       <div id="host" aria-hidden="true"></div>
       <canvas id="confetti" aria-hidden="true"></canvas>
       <div id="ring" aria-hidden="true"></div>
@@ -706,6 +765,12 @@ html.short .tab .ti { font-size: 21px; }
       <button id="stars" type="button" aria-label="Tricks found"><span class="st" aria-hidden="true">⭐</span><span class="num" aria-hidden="true">0/31</span><span class="bar" aria-hidden="true"><i></i></span></button>
       <div id="toast" aria-hidden="true"></div>
       <button id="keepBtn" type="button" aria-label="Keep it! Save a picture or a video" title="Keep it!"><span aria-hidden="true">📸</span></button>
+      <div id="camBar" role="group" aria-label="Camera" hidden>
+        <button id="camOff" class="cam-b" type="button" aria-label="Close the camera" title="Close the camera"><span aria-hidden="true">✕</span></button>
+        <button id="camSnap" type="button" aria-label="Snap a photo: 3, 2, 1!"><span aria-hidden="true">📸</span><span aria-hidden="true">Snap!</span></button>
+        <button id="camFlip" class="cam-b" type="button" aria-label="Use another camera" title="Use another camera" hidden><span aria-hidden="true">🔄</span></button>
+      </div>
+      <div id="camCount" aria-hidden="true"></div>
       <div id="announce" class="sr-only" aria-live="polite"></div>
     </div>
     <div id="hint" hidden>👇 Type a word and press <b>GO!</b></div>
@@ -760,9 +825,14 @@ html.short .tab .ti { font-size: 21px; }
         <label class="kp-opt"><input type="radio" name="kpFmt" value="mp4"><span class="ki" aria-hidden="true">🎬</span><span class="kl">Video</span><span class="ks">MP4</span></label>
       </fieldset>
       <fieldset class="kp-row kp-shapes"><legend>Shape</legend>
-        <label class="kp-opt"><input type="radio" name="kpShape" value="square"><span class="ki" aria-hidden="true">⬛</span><span class="kl">Square</span></label>
-        <label class="kp-opt"><input type="radio" name="kpShape" value="wide"><span class="ki" aria-hidden="true">🖥️</span><span class="kl">Wide</span></label>
-        <label class="kp-opt"><input type="radio" name="kpShape" value="tall"><span class="ki" aria-hidden="true">📱</span><span class="kl">Tall</span></label>
+        <label class="kp-opt"><input type="radio" name="kpShape" value="square" aria-label="Square, 1 by 1"><span class="kr" style="--w:1;--h:1" aria-hidden="true"></span><span class="kl" aria-hidden="true">Square</span><span class="ks" aria-hidden="true">1:1</span></label>
+        <label class="kp-opt"><input type="radio" name="kpShape" value="wide" aria-label="Wide, 16 by 9"><span class="kr" style="--w:16;--h:9" aria-hidden="true"></span><span class="kl" aria-hidden="true">Wide</span><span class="ks" aria-hidden="true">16:9</span></label>
+        <label class="kp-opt"><input type="radio" name="kpShape" value="tall" aria-label="Tall, 9 by 16"><span class="kr" style="--w:9;--h:16" aria-hidden="true"></span><span class="kl" aria-hidden="true">Tall</span><span class="ks" aria-hidden="true">9:16</span></label>
+        <label class="kp-opt"><input type="radio" name="kpShape" value="tablet" aria-label="Tablet, 4 by 3"><span class="kr" style="--w:4;--h:3" aria-hidden="true"></span><span class="kl" aria-hidden="true">Tablet</span><span class="ks" aria-hidden="true">4:3</span></label>
+        <label class="kp-opt"><input type="radio" name="kpShape" value="portrait" aria-label="Portrait, 3 by 4"><span class="kr" style="--w:3;--h:4" aria-hidden="true"></span><span class="kl" aria-hidden="true">Portrait</span><span class="ks" aria-hidden="true">3:4</span></label>
+        <label class="kp-opt"><input type="radio" name="kpShape" value="poster" aria-label="Poster, 4 by 5"><span class="kr" style="--w:4;--h:5" aria-hidden="true"></span><span class="kl" aria-hidden="true">Poster</span><span class="ks" aria-hidden="true">4:5</span></label>
+        <label class="kp-opt"><input type="radio" name="kpShape" value="postcard" aria-label="Postcard, 3 by 2"><span class="kr" style="--w:3;--h:2" aria-hidden="true"></span><span class="kl" aria-hidden="true">Postcard</span><span class="ks" aria-hidden="true">3:2</span></label>
+        <label class="kp-opt"><input type="radio" name="kpShape" value="movie" aria-label="Movie, 21 by 9"><span class="kr" style="--w:21;--h:9" aria-hidden="true"></span><span class="kl" aria-hidden="true">Movie</span><span class="ks" aria-hidden="true">21:9</span></label>
       </fieldset>
       <button id="kpMake" class="kp-make" type="button">✨ Make my picture</button>
       <div id="kpDone" class="kp-done" hidden>
@@ -3628,12 +3698,19 @@ const KEEP = (() => {
   }
 
   /* ---------- sizes, the whole job, and handing the file over ---------- */
-  const SHAPES = { square: [540, 540], wide: [960, 540], tall: [540, 960] };
-  const PIXELS = { png: { square: [1080, 1080], wide: [1920, 1080], tall: [1080, 1920] }, jpg: { square: [1080, 1080], wide: [1920, 1080], tall: [1080, 1920] },
-    gif: { square: [480, 480], wide: [640, 360], tall: [360, 640] }, mp4: { square: [1080, 1080], wide: [1280, 720], tall: [720, 1280] } };
+  /* the stage each shape is laid out on (its short side 540), then the pixels each kind of file gets.
+     Every size keeps the exact ratio and is even, as H.264 wants; videos stay within level 4 */
+  const SHAPES = { square: [540, 540], wide: [960, 540], tall: [540, 960], tablet: [720, 540], portrait: [540, 720], poster: [540, 675],
+    postcard: [810, 540], movie: [1260, 540] };
+  const STILL = { square: [1080, 1080], wide: [1920, 1080], tall: [1080, 1920], tablet: [1440, 1080], portrait: [1080, 1440], poster: [1080, 1350],
+    postcard: [1620, 1080], movie: [2520, 1080] };
+  const PIXELS = { png: STILL, jpg: STILL,
+    gif: { square: [480, 480], wide: [640, 360], tall: [360, 640], tablet: [560, 420], portrait: [420, 560], poster: [384, 480], postcard: [600, 400], movie: [700, 300] },
+    mp4: { square: [1080, 1080], wide: [1280, 720], tall: [720, 1280], tablet: [960, 720], portrait: [720, 960], poster: [864, 1080], postcard: [1080, 720], movie: [1680, 720] } };
   async function prepare(spec, shape) {
     const [W, H] = SHAPES[shape] || SHAPES.square;
     if (document.fonts && document.fonts.load && /^https?:$/.test(location.protocol)) { try { await document.fonts.load('700 40px Fredoka'); } catch (e) { /* the fallback font is fine */ } }
+    const S = SCENES[spec.scene]; if (S && S.ready) { try { await S.ready(); } catch (e) { /* the small picture will do */ } } /* a photo wakes at full size */
     return record(spec, W, H);
   }
   async function make(R, fmt, shape, onProgress, abort) {
@@ -3678,13 +3755,14 @@ const sceneCv = $('#scene'), sceneCx = sceneCv.getContext('2d'), scenesEl = $('#
 let sceneRaf = 0, sceneLast = 0;
 const sceneT0 = performance.now();
 function drawStageScene() {
-  const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h || state.scene === 'mix') return;
+  const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h || state.scene === 'mix' || cam.on) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(w * dpr), H = Math.round(h * dpr);
   if (sceneCv.width !== W || sceneCv.height !== H) { sceneCv.width = W; sceneCv.height = H; }
   sceneCx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawScene(sceneCx, state.scene, w, h, isReduced() ? 3 : (performance.now() - sceneT0) / 1000);
 }
-const sceneMoving = () => state.scene !== 'mix' && !isReduced() && !document.hidden;
+/* a photo stands still (one drawing is enough), and nothing is drawn under a live camera */
+const sceneMoving = () => { const S = SCENES[state.scene]; return !!S && state.scene !== 'mix' && !S.still && !cam.on && !isReduced() && !document.hidden; };
 function sceneTick(now) { sceneRaf = 0; if (now - sceneLast >= 30) { sceneLast = now; drawStageScene(); } if (sceneMoving()) sceneRaf = requestAnimationFrame(sceneTick); }
 function refreshScene() {
   if (sceneRaf) { cancelAnimationFrame(sceneRaf); sceneRaf = 0; }
@@ -3693,10 +3771,14 @@ function refreshScene() {
   drawStageScene();
   if (sceneMoving()) sceneRaf = requestAnimationFrame(sceneTick);
 }
-function markScene() { for (const t of scenesEl.children) { const on = t.dataset.scene === state.scene; t.classList.toggle('on', on); t.setAttribute('aria-pressed', String(on)); } }
-function setScene(id) {
+function markScene() {
+  for (const t of scenesEl.querySelectorAll('.tile[data-scene]')) { const on = t.dataset.scene === state.scene; t.classList.toggle('on', on); t.setAttribute('aria-pressed', String(on)); }
+  for (const d of scenesEl.querySelectorAll('.tile-del')) d.hidden = d.dataset.del !== state.scene; /* ✕ only on the photo in use */
+}
+function setScene(id, quiet) {
   state.scene = SCENES[id] ? id : 'mix';
-  save('fw.scene', state.scene); markScene(); refreshScene();
+  if (!quiet) { sceneTouched = true; save('fw.scene', state.scene); }
+  focusPhotos(); markScene(); refreshScene();
 }
 function buildSceneTiles() {
   SCENE_ORDER.forEach((id, k) => {
@@ -3712,8 +3794,13 @@ function buildSceneTiles() {
   });
 }
 scenesEl.addEventListener('click', (e) => {
+  const del = e.target.closest('.tile-del'); if (del) { removePhoto(del.dataset.del); return; }
   const b = e.target.closest('.tile'); if (!b) return;
-  hideHint(); setScene(b.dataset.scene); bump(b, 'demo'); sound.pop();
+  hideHint();
+  if (b.dataset.act === 'camera') { if (cam.on) stopCamera(); else startCamera('', e.detail === 0); sound.pop(); return; }
+  if (b.dataset.act === 'photo') { if (cam.on) stopCamera(); pickPhoto(); return; }
+  if (cam.on) stopCamera();
+  setScene(b.dataset.scene); bump(b, 'demo'); sound.pop();
   if (e.detail > 0) refocus();
 });
 
@@ -3862,6 +3949,264 @@ kpShare.addEventListener('click', () => saveIt(true));
 kpAgain.addEventListener('click', () => { clearResult(); kpMsg.textContent = ''; if (K.R && !K.raf) K.raf = requestAnimationFrame(previewTick); });
 window.addEventListener('resize', () => { if (K.open && !kpCanvas.hidden) { fitPreview(); if (!K.raf && K.R) K.raf = requestAnimationFrame(previewTick); } });
 
+/* ---------- 🖼️ my photos: a picture a kid picks or snaps becomes a scene behind the word. Photos never
+   leave the device: they live in this page's own storage (IndexedDB) until removed with ✕. ---------- */
+const PHOTO_SIDE = 1920, PHOTO_SMALL = 480, PHOTO_KEEP = 6;
+/* newest first: { id, blob, small, cv }. Only the photo on stage keeps its full-size canvas; the others
+   wait as a JPEG plus a small preview, so six photos cost a few megabytes, not fifty */
+const photos = [];
+let photoN = 0, sceneTouched = false;
+/* fill the frame like CSS object-fit: cover, a little above the middle where faces usually are */
+function coverDraw(c, img, w, h) {
+  const iw = img.width, ih = img.height; if (!iw || !ih) return;
+  const s = Math.max(w / iw, h / ih), sw = w / s, sh = h / s;
+  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+  c.drawImage(img, (iw - sw) / 2, (ih - sh) * .42, sw, sh, 0, 0, w, h);
+}
+/* any picture (an <img>, a camera <video>, a canvas) as a canvas no bigger than side, mirrored if it was seen mirrored */
+function photoCanvas(src, iw, ih, mirror, side) {
+  const s = Math.min(1, (side || PHOTO_SIDE) / Math.max(iw, ih)), w = Math.max(1, Math.round(iw * s)), h = Math.max(1, Math.round(ih * s));
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const c = cv.getContext('2d'); c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+  if (mirror) { c.translate(w, 0); c.scale(-1, 1); }
+  c.drawImage(src, 0, 0, w, h);
+  return cv;
+}
+/* an <img> decodes every format the browser knows and turns phone photos the right way up */
+async function decodePhoto(blob, side) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('not a picture')); img.src = url; });
+    if (!img.naturalWidth || !img.naturalHeight) throw new Error('empty picture');
+    return photoCanvas(img, img.naturalWidth, img.naturalHeight, false, side);
+  } finally { URL.revokeObjectURL(url); }
+}
+const toJPEG = (cv) => new Promise((res) => { try { cv.toBlob(res, 'image/jpeg', .9); } catch (e) { res(null); } });
+const photoDB = (() => {
+  let db = null;
+  const open = () => db || (db = new Promise((res, rej) => {
+    try {
+      const r = indexedDB.open('flying-words', 1);
+      r.onupgradeneeded = () => { r.result.createObjectStore('photos', { keyPath: 'id' }); };
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blocked'));
+    } catch (e) { rej(e); }
+  }));
+  const run = (mode, fn) => open().then((d) => new Promise((res, rej) => {
+    const t = d.transaction('photos', mode), q = fn(t.objectStore('photos'));
+    t.oncomplete = () => res(q.result); t.onerror = t.onabort = () => rej(t.error);
+  }));
+  return { all: () => run('readonly', (s) => s.getAll()), put: (rec) => run('readwrite', (s) => s.put(rec)), del: (id) => run('readwrite', (s) => s.delete(id)) };
+})();
+/* a photo scene draws its full-size picture, or the small one for the moment it takes to wake */
+function registerPhoto(rec) {
+  SCENES[rec.id] = { id: rec.id, name: 'My Photo', emoji: '🖼️', still: true, photo: true,
+    draw: (c, w, h) => { const img = rec.cv || rec.small; if (img) coverDraw(c, img, w, h); }, ready: () => wakePhoto(rec) };
+}
+function wakePhoto(rec) {
+  if (rec.cv) return Promise.resolve(rec.cv);
+  if (!rec.waking) {
+    rec.waking = decodePhoto(rec.blob, PHOTO_SIDE).then((cv) => { rec.waking = null; rec.cv = cv; if (state.scene === rec.id) refreshScene(); return cv; },
+      (e) => { rec.waking = null; throw e; });
+  }
+  return rec.waking;
+}
+/* the photo on stage gets its full size; the rest let theirs go (each can wake again from its JPEG) */
+function focusPhotos() { for (const p of photos) { if (p.id === state.scene) wakePhoto(p).catch(() => {}); else if (p.blob) p.cv = null; } }
+
+/* the tiles: 📷 Camera and 🖼️ Add Photo after Mix, then one tile per photo, newest first */
+const camTile = mkTile('scene act cam', 'Camera: take a photo of you');
+const addTile = mkTile('scene act add', 'Add a photo. It stays on this device');
+function actTile(b, act, emoji, name, k) {
+  b.dataset.act = act; b.style.setProperty('--c', tint(k));
+  const sw = document.createElement('span'); sw.className = 'sw'; sw.append(tileEmoji(emoji));
+  b.append(sw, tileName(name));
+}
+actTile(camTile, 'camera', '📷', 'Camera', 3);
+actTile(addTile, 'photo', '🖼️', 'Add Photo', 4);
+function renderPhotoTiles() {
+  for (const w of scenesEl.querySelectorAll('.tile-wrap')) w.remove();
+  let at = addTile;
+  photos.forEach((p, k) => {
+    const wrap = document.createElement('div'); wrap.className = 'tile-wrap';
+    const b = mkTile('scene photo', 'My photo ' + (k + 1)); b.dataset.scene = p.id;
+    const sw = document.createElement('span'); sw.className = 'sw';
+    const cv = document.createElement('canvas'); cv.className = 'scv'; cv.width = 156; cv.height = 112; cv.setAttribute('aria-hidden', 'true');
+    coverDraw(cv.getContext('2d'), p.small, 156, 112); sw.append(cv);
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'tile-del'; del.dataset.del = p.id;
+    del.setAttribute('aria-label', 'Remove my photo ' + (k + 1)); del.title = 'Remove this photo'; del.textContent = '✕';
+    b.append(sw, tileName('My Photo')); wrap.append(b, del);
+    at.after(wrap); at = wrap;
+  });
+  markScene();
+}
+function placeActTiles() { const mix = scenesEl.querySelector('.tile[data-scene="mix"]'); if (mix) mix.after(camTile, addTile); else scenesEl.prepend(camTile, addTile); }
+
+/* the photo is on stage at once; keeping it (a JPEG in IndexedDB) happens in the background */
+function addPhoto(cv) {
+  const t = Date.now() * 1000 + photoN % 1000; /* the order photos were taken, even within one millisecond */
+  const id = 'photo-' + Date.now().toString(36) + '-' + (photoN++), rec = { id, cv, blob: null, small: photoCanvas(cv, cv.width, cv.height, false, PHOTO_SMALL) };
+  registerPhoto(rec); photos.unshift(rec);
+  while (photos.length > PHOTO_KEEP) forgetPhoto(photos[photos.length - 1].id);
+  renderPhotoTiles(); setScene(id);
+  rec.saved = toJPEG(cv).then(async (blob) => {
+    rec.blob = blob; /* without one the photo just keeps its canvas */
+    if (blob && state.scene !== id) rec.cv = null; /* a newer photo took the stage meanwhile */
+    if (blob && SCENES[id]) { try { await photoDB.put({ id, blob, t }); } catch (e) { /* no storage here: it lasts until the page closes */ } }
+  });
+  return id;
+}
+function forgetPhoto(id) {
+  const i = photos.findIndex((p) => p.id === id); if (i < 0) return;
+  photos.splice(i, 1); delete SCENES[id];
+  photoDB.del(id).catch(() => {});
+  if (state.scene === id) setScene('mix');
+}
+function removePhoto(id) {
+  const tiles = Array.prototype.slice.call(scenesEl.querySelectorAll('.tile.photo')), at = tiles.findIndex((t) => t.dataset.scene === id);
+  forgetPhoto(id); renderPhotoTiles(); sound.pop();
+  /* keep a keyboard user in the row: on the photo that moved into this place, else on Add Photo */
+  const next = scenesEl.querySelectorAll('.tile.photo')[Math.max(0, Math.min(at, photos.length - 1))] || addTile;
+  try { next.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+  toast('🗑️ Photo removed');
+}
+async function usePhotoFile(file) {
+  if (!file || (file.type && !/^image\//.test(file.type))) { toast('That is not a photo. Try another one!', 3200); return null; }
+  hideHint();
+  try { const id = addPhoto(await decodePhoto(file, PHOTO_SIDE)); toast('🖼️ Your photo is the scene!', 2600); if (!state.autoplay) again(); return id; }
+  catch (e) { toast('That photo didn’t open. Try another one!', 3200); return null; }
+}
+async function restorePhotos() {
+  let recs = [];
+  try { recs = (await photoDB.all()) || []; } catch (e) { return; }
+  recs.sort((a, b) => b.t - a.t);
+  for (const r of recs.slice(0, PHOTO_KEEP)) {
+    if (SCENES[r.id] || !r.blob) continue;
+    try { const rec = { id: r.id, blob: r.blob, cv: null, small: await decodePhoto(r.blob, PHOTO_SMALL) }; registerPhoto(rec); photos.push(rec); }
+    catch (e) { photoDB.del(r.id).catch(() => {}); }
+  }
+  for (const r of recs.slice(PHOTO_KEEP)) photoDB.del(r.id).catch(() => {});
+  photos.sort((a, b) => (recs.findIndex((r) => r.id === a.id) - recs.findIndex((r) => r.id === b.id))); /* one snapped meanwhile stays first */
+  while (photos.length > PHOTO_KEEP) forgetPhoto(photos[photos.length - 1].id);
+  renderPhotoTiles();
+  const want = load('fw.scene', 'mix');
+  if (!sceneTouched && SCENES[want] && state.scene !== want) setScene(want, true);
+}
+
+/* picking a file: a hidden input the Add Photo tile clicks, and the same for a dropped picture */
+const photoFile = document.createElement('input'); photoFile.type = 'file'; photoFile.accept = 'image/*'; photoFile.id = 'photoFile'; photoFile.hidden = true;
+/* a phone's own camera app, for when the live camera is not allowed */
+const snapFile = document.createElement('input'); snapFile.type = 'file'; snapFile.accept = 'image/*'; snapFile.setAttribute('capture', 'user'); snapFile.id = 'snapFile'; snapFile.hidden = true;
+document.body.append(photoFile, snapFile);
+for (const inp of [photoFile, snapFile]) inp.addEventListener('change', () => { const f = inp.files && inp.files[0]; inp.value = ''; if (f) usePhotoFile(f); });
+function pickPhoto() { photoFile.value = ''; photoFile.click(); }
+const hasFiles = (e) => { try { return Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') >= 0; } catch (err) { return false; } };
+document.addEventListener('dragover', (e) => { if (!hasFiles(e) || (keepDlg && keepDlg.open)) return; e.preventDefault(); stage.classList.add('drop'); });
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) stage.classList.remove('drop'); });
+document.addEventListener('drop', (e) => {
+  stage.classList.remove('drop');
+  if (!hasFiles(e) || (keepDlg && keepDlg.open)) return;
+  e.preventDefault();
+  const f = Array.prototype.filter.call(e.dataTransfer.files || [], (x) => /^image\//.test(x.type))[0];
+  if (f) { hideHint(); usePhotoFile(f); } else toast('Drop a photo here!', 2600);
+});
+
+/* ---------- 📷 the live camera: the kid on stage behind the word, then 3, 2, 1, snap! ---------- */
+const camVid = $('#camVid'), camBar = $('#camBar'), camSnap = $('#camSnap'), camFlip = $('#camFlip'), camOff = $('#camOff'), camCount = $('#camCount');
+const cam = { on: false, stream: null, devices: [], deviceId: '', mirror: true, seq: 0, counting: false };
+const camOK = () => !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
+/* a frame that may not use the camera (claude.ai's viewer is one) says so up front in Chromium, so a
+   phone can open its camera app while the tap still counts as a tap */
+const camBlocked = () => { try { const fp = document.permissionsPolicy || document.featurePolicy; return !!(fp && typeof fp.allowsFeature === 'function' && !fp.allowsFeature('camera')); } catch (e) { return false; } };
+function stopStream() { if (cam.stream) { cam.stream.getTracks().forEach((t) => { try { t.stop(); } catch (e) { /* ignore */ } }); cam.stream = null; } }
+function markCam() { camTile.classList.toggle('on', cam.on); camTile.setAttribute('aria-pressed', String(cam.on)); }
+function noCamera(why, byKeys) {
+  stopCamera();
+  const msg = why === 'NotAllowedError' || why === 'SecurityError' ? 'The camera is switched off here. Add a photo instead! 🖼️'
+    : why === 'NotReadableError' ? 'Another app is using the camera. Add a photo instead! 🖼️' : 'No camera found. Add a photo instead! 🖼️';
+  toast(msg, 4200); announceEl.textContent = msg;
+  /* a phone or tablet can still open its own camera app */
+  if (!finePointer()) { try { snapFile.click(); } catch (e) { /* ignore */ } }
+  bump(addTile, 'wiggle');
+  if (byKeys) { try { addTile.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+}
+async function startCamera(deviceId, byKeys) {
+  const seq = ++cam.seq;
+  if (!camOK()) { noCamera('none', byKeys); return false; }
+  if (camBlocked()) { noCamera('NotAllowedError', byKeys); return false; }
+  cam.on = true; markCam(); hideHint();
+  stage.classList.add('cam'); camBar.hidden = false; camSnap.disabled = true; camFlip.hidden = cam.devices.length < 2;
+  refreshScene();
+  if (byKeys) { try { camOff.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+  stopStream();
+  const want = deviceId || load('fw.cam', ''), size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+  let stream = null;
+  try {
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: Object.assign(want ? { deviceId: { exact: want } } : { facingMode: 'user' }, size) }); }
+    catch (e) {
+      if (!want || !e || ['OverconstrainedError', 'NotFoundError', 'NotReadableError'].indexOf(e.name) < 0) throw e;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: size }); /* that camera is gone: any camera will do */
+    }
+  } catch (e) { if (seq === cam.seq) noCamera(e && e.name, byKeys); return false; }
+  if (seq !== cam.seq || !cam.on) { stream.getTracks().forEach((t) => t.stop()); return false; }
+  cam.stream = stream;
+  const tr = stream.getVideoTracks()[0], st = (tr && tr.getSettings && tr.getSettings()) || {};
+  if (tr) tr.addEventListener('ended', () => { if (cam.stream === stream) { stopCamera(); toast('The camera stopped.', 2600); } }); /* unplugged */
+  cam.deviceId = st.deviceId || ''; cam.mirror = st.facingMode !== 'environment'; /* a selfie is seen in a mirror, a back camera is not */
+  stage.classList.toggle('mirror', cam.mirror);
+  camVid.srcObject = stream;
+  try { await camVid.play(); } catch (e) { /* muted inline video plays; if not, the first frame still shows */ }
+  if (seq !== cam.seq) return false;
+  try { cam.devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput'); } catch (e) { cam.devices = []; }
+  if (seq !== cam.seq) return false;
+  camFlip.hidden = cam.devices.length < 2; camSnap.disabled = false;
+  announceEl.textContent = 'Camera on. Press Snap for a photo.';
+  return true;
+}
+function stopCamera() {
+  const had = cam.on || cam.stream; cam.seq++; cam.on = false; cam.counting = false;
+  stopStream(); try { camVid.pause(); } catch (e) { /* ignore */ } camVid.srcObject = null;
+  const focusIn = camBar.contains(document.activeElement);
+  stage.classList.remove('cam', 'mirror'); camBar.hidden = true; camCount.textContent = ''; camCount.classList.remove('go');
+  markCam();
+  if (had) refreshScene();
+  if (focusIn) { try { camTile.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+}
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+async function snap(quick) {
+  if (!cam.stream || cam.counting) return null;
+  const seq = cam.seq; cam.counting = true; camSnap.disabled = true;
+  for (const n of quick ? [] : [3, 2, 1]) {
+    camCount.textContent = String(n); bump(camCount, 'go'); sound.tick(); announceEl.textContent = String(n);
+    await pause(800);
+    if (seq !== cam.seq) return null;
+  }
+  camCount.textContent = ''; camCount.classList.remove('go');
+  const w = camVid.videoWidth, h = camVid.videoHeight;
+  if (!w || !h) { cam.counting = false; camSnap.disabled = false; toast('No picture yet. Try again!', 2600); return null; }
+  const cv = photoCanvas(camVid, w, h, cam.mirror); /* the photo looks just like what the kid saw */
+  if (!isReduced() && FEAT.animate) { try { flashEl.animate([{ opacity: .95 }, { opacity: 0 }], { duration: 380, easing: 'ease-out' }); } catch (e) { /* ignore */ } }
+  sound.pop();
+  stopCamera();
+  const id = addPhoto(cv);
+  toast('📸 Snap! You are in the scene!', 3000); announceEl.textContent = 'Photo taken. It is the scene now.';
+  if (!state.autoplay) again();
+  return id;
+}
+camSnap.addEventListener('click', () => { snap(false); });
+camOff.addEventListener('click', () => { stopCamera(); sound.pop(); });
+camFlip.addEventListener('click', async () => {
+  if (cam.devices.length < 2) return;
+  const i = cam.devices.findIndex((d) => d.deviceId === cam.deviceId), k = (i + 1) % cam.devices.length, next = cam.devices[k];
+  save('fw.cam', next.deviceId); sound.pop();
+  if (await startCamera(next.deviceId, false)) toast('🎥 ' + (next.label || 'Camera ' + (k + 1)), 2600);
+  try { camFlip.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+});
+camBar.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); stopCamera(); } });
+/* a camera nobody can see is switched off */
+document.addEventListener('visibilitychange', () => { if (document.hidden && cam.on) stopCamera(); });
+window.addEventListener('pagehide', () => { if (cam.on) stopCamera(); });
+
 /* ---------- debug / testing API ---------- */
 window.FW = {
   version: 'v1',
@@ -3885,6 +4230,15 @@ window.FW = {
   setTab(name) { setTab(name); },
   setScene(id) { setScene(id); },
   scenes: SCENE_ORDER.slice(),
+  photos: {
+    list: () => photos.map((p) => ({ id: p.id, full: !!p.cv, w: p.cv ? p.cv.width : 0, h: p.cv ? p.cv.height : 0, sw: p.small.width, sh: p.small.height, saved: !!p.blob })),
+    async add(url, type) { const b = await (await fetch(url)).blob(); return usePhotoFile(new File([b], 'photo', { type: type || b.type || 'image/png' })); },
+    remove: (id) => removePhoto(id), restore: () => restorePhotos()
+  },
+  camera: {
+    start: () => startCamera('', false), snap: (quick) => snap(!!quick), stop: () => stopCamera(),
+    info: () => ({ on: cam.on, live: !!cam.stream, devices: cam.devices.length, mirror: cam.mirror, deviceId: cam.deviceId, counting: cam.counting })
+  },
   keep: {
     open: () => openKeep(), close: () => closeKeep(), spec: (text) => stageSpec(text), ctxFilter: KEEP.CTX_FILTER, inViewer: KEEP.inViewer,
     /* make a file the way the dialog does and describe it (the blob is left on window.__keepBlob for tests) */
@@ -3916,6 +4270,7 @@ buildStyleTiles();
 buildChips();
 buildEmojiTiles();
 buildSceneTiles();
+placeActTiles();
 buildEvery();
 /* after the tiles and options exist, so the widths are real */
 stripEdges = [styleEl, chipsEl, scenesEl, emojiEl, showEl].map(makeStrip);
@@ -3925,7 +4280,8 @@ renderSeen();
 setShuffle(load('fw.shuffle', true) !== false);
 setEvery(load('fw.every', 2000)); /* the show itself always starts off: nothing moves until a kid asks */
 setCalm(load('fw.calm', false) === true);
-setScene(load('fw.scene', 'mix'));
+setScene(load('fw.scene', 'mix'), true);
+restorePhotos(); /* a saved photo scene comes back once its picture has loaded */
 if (load('fw.sound', false) === true) { state.sound = true; showSound(); }
 if (!load('fw.hinted', false)) hintEl.hidden = false;
 if (hoverable()) { try { input.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }

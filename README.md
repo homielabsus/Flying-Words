@@ -22,7 +22,7 @@ Works on phones, tablets and desktops. Tap a letter to make it hop; double-tap t
 - **The toy box** has tabs. On a phone it sits under the word box as a row of big tiles you can swipe (two rows on a tablet held upright); on a wide screen it is a side panel of grids.
   - 🎨 **Styles** — every style draws "Wow" in itself, so you can see it before you pick it. Tap one and your word wears it straight away; tap it again to replay the word. 🎲 **Mix** goes back to a new style every time.
   - 🎬 **Moves** — each tile's emoji acts out its move when you point at it. Tap one to see your word do it. 🎲 **Mix** goes back to a new move every time.
-  - 🏞️ **Scenes** — a world behind your word: Sunny Sky, Outer Space, Under the Sea, Rainbow, Sunset, Snow Day, Flower Garden, Dino Land, Candyland, Party Time and Magic Castle. Each one moves (clouds drift, fish swim, stars twinkle) and stays until you pick another. 🎲 **Mix** goes back to the colour-changing stage.
+  - 🏞️ **Scenes** — a world behind your word: Sunny Sky, Outer Space, Under the Sea, Rainbow, Sunset, Snow Day, Flower Garden, Dino Land, Candyland, Party Time and Magic Castle. Each one moves (clouds drift, fish swim, stars twinkle) and stays until you pick another. 🎲 **Mix** goes back to the colour-changing stage. **📷 Camera** and **🖼️ Add Photo** put *you* behind your word (see below).
   - 😀 **Emoji** — tap to add emoji to your word (handy on computers with no emoji keyboard), plus ⌫ to delete one and 🧹 to clear.
   - 🎛️ **Show** — Auto Play, Shuffle, the ⏱ timer, 🔊 Sound and 🐢 Calm. On a wide screen these are always in view at the bottom of the panel instead.
 
@@ -45,13 +45,33 @@ The Mix stage colours change on every press, now from 14 colour pairs (strawberr
 - **Exit and return:** 🧨 Blast Off · 💥 Shatter · 🍂 Fall Apart
 - **Everything at once:** 🎆 Party! It also turns up by itself on runs 10, 25 and 50, and for words like `party`, `🎉`, `🥳`, `🎂`, unless you have pinned a move. A tile you picked always wins.
 
+## 📷 Your own photo as the scene
+
+- **🖼️ Add Photo** picks a picture from the device (on a computer you can also drop one onto the page). It fills the stage behind your word, whatever style or move is playing.
+- **📷 Camera** puts the live camera on the stage, so you can see yourself with the word flying in front of you. Tap **📸 Snap!**: it counts 3, 2, 1, and the photo becomes the scene. **✕** closes the camera. With more than one camera (a laptop's own and a USB webcam, or a phone's front and back), **🔄** switches between them, says which one is on, and remembers it for next time. A selfie camera is shown like a mirror and the photo is saved the way you saw it.
+- Each photo gets its own tile (newest first, up to 6). The photo in use shows a **✕** on its tile to remove it.
+- Photos never leave the device. They are kept in the browser's own storage for this page, so they are still there next time, until you remove them.
+- If the camera is not allowed (inside the claude.ai preview, for example, or if you said no), the page says so: a phone or tablet opens its own camera app instead, and on a computer you can use **🖼️ Add Photo**. The live camera needs the page opened directly (from the file or GitHub Pages) in a browser that can use the camera.
+- **📸 Keep it** saves the photo scene with your word like any other scene.
+
 ## 📸 Keep it: save a picture, a GIF or a video
 
 Saw one you love? Tap **📸** on the stage. You keep exactly what was playing: the same word, style, move, colours and scene, down to where each letter rained in from.
 
-- Change the word if you like, then pick **🖼️ Picture** (PNG), **📷 Photo** (JPEG), **🎞️ GIF** (it moves and loops) or **🎬 Video** (MP4), and a shape: **Square**, **Wide** or **Tall**.
-- The preview shows what you will get. Tap **✨ Make**, watch it appear, then **⬇️ Save it!**
-- Pictures are 1080 pixels on the short side (1920×1080 when wide), GIFs 480 pixels, videos 1080×1080 or 720p.
+- Change the word if you like, then pick **🖼️ Picture** (PNG), **📷 Photo** (JPEG), **🎞️ GIF** (it moves and loops) or **🎬 Video** (MP4), and one of eight shapes. Each shape tile draws its own outline:
+
+  | Shape | Ratio | Picture / Photo | GIF | Video |
+  |---|---|---|---|---|
+  | Square | 1:1 | 1080×1080 | 480×480 | 1080×1080 |
+  | Wide | 16:9 | 1920×1080 | 640×360 | 1280×720 |
+  | Tall | 9:16 | 1080×1920 | 360×640 | 720×1280 |
+  | Tablet | 4:3 | 1440×1080 | 560×420 | 960×720 |
+  | Portrait | 3:4 | 1080×1440 | 420×560 | 720×960 |
+  | Poster | 4:5 | 1080×1350 | 384×480 | 864×1080 |
+  | Postcard | 3:2 | 1620×1080 | 600×400 | 1080×720 |
+  | Movie | 21:9 | 2520×1080 | 700×300 | 1680×720 |
+
+- The preview shows what you will get. Tap **✨ Make**, watch it appear, then **⬇️ Save it!** The dialog remembers your last format and shape.
 - On a phone or tablet, **📤 Share** can put it straight into Photos or a message.
 - Videos are H.264 MP4 in Chrome, Edge and Safari. A browser without an H.264 encoder (some Linux builds) writes the MP4 with VP9 instead, and one with no video encoder at all records a WebM.
 - Everything happens on your device: nothing is uploaded.
@@ -67,6 +87,6 @@ Type a new word while the show is running and it carries on with the new word. T
 ## Extras
 
 - 🔊 sound (a few tiny synthesized sounds, off by default), 🐢 Calm mode for gentler motion (also follows your system's reduced-motion setting); with Calm on, scenes stand still too.
-- Keyboard: **Enter** = go, **Esc** clears the box, **↑/↓** in the word box change the move, **←/→** move between the toy box tabs, and ↑/↓ step through the ⏱ menu while it has the focus.
+- Keyboard: **Enter** = go, **Esc** clears the box (or closes the camera), **↑/↓** in the word box change the move, **←/→** move between the toy box tabs, and ↑/↓ step through the ⏱ menu while it has the focus.
 - Any input works: emoji families, flags, accents, CJK, Arabic, long phrases. An empty box plays the example it shows, or replays your last word.
 - A first-time hint points at the word box until the first word is typed.
