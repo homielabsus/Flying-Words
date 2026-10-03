@@ -2666,6 +2666,26 @@ const CLOUD = variants((v) => model('cloud-' + v, .62, (g) => {
   if (/-face$/.test(v)) face(g, .5, .38, .07, { sleepy: v.indexOf('dusk') < 0 && v.indexOf('night') < 0 ? false : true });
 }));
 
+/* ---------- still layers: the parts of a scene that never move (sky, hills, fence, castle …) are painted once
+   per size into a canvas of their own, so each frame only copies them and draws what moves. A small canvas
+   (a tile) just paints straight away. ---------- */
+const LAYERS = new Map();
+function still(c, key, w, h, paint) {
+  const k = pxScale(c), W = Math.round(w * k), H = Math.round(h * k);
+  if (W * H < 120000) { paint(c); return; }
+  const id = key + '@' + W + 'x' + H;
+  let cv = LAYERS.get(id);
+  if (cv) { LAYERS.delete(id); LAYERS.set(id, cv); }
+  else {
+    cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d'); g.scale(W / w, H / h); g.lineJoin = 'round'; g.lineCap = 'round';
+    try { paint(g); } catch (e) { /* half a layer beats a broken scene */ }
+    LAYERS.set(id, cv);
+    while (LAYERS.size > 8) LAYERS.delete(LAYERS.keys().next().value);
+  }
+  const a = c.globalAlpha; c.globalAlpha = 1; c.drawImage(cv, 0, 0, w, h); c.globalAlpha = a;
+}
+
 /* ---------- background kit (drawn straight onto the scene, in scene units) ---------- */
 function vfill(c, w, h, stops) { const g = c.createLinearGradient(0, 0, 0, h); for (const s of stops) g.addColorStop(s[0], s[1]); c.fillStyle = g; c.fillRect(0, 0, w, h); }
 /* a radial gradient stretched into an ellipse, as CSS draws radial-gradient(RX RY at X Y, …) */
@@ -2946,6 +2966,11 @@ const UFO = model('ufo', .72, (g) => {
 });
 
 /* ---------- sea models ---------- */
+const BUBBLE = model('bubble', 1, (g) => {
+  circle(g, .5, .5, .45); g.fillStyle = rg(g, .4, .4, .6, [[0, 'rgba(255, 255, 255, .35)'], [1, 'rgba(255, 255, 255, .05)']]); g.fill();
+  g.strokeStyle = 'rgba(255, 255, 255, .85)'; g.lineWidth = .09; g.stroke();
+  g.fillStyle = 'rgba(255, 255, 255, .9)'; circle(g, .33, .33, .12); g.fill();
+});
 const FISH = variants((v) => model('fish-' + v, .66, (g) => {
   const [a, b, e, stripe] = { clown: ['#ffb36b', '#ff6a1a', '#b84000', '#ffffff'], tang: ['#7fc8ff', '#2463eb', '#173f9e', '#ffe14d'],
     yellow: ['#fff3a0', '#ffc21a', '#c98a00', '#ff8fb8'], pink: ['#ffd1ea', '#ff6fb5', '#b8357f', '#ffffff'] }[v];
@@ -3378,25 +3403,28 @@ defScene({ id: 'sky', name: 'Sunny Sky', emoji: '☀️',
     trees: [{ x: .06, s: .2, v: 'green' }, { x: .17, s: .15, v: 'deep' }, { x: .86, s: .17, v: 'deep' }, { x: .95, s: .22, v: 'green' }],
     dots: Array.from({ length: 24 }, () => ({ x: r(), y: r.range(.9, .99), col: r.pick(['#ffffff', '#ffe14d', '#ff8cc6']) })) }),
   draw(c, w, h, t, D, u) {
-    vfill(c, w, h, [[0, '#3fa9ff'], [.6, '#9edcff'], [1, '#e2f6ff']]);
     const sx = w * .84, sy = h * .2, sr = u * .2;
-    glow(c, sx, sy, sr * 2.6, '255, 236, 150', .55);
+    still(c, 'sky:back', w, h, (c) => { vfill(c, w, h, [[0, '#3fa9ff'], [.6, '#9edcff'], [1, '#e2f6ff']]); glow(c, sx, sy, sr * 2.6, '255, 236, 150', .55); });
     put(c, SUN_RAYS, sr * 1.7, sx, sy, { rot: t * .12 }); put(c, SUN_FACE, sr, sx, sy, { rot: Math.sin(t * .8) * .06 });
     for (const k of D.clouds) put(c, CLOUD(k.f ? 'day-face' : 'day'), k.s * u, loopX(k.x, k.v * u, t, w, k.s * u * .6), k.y * h);
     put(c, BALLOON_HOT, u * .19, loopX(.3, u * .016, t, w, u * .12), h * .3 + Math.sin(t * .7) * u * .025, { rot: Math.sin(t * .5) * .04 });
     bird(c, loopX(.6, u * .05, t, w, u * .08), h * .14 + Math.sin(t * 1.6) * u * .02, u * .085, 'blue', t, 0);
     bird(c, loopX(.52, u * .05, t, w, u * .08), h * .19 + Math.sin(t * 1.6 + 1) * u * .02, u * .07, 'red', t, 1.7);
-    const back = hill(c, w, h, .84, .05, 1.3, 0, '#a8ec7a', '#6fcf4f', 'rgba(255, 255, 255, .5)');
-    for (const k of D.trees) put(c, TREE(k.v), k.s * u, k.x * w, edgeY(back, k.x * w) + u * .02);
-    const front = hill(c, w, h, .92, .035, 2.1, 1.7, '#7fdc5f', '#3fae3a');
-    grassFringe(c, front, w, h, u, '#6ad154', t);
-    for (const d of D.dots) { c.fillStyle = d.col; c.beginPath(); c.arc(d.x * w, d.y * h, u * .006, 0, TAU); c.fill(); }
+    still(c, 'sky:front', w, h, (c) => {
+      const back = hill(c, w, h, .84, .05, 1.3, 0, '#a8ec7a', '#6fcf4f', 'rgba(255, 255, 255, .5)');
+      for (const k of D.trees) put(c, TREE(k.v), k.s * u, k.x * w, edgeY(back, k.x * w) + u * .02);
+      const front = hill(c, w, h, .92, .035, 2.1, 1.7, '#7fdc5f', '#3fae3a');
+      grassFringe(c, front, w, h, u, '#6ad154', 0);
+      for (const d of D.dots) { c.fillStyle = d.col; c.beginPath(); c.arc(d.x * w, d.y * h, u * .006, 0, TAU); c.fill(); }
+    });
   } });
 defScene({ id: 'space', name: 'Outer Space', emoji: '🚀',
   init: (r) => ({ stars: Array.from({ length: 120 }, () => ({ x: r(), y: r(), s: r() < .12 ? 2.6 : .5 + r() * 1.3, p: r() * TAU, v: .8 + r() * 2.2, col: r.pick(['#ffffff', '#ffffff', '#fff3c4', '#cfe6ff', '#ffd6f5']) })) }),
   draw(c, w, h, t, D, u) {
-    ellipseFill(c, w, h, w * .5, h * .3, w * 1.1, h * 1.1, [[0, '#2c1a7a'], [1, '#090722']]);
-    glow(c, w * .18, h * .22, u * .7, '255, 90, 200', .22); glow(c, w * .85, h * .75, u * .75, '60, 200, 255', .18); glow(c, w * .55, h * .5, u * .6, '150, 90, 255', .15);
+    still(c, 'space:back', w, h, (c) => {
+      ellipseFill(c, w, h, w * .5, h * .3, w * 1.1, h * 1.1, [[0, '#2c1a7a'], [1, '#090722']]);
+      glow(c, w * .18, h * .22, u * .7, '255, 90, 200', .22); glow(c, w * .85, h * .75, u * .75, '60, 200, 255', .18); glow(c, w * .55, h * .5, u * .6, '150, 90, 255', .15);
+    });
     const z = u / 500;
     for (const s of D.stars) {
       const a = .35 + .65 * (.5 + .5 * Math.sin(t * s.v + s.p));
@@ -3428,16 +3456,21 @@ defScene({ id: 'sea', name: 'Under the Sea', emoji: '🐠',
     weeds: Array.from({ length: 9 }, (_, k) => ({ x: (k + .3 + r() * .4) / 9, len: .16 + r() * .16, p: r() * TAU, col: r.pick([['#5fe08f', '#1f9e5a'], ['#8be06a', '#3f9e2a'], ['#3fd1a8', '#13806a']]) })),
     fish: [{ v: 'clown', y: .3, sp: .07, d: 1, x: .1, s: .15 }, { v: 'tang', y: .58, sp: .05, d: -1, x: .6, s: .16 }, { v: 'yellow', y: .45, sp: .04, d: 1, x: .55, s: .12 }, { v: 'pink', y: .18, sp: .03, d: -1, x: .3, s: .1 }] }),
   draw(c, w, h, t, D, u) {
-    vfill(c, w, h, [[0, '#5fe6f4'], [.45, '#22a0da'], [1, '#124a8c']]);
-    for (let k = 0; k < 5; k++) {
-      const x = w * (.08 + k * .22) + Math.sin(t * .3 + k) * w * .03;
-      const rgr = c.createLinearGradient(0, 0, 0, h); rgr.addColorStop(0, 'rgba(255, 255, 255, .22)'); rgr.addColorStop(1, 'rgba(255, 255, 255, 0)');
-      c.fillStyle = rgr; c.beginPath(); c.moveTo(x - w * .03, 0); c.lineTo(x + w * .05, 0); c.lineTo(x + w * .17, h); c.lineTo(x - w * .02, h); c.fill();
-    }
-    const sand = hill(c, w, h, .9, .025, 3, .5, '#ffe7b3', '#f0c784', 'rgba(255, 255, 255, .5)');
-    c.fillStyle = 'rgba(200, 150, 80, .25)'; for (let k = 0; k < 14; k++) { c.beginPath(); c.ellipse((k * .073 + .03) * w, h * (.94 + (k % 3) * .02), u * .02, u * .004, 0, 0, TAU); c.fill(); }
-    put(c, CORAL('pink'), u * .3, w * .1, edgeY(sand, w * .1) + u * .02); put(c, CORAL('orange'), u * .22, w * .2, edgeY(sand, w * .2) + u * .02);
-    put(c, CORAL('purple'), u * .26, w * .9, edgeY(sand, w * .9) + u * .02);
+    still(c, 'sea:back', w, h, (c) => vfill(c, w, h, [[0, '#5fe6f4'], [.45, '#22a0da'], [1, '#124a8c']]));
+    /* five sun rays in one fill, fading out before the sand */
+    const rgr = c.createLinearGradient(0, 0, 0, h * .8); rgr.addColorStop(0, 'rgba(255, 255, 255, .22)'); rgr.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    c.fillStyle = rgr; c.beginPath();
+    for (let k = 0; k < 5; k++) { const x = w * (.08 + k * .22) + Math.sin(t * .3 + k) * w * .03; c.moveTo(x - w * .03, 0); c.lineTo(x + w * .05, 0); c.lineTo(x + w * .15, h * .8); c.lineTo(x - w * .01, h * .8); c.closePath(); }
+    c.fill();
+    const sand = hillEdge(w, h, .9, .025, 3, .5);
+    still(c, 'sea:floor', w, h, (c) => {
+      hill(c, w, h, .9, .025, 3, .5, '#ffe7b3', '#f0c784', 'rgba(255, 255, 255, .5)');
+      c.fillStyle = 'rgba(200, 150, 80, .25)'; for (let k = 0; k < 14; k++) { c.beginPath(); c.ellipse((k * .073 + .03) * w, h * (.94 + (k % 3) * .02), u * .02, u * .004, 0, 0, TAU); c.fill(); }
+      put(c, CORAL('pink'), u * .3, w * .1, edgeY(sand, w * .1) + u * .02); put(c, CORAL('orange'), u * .22, w * .2, edgeY(sand, w * .2) + u * .02);
+      put(c, CORAL('purple'), u * .26, w * .9, edgeY(sand, w * .9) + u * .02);
+      put(c, STARFISH('orange'), u * .09, w * .32, edgeY(sand, w * .32) + u * .03, { rot: .2 }); put(c, STARFISH('pink'), u * .07, w * .74, edgeY(sand, w * .74) + u * .035, { rot: -.3 });
+      put(c, SHELL, u * .06, w * .58, edgeY(sand, w * .58) + u * .03);
+    });
     c.lineCap = 'round';
     for (const s of D.weeds) {
       const x = s.x * w, L = s.len * h, base = edgeY(sand, x) + u * .02, n = 8;
@@ -3446,8 +3479,6 @@ defScene({ id: 'sea', name: 'Under the Sea', emoji: '🐠',
       for (let k = n; k >= 0; k--) { const q = k / n, y = base - L * q, sw = Math.sin(t * 1.4 + s.p + q * 3) * u * .03 * q, wd = u * .014 * (1 - q * .7); c.lineTo(x + sw + wd, y); }
       c.fill();
     }
-    put(c, STARFISH('orange'), u * .09, w * .32, edgeY(sand, w * .32) + u * .03, { rot: .2 }); put(c, STARFISH('pink'), u * .07, w * .74, edgeY(sand, w * .74) + u * .035, { rot: -.3 });
-    put(c, SHELL, u * .06, w * .58, edgeY(sand, w * .58) + u * .03);
     const cx = w * (.5 + .16 * Math.sin(t * .35));
     put(c, CRAB, u * .12, cx, edgeY(sand, cx) + u * .01 - Math.abs(Math.sin(t * 6)) * u * .006, { rot: Math.sin(t * 6) * .05 });
     for (const f of D.fish) fish(c, loopX(f.x, f.sp * u * f.d, t, w, u * .12), f.y * h + Math.sin(t * 1.3 + f.x * 9) * u * .02, u * f.s, f.v, t, f.x * 7, f.d);
@@ -3457,25 +3488,24 @@ defScene({ id: 'sea', name: 'Under the Sea', emoji: '🐠',
     put(c, JELLY, u * .12, jx, jy, { sx: pulse, sy: 1 / pulse });
     for (const b of D.bubbles) {
       const x = b.x * w + Math.sin(t * 1.6 + b.p) * u * .012, y = loopY(b.y, -b.v * u, t, h, 20), r = b.s * u;
-      c.fillStyle = rg(c, x - r * .3, y - r * .3, r * 1.3, [[0, 'rgba(255, 255, 255, .35)'], [1, 'rgba(255, 255, 255, .05)']]);
-      c.strokeStyle = 'rgba(255, 255, 255, .8)'; c.lineWidth = Math.max(1, u * .003);
-      c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); c.stroke();
-      c.fillStyle = 'rgba(255, 255, 255, .9)'; c.beginPath(); c.arc(x - r * .35, y - r * .35, r * .25, 0, TAU); c.fill();
+      put(c, BUBBLE, r * 2, x, y);
     }
   } });
 defScene({ id: 'rainbow', name: 'Rainbow', emoji: '🌈',
   init: (r) => ({ sparks: Array.from({ length: 18 }, () => ({ x: r(), y: r() * .75, s: .012 + r() * .016, p: r() * TAU, col: r.pick(['#ffd60a', '#ff8cc6', '#7cc8ff', '#ffffff']) })),
     hearts: Array.from({ length: 7 }, () => ({ x: r(), y: r(), v: .025 + r() * .025, s: .04 + r() * .035, p: r() * TAU, k: r.pick(['pink', 'red', 'purple']) })) }),
   draw(c, w, h, t, D, u) {
-    vfill(c, w, h, [[0, '#ffe9f6'], [.5, '#f6f0ff'], [1, '#dff1ff']]);
-    glow(c, w * .5, h * .25, u * .8, '255, 255, 255', .9);
     const cx = w / 2, cy = h * 1.02, R0 = h * .74, band = u * .055;
-    glow(c, cx, cy, R0 * 1.25, '255, 200, 240', .25);
-    ['#ff4d6d', '#ff9f1c', '#ffd60a', '#4cd964', '#3cb4ff', '#5b6cff', '#b45cff'].forEach((col, k) => {
-      c.strokeStyle = col; c.lineWidth = band + 1; c.beginPath(); c.arc(cx, cy, R0 - k * band, Math.PI, TAU); c.stroke();
+    still(c, 'rainbow:back', w, h, (c) => {
+      vfill(c, w, h, [[0, '#ffe9f6'], [.5, '#f6f0ff'], [1, '#dff1ff']]);
+      glow(c, w * .5, h * .25, u * .8, '255, 255, 255', .9);
+      glow(c, cx, cy, R0 * 1.25, '255, 200, 240', .25);
+      ['#ff4d6d', '#ff9f1c', '#ffd60a', '#4cd964', '#3cb4ff', '#5b6cff', '#b45cff'].forEach((col, k) => {
+        c.strokeStyle = col; c.lineWidth = band + 1; c.beginPath(); c.arc(cx, cy, R0 - k * band, Math.PI, TAU); c.stroke();
+      });
+      c.strokeStyle = 'rgba(255, 255, 255, .35)'; c.lineWidth = band * .22;
+      for (let k = 0; k < 7; k++) { c.beginPath(); c.arc(cx, cy, R0 - k * band + band * .25, Math.PI * 1.06, Math.PI * 1.45); c.stroke(); }
     });
-    c.strokeStyle = 'rgba(255, 255, 255, .35)'; c.lineWidth = band * .22;
-    for (let k = 0; k < 7; k++) { c.beginPath(); c.arc(cx, cy, R0 - k * band + band * .25, Math.PI * 1.06, Math.PI * 1.45); c.stroke(); }
     for (const s of D.sparks) twinkle(c, s.x * w, s.y * h, s.s * u, s.col, .45 + .55 * (.5 + .5 * Math.sin(t * 2 + s.p)));
     for (const k of D.hearts) put(c, HEART(k.k), k.s * u, k.x * w + Math.sin(t * .9 + k.p) * u * .03, loopY(k.y, -k.v * u, t, h, k.s * u), { rot: Math.sin(t * 1.3 + k.p) * .25 });
     const s = u * .5;
@@ -3486,50 +3516,56 @@ defScene({ id: 'sunset', name: 'Sunset', emoji: '🌅',
     sparkle: Array.from({ length: 26 }, () => ({ x: r(), y: r(), p: r() * TAU, l: .02 + r() * .05 })),
     clouds: [{ x: .1, y: .22, s: .3, v: .006 }, { x: .6, y: .12, s: .24, v: .004 }, { x: .82, y: .32, s: .18, v: .008 }] }),
   draw(c, w, h, t, D, u) {
-    const sea = h * .68;
-    vfill(c, w, h, [[0, '#3b1d78'], [.32, '#a13d8f'], [.55, '#ff6f7d'], [.68, '#ffb35c'], [1, '#ffb35c']]);
-    const sx = w * .5, sy = sea - u * .04 + Math.sin(t * .25) * u * .006, R = u * .2;
-    glow(c, sx, sy, R * 3, '255, 210, 120', .55);
+    const sea = h * .68, sx = w * .5, sy = sea - u * .04, R = u * .2;
+    still(c, 'sunset:back', w, h, (c) => {
+      vfill(c, w, h, [[0, '#3b1d78'], [.32, '#a13d8f'], [.55, '#ff6f7d'], [.68, '#ffb35c'], [1, '#ffb35c']]);
+      glow(c, sx, sy, R * 3, '255, 210, 120', .55);
+      c.save(); c.beginPath(); c.rect(0, 0, w, sea); c.clip();
+      c.fillStyle = lg(c, 0, sy - R, 0, sy + R, [[0, '#fff7c2'], [.6, '#ffc35c'], [1, '#ff7a3c']]); c.beginPath(); c.arc(sx, sy, R, 0, TAU); c.fill();
+      c.restore();
+      c.fillStyle = lg(c, 0, sea, 0, h, [[0, '#ff8a6a'], [.3, '#a2457f'], [1, '#2e1650']]); c.fillRect(0, sea, w, h - sea);
+      c.fillStyle = '#3a1550'; c.beginPath(); c.moveTo(0, sea + u * .02); c.quadraticCurveTo(w * .12, sea - u * .07, w * .26, sea + u * .02); c.closePath(); c.fill();
+    });
     for (const k of D.clouds) put(c, CLOUD('dusk'), k.s * u, loopX(k.x, k.v * u, t, w, k.s * u), k.y * h);
-    c.save(); c.beginPath(); c.rect(0, 0, w, sea); c.clip();
-    c.fillStyle = lg(c, 0, sy - R, 0, sy + R, [[0, '#fff7c2'], [.6, '#ffc35c'], [1, '#ff7a3c']]); c.beginPath(); c.arc(sx, sy, R, 0, TAU); c.fill();
-    c.restore();
-    c.fillStyle = lg(c, 0, sea, 0, h, [[0, '#ff8a6a'], [.3, '#a2457f'], [1, '#2e1650']]); c.fillRect(0, sea, w, h - sea);
-    c.lineCap = 'round';
+    c.lineCap = 'round'; c.lineWidth = Math.max(1, u * .006);
     for (const s of D.sparkle) {
       const y = sea + (h - sea) * (.05 + .9 * s.y), spread = (y - sea) / (h - sea), x = sx + (s.x - .5) * u * (.25 + spread * .9) + Math.sin(t * 1.5 + s.p) * u * .01;
-      c.strokeStyle = 'rgba(255, 236, 170, ' + (.35 + .45 * (.5 + .5 * Math.sin(t * 3 + s.p))) * (1 - spread * .6) + ')'; c.lineWidth = Math.max(1, u * .006);
+      c.strokeStyle = 'rgba(255, 236, 170, ' + (.35 + .45 * (.5 + .5 * Math.sin(t * 3 + s.p))) * (1 - spread * .6) + ')';
       c.beginPath(); c.moveTo(x - s.l * u, y); c.lineTo(x + s.l * u, y); c.stroke();
     }
-    c.fillStyle = '#3a1550'; c.beginPath(); c.moveTo(0, sea + u * .02); c.quadraticCurveTo(w * .12, sea - u * .07, w * .26, sea + u * .02); c.closePath(); c.fill();
     put(c, PALM_DARK, u * .3, w * .1, sea + u * .01, { rot: Math.sin(t * .8) * .02 }); put(c, PALM_DARK, u * .22, w * .18, sea + u * .01, { rot: Math.sin(t * .8 + 1) * .025, sx: -1 });
     put(c, BOAT, u * .14, loopX(.7, u * .012, t, w, u * .1), sea + u * .06 + Math.sin(t * 1.2) * u * .004, { rot: Math.sin(t * 1.2) * .04 });
-    c.strokeStyle = '#3a1550'; c.lineJoin = 'round';
+    c.strokeStyle = '#3a1550'; c.lineJoin = 'round'; c.lineWidth = Math.max(1.2, u * .008); c.beginPath();
     for (const b of D.birds) {
       const x = loopX(b.x, b.v * u, t, w, u * .05), y = b.y * h, s = b.s * u, f = Math.sin(t * 6 + b.p) * s * .5;
-      c.lineWidth = Math.max(1.2, u * .008); c.beginPath(); c.moveTo(x - s, y - f); c.quadraticCurveTo(x - s * .4, y - s * .25, x, y); c.quadraticCurveTo(x + s * .4, y - s * .25, x + s, y - f); c.stroke();
+      c.moveTo(x - s, y - f); c.quadraticCurveTo(x - s * .4, y - s * .25, x, y); c.quadraticCurveTo(x + s * .4, y - s * .25, x + s, y - f);
     }
+    c.stroke();
   } });
 defScene({ id: 'snow', name: 'Snow Day', emoji: '⛄',
   init: (r) => ({ flakes: Array.from({ length: 80 }, () => ({ x: r(), y: r(), s: .6 + r() * 1.6, v: .04 + r() * .06, p: r() * TAU })),
     crystals: Array.from({ length: 9 }, () => ({ x: r(), y: r(), s: .03 + r() * .025, v: .03 + r() * .03, p: r() * TAU })) }),
   draw(c, w, h, t, D, u) {
-    vfill(c, w, h, [[0, '#6aa6ff'], [.55, '#b8dbff'], [1, '#eef7ff']]);
-    glow(c, w * .82, h * .12, u * .5, '255, 255, 230', .7);
-    const back = hill(c, w, h, .78, .05, 1.4, .3, '#f4f9ff', '#d3e5fb', 'rgba(255, 255, 255, .9)');
-    for (const [x, s] of [[.32, .13], [.4, .1], [.62, .11], [.7, .14]]) put(c, PINE('far'), s * u, x * w, edgeY(back, x * w) + u * .01);
-    const cx = w * .2, cy = edgeY(back, cx) + u * .03;
+    const back = hillEdge(w, h, .78, .05, 1.4, .3), front = hillEdge(w, h, .88, .035, 2.2, 1.9), cx = w * .2, cy = edgeY(back, cx) + u * .03;
+    still(c, 'snow:back', w, h, (c) => {
+      vfill(c, w, h, [[0, '#6aa6ff'], [.55, '#b8dbff'], [1, '#eef7ff']]);
+      glow(c, w * .82, h * .12, u * .5, '255, 255, 230', .7);
+      hill(c, w, h, .78, .05, 1.4, .3, '#f4f9ff', '#d3e5fb', 'rgba(255, 255, 255, .9)');
+      for (const [x, s] of [[.32, .13], [.4, .1], [.62, .11], [.7, .14]]) put(c, PINE('far'), s * u, x * w, edgeY(back, x * w) + u * .01);
+    });
     for (let k = 0; k < 4; k++) { const q = ((t * .25 + k / 4) % 1); c.fillStyle = 'rgba(235, 240, 250, ' + (.55 * (1 - q)) + ')'; c.beginPath(); c.arc(cx + u * .05 + Math.sin(q * 5 + k) * u * .025, cy - u * .21 - q * u * .22, u * (.012 + q * .03), 0, TAU); c.fill(); }
-    put(c, CABIN, u * .26, cx, cy);
-    const front = hill(c, w, h, .88, .035, 2.2, 1.9, '#ffffff', '#dceaff', 'rgba(170, 200, 240, .8)');
-    put(c, PINE('near'), u * .3, w * .05, edgeY(front, w * .05) + u * .03); put(c, PINE('near'), u * .22, w * .12, edgeY(front, w * .12) + u * .03);
-    put(c, PINE('near'), u * .26, w * .97, edgeY(front, w * .97) + u * .03);
+    still(c, 'snow:front', w, h, (c) => {
+      put(c, CABIN, u * .26, cx, cy);
+      hill(c, w, h, .88, .035, 2.2, 1.9, '#ffffff', '#dceaff', 'rgba(170, 200, 240, .8)');
+      put(c, PINE('near'), u * .3, w * .05, edgeY(front, w * .05) + u * .03); put(c, PINE('near'), u * .22, w * .12, edgeY(front, w * .12) + u * .03);
+      put(c, PINE('near'), u * .26, w * .97, edgeY(front, w * .97) + u * .03);
+    });
     put(c, SNOWMAN, u * .28, w * .84, edgeY(front, w * .84) + u * .035, { rot: Math.sin(t * .9) * .02 });
     const px = w * (.5 + .22 * Math.sin(t * .15));
     put(c, PENGUIN, u * .13, px, edgeY(front, px) + u * .03, { rot: Math.sin(t * 6) * .12, sx: Math.cos(t * .15) >= 0 ? 1 : -1 });
-    c.fillStyle = '#fff';
-    for (const f of D.flakes) { const y = loopY(f.y, f.v * u, t, h, 10), x = f.x * w + Math.sin(t * .9 + f.p) * u * .03; c.globalAlpha = .9; c.beginPath(); c.arc(x, y, f.s * u / 260, 0, TAU); c.fill(); }
-    c.globalAlpha = 1;
+    c.fillStyle = 'rgba(255, 255, 255, .9)'; c.beginPath();
+    for (const f of D.flakes) { const y = loopY(f.y, f.v * u, t, h, 10), x = f.x * w + Math.sin(t * .9 + f.p) * u * .03, r = f.s * u / 260; c.moveTo(x + r, y); c.arc(x, y, r, 0, TAU); }
+    c.fill();
     for (const f of D.crystals) put(c, FLAKE, f.s * u, f.x * w + Math.sin(t * .7 + f.p) * u * .04, loopY(f.y, f.v * u, t, h, 20), { rot: t * .4 + f.p, a: .9 });
   } });
 defScene({ id: 'garden', name: 'Flower Garden', emoji: '🌷',
@@ -3544,13 +3580,15 @@ defScene({ id: 'garden', name: 'Flower Garden', emoji: '🌷',
     };
   },
   draw(c, w, h, t, D, u) {
-    vfill(c, w, h, [[0, '#86d3ff'], [.55, '#dcf4ff'], [1, '#fff1f8']]);
-    glow(c, w * .9, h * .06, u * .55, '255, 244, 190', .85);
+    still(c, 'garden:back', w, h, (c) => {
+      vfill(c, w, h, [[0, '#86d3ff'], [.55, '#dcf4ff'], [1, '#fff1f8']]);
+      glow(c, w * .9, h * .06, u * .55, '255, 244, 190', .85);
+      hill(c, w, h, .79, .035, 1.6, .6, '#c4f09a', '#95d76e', 'rgba(255, 255, 255, .6)');
+      fence(c, w, h, h * .84, u * .1);
+      const front = hill(c, w, h, .875, .018, 2.4, 1.3, '#86e063', '#46b33d');
+      grassFringe(c, front, w, h, u, '#6ad154', 0);
+    });
     for (const k of D.clouds) put(c, CLOUD('day'), k.s * u, loopX(k.x, k.v * u, t, w, k.s * u), k.y * h);
-    hill(c, w, h, .79, .035, 1.6, .6, '#c4f09a', '#95d76e', 'rgba(255, 255, 255, .6)');
-    fence(c, w, h, h * .84, u * .1);
-    const front = hill(c, w, h, .875, .018, 2.4, 1.3, '#86e063', '#46b33d');
-    grassFringe(c, front, w, h, u, '#6ad154', t);
     for (const f of D.flowers) {
       const x = f.x * w, base = h * 1.03, sway = Math.sin(t * 1.1 + f.p) * u * .014, hx = x + sway, hy = h * f.top, size = u * .12 * f.s, lean = sway / (u * .2);
       c.strokeStyle = lg(c, 0, hy, 0, base, [[0, '#5fcf62'], [1, '#2a8a3c']]); c.lineWidth = Math.max(1.5, u * .013); c.lineCap = 'round';
@@ -3574,29 +3612,34 @@ defScene({ id: 'garden', name: 'Flower Garden', emoji: '🌷',
   } });
 defScene({ id: 'dino', name: 'Dino Land', emoji: '🦕',
   draw(c, w, h, t, D, u) {
-    vfill(c, w, h, [[0, '#ffc874'], [.55, '#ffe9b8'], [1, '#e2f6c4']]);
-    glow(c, w * .2, h * .15, u * .5, '255, 250, 210', .7);
-    c.fillStyle = 'rgba(190, 140, 190, .45)'; c.beginPath(); c.moveTo(0, h * .7);
-    for (let k = 0; k <= 10; k++) c.lineTo(w * k / 10, h * (.62 - (k % 2 ? .1 : .02) - Math.sin(k) * .03)); c.lineTo(w, h * .8); c.lineTo(0, h * .8); c.fill();
-    const vx = w * .78, vb = h * .82, vw = u * .62;
+    const vx = w * .78, vb = h * .82, vw = u * .62, back = hillEdge(w, h, .82, .03, 1.8, .6), front = hillEdge(w, h, .9, .025, 2.7, 2);
+    still(c, 'dino:back', w, h, (c) => {
+      vfill(c, w, h, [[0, '#ffc874'], [.55, '#ffe9b8'], [1, '#e2f6c4']]);
+      glow(c, w * .2, h * .15, u * .5, '255, 250, 210', .7);
+      c.fillStyle = 'rgba(190, 140, 190, .45)'; c.beginPath(); c.moveTo(0, h * .7);
+      for (let k = 0; k <= 10; k++) c.lineTo(w * k / 10, h * (.62 - (k % 2 ? .1 : .02) - Math.sin(k) * .03)); c.lineTo(w, h * .8); c.lineTo(0, h * .8); c.fill();
+      put(c, VOLCANO, vw, vx, vb);
+      hill(c, w, h, .82, .03, 1.8, .6, '#a6e07a', '#74c450', 'rgba(255, 255, 255, .5)');
+    });
     for (let k = 0; k < 6; k++) {
       const q = ((t * .2 + k / 6) % 1), r = u * (.03 + q * .07);
       c.fillStyle = 'rgba(205, 195, 205, ' + (.4 * (1 - q)) + ')'; c.beginPath(); c.arc(vx + Math.sin(q * 4 + k) * u * .04 + q * u * .05, vb - vw * .62 * .9 - q * u * .32, r * .85, 0, TAU); c.fill();
     }
     glow(c, vx, vb - vw * .62 * .88, u * .12, '255, 150, 60', .5 + .2 * Math.sin(t * 3));
-    put(c, VOLCANO, vw, vx, vb);
-    const back = hill(c, w, h, .82, .03, 1.8, .6, '#a6e07a', '#74c450', 'rgba(255, 255, 255, .5)');
     put(c, BRONTO, u * .36, loopX(.15, u * .03, t, w, u * .2), edgeY(back, loopX(.15, u * .03, t, w, u * .2)) + u * .03 - Math.abs(Math.sin(t * 3)) * u * .006);
     /* the wings swing round the shoulder, from up-and-back to down-and-back */
     const px = w * .62 + Math.sin(t * .4) * w * .2, py = h * .2 + Math.sin(t * .9) * u * .04 - Math.sin(t * 5) * u * .006, sw = Math.sin(t * 5);
     c.save(); c.translate(px, py); if (Math.cos(t * .4) < 0) c.scale(-1, 1);
     put(c, PTERO_WING, u * .16, u * .02, -u * .012, { sx: -1, rot: -.75 + .7 * Math.sin(t * 5 - .3), a: .75 });
     put(c, PTERO, u * .2, 0, 0); put(c, PTERO_WING, u * .19, -u * .005, -u * .004, { sx: -1, rot: -.7 + .7 * sw }); c.restore();
-    const front = hill(c, w, h, .9, .025, 2.7, 2, '#8fd86a', '#4fae3a');
+    still(c, 'dino:front', w, h, (c) => {
+      hill(c, w, h, .9, .025, 2.7, 2, '#8fd86a', '#4fae3a');
+      put(c, FERN, u * .13, w * .93, edgeY(front, w * .93) + u * .02);
+      put(c, EGG('blue'), u * .055, w * .3, edgeY(front, w * .3) + u * .015); put(c, EGG('pink'), u * .048, w * .335, edgeY(front, w * .335) + u * .018, { rot: .25 });
+      put(c, EGG('mint'), u * .05, w * .28, edgeY(front, w * .28) + u * .03, { rot: -.2 });
+    });
     put(c, PALM, u * .44, w * .07, edgeY(front, w * .07) + u * .03, { rot: Math.sin(t * .9) * .02 });
-    put(c, FERN, u * .16, w * .2, edgeY(front, w * .2) + u * .02, { rot: Math.sin(t * 1.3) * .03 }); put(c, FERN, u * .13, w * .93, edgeY(front, w * .93) + u * .02);
-    put(c, EGG('blue'), u * .055, w * .3, edgeY(front, w * .3) + u * .015); put(c, EGG('pink'), u * .048, w * .335, edgeY(front, w * .335) + u * .018, { rot: .25 });
-    put(c, EGG('mint'), u * .05, w * .28, edgeY(front, w * .28) + u * .03, { rot: -.2 });
+    put(c, FERN, u * .16, w * .2, edgeY(front, w * .2) + u * .02, { rot: Math.sin(t * 1.3) * .03 });
     const tx = loopX(.8, -u * .035, t, w, u * .2);
     put(c, TRICERA, u * .22, tx, edgeY(front, tx) + u * .035 - Math.abs(Math.sin(t * 4)) * u * .006, { sx: -1, rot: Math.sin(t * 4) * .02 });
   } });
@@ -3604,22 +3647,29 @@ defScene({ id: 'candy', name: 'Candyland', emoji: '🍭',
   init: (r) => ({ sweets: Array.from({ length: 8 }, (_, k) => ({ m: ['wrap:pink', 'donut', 'cupcake', 'wrap:blue', 'icecream', 'wrap:yellow', 'donut', 'lolli:rainbow'][k], x: .08 + r() * .84, y: .06 + r() * .5, p: r() * TAU, s: .09 + r() * .04 })),
     clouds: [{ x: .2, y: .1, s: .26, v: .01 }, { x: .7, y: .2, s: .2, v: .014 }] }),
   draw(c, w, h, t, D, u) {
-    vfill(c, w, h, [[0, '#ffd3ef'], [.6, '#efd8ff'], [1, '#dccbff']]);
+    still(c, 'candy:back', w, h, (c) => vfill(c, w, h, [[0, '#ffd3ef'], [.6, '#efd8ff'], [1, '#dccbff']]));
+    /* the drifting polka dots: one fill per colour */
     const gap = u * .12, dr = u * .014, off = (t * u * .01) % gap, cols = ['rgba(255,255,255,.55)', 'rgba(255,150,210,.35)', 'rgba(150,200,255,.35)'];
-    for (let y = -gap, row = 0; y < h + gap; y += gap, row++) for (let x = -gap + (row % 2) * gap / 2, k = 0; x < w + gap; x += gap, k++) { c.fillStyle = cols[(row + k) % 3]; c.beginPath(); c.arc(x + off, y + off, dr, 0, TAU); c.fill(); }
-    for (const k of D.clouds) put(c, CLOUD('candy'), k.s * u, loopX(k.x, k.v * u, t, w, k.s * u), k.y * h);
-    const hill2 = hill(c, w, h, .8, .04, 1.5, 1, '#c9f2e0', '#8fdcc0');
-    put(c, CANE, u * .12, w * .2, edgeY(hill2, w * .2) + u * .04); put(c, CANE, u * .1, w * .76, edgeY(hill2, w * .76) + u * .04, { sx: -1 });
-    const front = hill(c, w, h, .88, .03, 2.2, .3, '#ffd1ea', '#ff9ac8');
-    c.fillStyle = '#ffffff'; c.beginPath(); c.moveTo(0, edgeY(front, 0));
-    for (let x = 0; x <= w; x += u * .04) { const y = edgeY(front, x), d = (Math.sin(x * 9.1 / u) + 1) * u * .02 + u * .008; c.lineTo(x, y); c.quadraticCurveTo(x + u * .01, y + d * 1.3, x + u * .02, y + u * .004); }
-    c.lineTo(w, edgeY(front, w) - u * .012); c.lineTo(0, edgeY(front, 0) - u * .012); c.closePath(); c.fill();
-    for (const [x, v] of [[.32, 'red'], [.4, 'green'], [.6, 'purple'], [.67, 'orange']]) put(c, GUMDROP(v), u * .09, x * w, edgeY(front, x * w) + u * .02);
-    for (const [x, y, v, s] of [[.1, .74, 'pink', .16], [.9, .72, 'mint', .14]]) {
-      c.fillStyle = '#fff'; c.strokeStyle = 'rgba(200, 120, 170, .6)'; c.lineWidth = Math.max(1, u * .004);
-      c.beginPath(); c.rect(x * w - u * .008, y * h, u * .016, h); c.fill(); c.stroke();
-      put(c, LOLLI(v), s * u, x * w, y * h, { rot: t * .3 * (v === 'pink' ? 1 : -1) });
+    for (let ci = 0; ci < 3; ci++) {
+      c.fillStyle = cols[ci]; c.beginPath();
+      for (let y = -gap, row = 0; y < h + gap; y += gap, row++) for (let x = -gap + (row % 2) * gap / 2, k = 0; x < w + gap; x += gap, k++) if ((row + k) % 3 === ci) { c.moveTo(x + off + dr, y + off); c.arc(x + off, y + off, dr, 0, TAU); }
+      c.fill();
     }
+    for (const k of D.clouds) put(c, CLOUD('candy'), k.s * u, loopX(k.x, k.v * u, t, w, k.s * u), k.y * h);
+    still(c, 'candy:hills', w, h, (c) => {
+      const hill2 = hill(c, w, h, .8, .04, 1.5, 1, '#c9f2e0', '#8fdcc0');
+      put(c, CANE, u * .12, w * .2, edgeY(hill2, w * .2) + u * .04); put(c, CANE, u * .1, w * .76, edgeY(hill2, w * .76) + u * .04, { sx: -1 });
+      const front = hill(c, w, h, .88, .03, 2.2, .3, '#ffd1ea', '#ff9ac8');
+      c.fillStyle = '#ffffff'; c.beginPath(); c.moveTo(0, edgeY(front, 0));
+      for (let x = 0; x <= w; x += u * .04) { const y = edgeY(front, x), d = (Math.sin(x * 9.1 / u) + 1) * u * .02 + u * .008; c.lineTo(x, y); c.quadraticCurveTo(x + u * .01, y + d * 1.3, x + u * .02, y + u * .004); }
+      c.lineTo(w, edgeY(front, w) - u * .012); c.lineTo(0, edgeY(front, 0) - u * .012); c.closePath(); c.fill();
+      for (const [x, v] of [[.32, 'red'], [.4, 'green'], [.6, 'purple'], [.67, 'orange']]) put(c, GUMDROP(v), u * .09, x * w, edgeY(front, x * w) + u * .02);
+      for (const [x, y] of [[.1, .74], [.9, .72]]) {
+        c.fillStyle = '#fff'; c.strokeStyle = 'rgba(200, 120, 170, .6)'; c.lineWidth = Math.max(1, u * .004);
+        c.beginPath(); c.rect(x * w - u * .008, y * h, u * .016, h); c.fill(); c.stroke();
+      }
+    });
+    for (const [x, y, v, s] of [[.1, .74, 'pink', .16], [.9, .72, 'mint', .14]]) put(c, LOLLI(v), s * u, x * w, y * h, { rot: t * .3 * (v === 'pink' ? 1 : -1) });
     for (const d of D.sweets) {
       const [m, v] = d.m.split(':'), x = d.x * w + Math.sin(t * .5 + d.p) * u * .03, y = d.y * h + Math.cos(t * .6 + d.p) * u * .03, rot = Math.sin(t + d.p) * .25, s = d.s * u;
       if (m === 'wrap') put(c, WRAPPED(v), s * 1.4, x, y, { rot }); else if (m === 'donut') put(c, DONUT, s, x, y, { rot }); else if (m === 'cupcake') put(c, CUPCAKE, s, x, y, { rot: rot * .5 });
@@ -3629,22 +3679,30 @@ defScene({ id: 'candy', name: 'Candyland', emoji: '🍭',
 defScene({ id: 'party', name: 'Party Time', emoji: '🎉',
   init: (r) => ({
     balloons: Array.from({ length: 9 }, () => ({ x: r(), y: r(), v: .03 + r() * .04, s: .08 + r() * .05, p: r() * TAU, col: r.pick(['red', 'yellow', 'blue', 'green', 'orange', 'pink', 'purple']) })),
-    bits: Array.from({ length: 50 }, () => ({ x: r(), y: r(), v: .03 + r() * .05, rot: r() * TAU, vr: r.range(-3, 3), s: .01 + r() * .012, k: r.int(3), col: r.pick(['#ffffff', '#ffd23f', '#3ddc4c', '#2fb8ff', '#ff5fa2', '#b45cff']) })) }),
+    bits: Array.from({ length: 50 }, () => ({ x: r(), y: r(), v: .03 + r() * .05, rot: r() * TAU, vr: r.range(-3, 3), s: .01 + r() * .012, k: r.int(3), p: r() * TAU, col: r.pick(['#ffffff', '#ffd23f', '#3ddc4c', '#2fb8ff', '#ff5fa2', '#b45cff']) })) }),
   draw(c, w, h, t, D, u) {
-    vfill(c, w, h, [[0, '#6a35d8'], [.55, '#b23fc0'], [1, '#ff5fa2']]);
+    still(c, 'party:back', w, h, (c) => vfill(c, w, h, [[0, '#6a35d8'], [.55, '#b23fc0'], [1, '#ff5fa2']]));
+    /* four disco beams sweeping from the top, fading out before the floor */
     for (let k = 0; k < 4; k++) {
-      const a = Math.sin(t * .5 + k * 1.7) * .5 + (k - 1.5) * .35, x0 = w * (.2 + k * .2);
+      const a = Math.sin(t * .5 + k * 1.7) * .5 + (k - 1.5) * .35, x0 = w * (.2 + k * .2), L = h * .85;
       c.save(); c.translate(x0, -u * .05); c.rotate(a);
-      const bg = c.createLinearGradient(0, 0, 0, h * 1.2); bg.addColorStop(0, ['rgba(255,240,120,.25)', 'rgba(120,220,255,.22)', 'rgba(255,140,220,.22)', 'rgba(150,255,170,.2)'][k]); bg.addColorStop(1, 'rgba(255,255,255,0)');
-      c.fillStyle = bg; c.beginPath(); c.moveTo(-u * .02, 0); c.lineTo(u * .02, 0); c.lineTo(u * .2, h * 1.2); c.lineTo(-u * .2, h * 1.2); c.fill(); c.restore();
+      const bg = c.createLinearGradient(0, 0, 0, L); bg.addColorStop(0, ['rgba(255,240,120,.28)', 'rgba(120,220,255,.25)', 'rgba(255,140,220,.25)', 'rgba(150,255,170,.22)'][k]); bg.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = bg; c.beginPath(); c.moveTo(-u * .02, 0); c.lineTo(u * .02, 0); c.lineTo(u * .15, L); c.lineTo(-u * .15, L); c.fill(); c.restore();
     }
-    for (const b of D.bits) {
-      const x = b.x * w + Math.sin(t + b.p) * u * .02, y = loopY(b.y, b.v * u, t, h, 10), s = b.s * u;
-      c.save(); c.translate(x, y); c.rotate(b.rot + b.vr * t); c.fillStyle = b.col;
-      if (b.k === 0) c.fillRect(-s, -s * .5, s * 2, s);
-      else if (b.k === 1) { c.beginPath(); c.arc(0, 0, s * .7, 0, TAU); c.fill(); }
-      else { c.strokeStyle = b.col; c.lineWidth = s * .5; c.lineCap = 'round'; c.beginPath(); c.moveTo(-s * 1.5, 0); c.bezierCurveTo(-s * .5, -s * 1.5, s * .5, s * 1.5, s * 1.5, 0); c.stroke(); }
-      c.restore();
+    /* confetti: every piece of one colour goes into one path (pieces turned by hand, no save/restore each) */
+    const byCol = {};
+    for (const b of D.bits) (byCol[b.col] || (byCol[b.col] = [])).push(b);
+    c.lineCap = 'round';
+    for (const col in byCol) {
+      const fill = new Path2D(), curl = new Path2D();
+      for (const b of byCol[col]) {
+        const x = b.x * w + Math.sin(t + b.p) * u * .02, y = loopY(b.y, b.v * u, t, h, 10), s = b.s * u, a = b.rot + b.vr * t, ca = Math.cos(a), sa = Math.sin(a);
+        const P = (px, py) => [x + px * ca - py * sa, y + px * sa + py * ca];
+        if (b.k === 0) { const q = [P(-s, -s * .5), P(s, -s * .5), P(s, s * .5), P(-s, s * .5)]; fill.moveTo(q[0][0], q[0][1]); for (let i = 1; i < 4; i++) fill.lineTo(q[i][0], q[i][1]); fill.closePath(); }
+        else if (b.k === 1) { fill.moveTo(x + s * .7, y); fill.arc(x, y, s * .7, 0, TAU); }
+        else { const p0 = P(-s * 1.5, 0), p1 = P(-s * .5, -s * 1.5), p2 = P(s * .5, s * 1.5), p3 = P(s * 1.5, 0); curl.moveTo(p0[0], p0[1]); curl.bezierCurveTo(p1[0], p1[1], p2[0], p2[1], p3[0], p3[1]); }
+      }
+      c.fillStyle = col; c.fill(fill); c.strokeStyle = col; c.lineWidth = u * .006; c.stroke(curl);
     }
     for (const b of D.balloons) {
       const x = b.x * w + Math.sin(t * .8 + b.p) * u * .02, y = loopY(b.y, -b.v * u, t, h, b.s * u * 2.6), s = b.s * u;
@@ -3665,8 +3723,11 @@ defScene({ id: 'magic', name: 'Magic Castle', emoji: '🏰',
   init: (r) => ({ sparks: Array.from({ length: 50 }, () => ({ x: r(), y: r(), s: .006 + r() * .012, v: .01 + r() * .03, p: r() * TAU, col: r.pick(['#ffffff', '#ffe58a', '#ffc2f0', '#bfe6ff']) })),
     stars: Array.from({ length: 70 }, () => ({ x: r(), y: r() * .7, s: .4 + r() * 1.2, p: r() * TAU })) }),
   draw(c, w, h, t, D, u) {
-    vfill(c, w, h, [[0, '#1c1452'], [.5, '#4a2a8f'], [1, '#8a4fc0']]);
-    glow(c, w * .5, h * .95, u * .9, '255, 160, 230', .35);
+    const mx = w * .15, my = h * .2, mr = u * .2;
+    still(c, 'magic:back', w, h, (c) => {
+      vfill(c, w, h, [[0, '#1c1452'], [.5, '#4a2a8f'], [1, '#8a4fc0']]);
+      glow(c, w * .5, h * .95, u * .9, '255, 160, 230', .35);
+    });
     c.save(); c.globalAlpha = .35;
     for (let k = 0; k < 3; k++) { c.fillStyle = ['rgba(120, 255, 200, .5)', 'rgba(150, 180, 255, .5)', 'rgba(255, 150, 230, .45)'][k]; c.beginPath(); c.moveTo(0, h * (.2 + k * .06));
       for (let x = 0; x <= w; x += w / 20) c.lineTo(x, h * (.2 + k * .06) + Math.sin(x / w * 6 + t * .4 + k) * h * .04); for (let x = w; x >= 0; x -= w / 20) c.lineTo(x, h * (.26 + k * .06) + Math.sin(x / w * 6 + t * .4 + k + .5) * h * .05); c.fill(); }
@@ -3674,12 +3735,13 @@ defScene({ id: 'magic', name: 'Magic Castle', emoji: '🏰',
     const z = u / 500;
     for (const s of D.stars) { c.globalAlpha = .3 + .7 * (.5 + .5 * Math.sin(t * 1.7 + s.p)); c.fillStyle = '#fff'; c.beginPath(); c.arc(s.x * w, s.y * h, s.s * z, 0, TAU); c.fill(); }
     c.globalAlpha = 1;
-    const mx = w * .15, my = h * .2, mr = u * .2;
     glow(c, mx, my, mr * 1.6, '255, 246, 201', .5); put(c, MOON, mr, mx, my, { rot: Math.sin(t * .5) * .05 });
     const q = (t % 7) / 1;
     if (q < 1) { const sx = w * (.55 + .35 * q), sy = h * (.05 + .15 * q), tl = u * .18; const sg = c.createLinearGradient(sx, sy, sx - tl, sy - tl * .45); sg.addColorStop(0, 'rgba(255,255,255,.95)'); sg.addColorStop(1, 'rgba(255,255,255,0)'); c.strokeStyle = sg; c.lineWidth = u * .007; c.lineCap = 'round'; c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx - tl, sy - tl * .45); c.stroke(); }
-    const hl = hill(c, w, h, .9, .05, 1, 0, '#6a4fc0', '#3a2580', 'rgba(255, 200, 255, .5)');
-    put(c, CASTLE, u * .72, w * .5, edgeY(hl, w * .5) + u * .02);
+    still(c, 'magic:castle', w, h, (c) => {
+      const hl = hill(c, w, h, .9, .05, 1, 0, '#6a4fc0', '#3a2580', 'rgba(255, 200, 255, .5)');
+      put(c, CASTLE, u * .72, w * .5, edgeY(hl, w * .5) + u * .02);
+    });
     for (const s of D.sparks) twinkle(c, s.x * w, loopY(s.y, -s.v * u, t, h, 10), s.s * u, s.col, .3 + .7 * (.5 + .5 * Math.sin(t * 2.2 + s.p)));
     const fx = (.5 + .36 * Math.sin(t * .4)) * w, fy = (.3 + .1 * Math.sin(t * .8)) * h, dir = Math.cos(t * .4) >= 0 ? 1 : -1;
     for (let k = 1; k <= 8; k++) { const tt = t - k * .08; twinkle(c, (.5 + .36 * Math.sin(tt * .4)) * w, (.3 + .1 * Math.sin(tt * .8)) * h + u * .03, u * .012 * (1 - k / 10), '#ffe58a', .8 * (1 - k / 9)); }
@@ -4618,9 +4680,9 @@ const KEEP = (() => {
   return { prepare, make, drawFrame, confettiSim, save, share, canShare, SHAPES, PIXELS, muxMP4, inViewer, CTX_FILTER, _parseTransform: parseTransform, _valueAt: valueAt };
 })();
 
-/* ---------- scenes on the stage: a canvas behind the word, ~30 frames a second, still when calm ---------- */
+/* ---------- scenes on the stage: a canvas behind the word, 60 frames a second, still when calm ---------- */
 const sceneCv = $('#scene'), sceneCx = sceneCv.getContext('2d'), scenesEl = $('#pane-scenes');
-let sceneRaf = 0, sceneLast = 0;
+let sceneRaf = 0, scenePrev = 0, sceneGap = 1000 / 60, sceneSkip = 0;
 const sceneT0 = performance.now();
 function drawStageScene() {
   const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h || state.scene === 'mix' || cam.on) return;
@@ -4629,11 +4691,22 @@ function drawStageScene() {
   sceneCx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawScene(sceneCx, state.scene, w, h, isReduced() ? 3 : (performance.now() - sceneT0) / 1000);
 }
-/* a photo stands still (one drawing is enough), and nothing is drawn under a live camera */
-const sceneMoving = () => { const S = SCENES[state.scene]; return !!S && state.scene !== 'mix' && !S.still && !cam.on && !isReduced() && !document.hidden; };
-function sceneTick(now) { sceneRaf = 0; if (now - sceneLast >= 30) { sceneLast = now; drawStageScene(); } if (sceneMoving()) sceneRaf = requestAnimationFrame(sceneTick); }
+/* a photo stands still (one drawing is enough); nothing is drawn under a live camera; and the stage rests while
+   the Keep-it dialog covers it, so the dialog's preview and the file being made get the computer to themselves */
+const sceneMoving = () => { const S = SCENES[state.scene]; return !!S && state.scene !== 'mix' && !S.still && !cam.on && !K.open && !isReduced() && !document.hidden; };
+/* Every display frame on a 60–90 Hz screen. A faster screen (120 Hz and up) draws every 2nd frame (or 3rd …),
+   which keeps the pace even at about 60 a second and spares the battery. sceneGap learns the screen's frame time. */
+function sceneTick(now) {
+  sceneRaf = 0;
+  const d = now - scenePrev; scenePrev = now;
+  if (d > 3 && d < 40) sceneGap += (d - sceneGap) * .1;
+  const every = Math.max(1, Math.floor(1000 / 60 / sceneGap + .25));
+  if (++sceneSkip >= every) { sceneSkip = 0; drawStageScene(); }
+  if (sceneMoving()) sceneRaf = requestAnimationFrame(sceneTick);
+}
 function refreshScene() {
   if (sceneRaf) { cancelAnimationFrame(sceneRaf); sceneRaf = 0; }
+  scenePrev = 0; sceneSkip = 0;
   stage.classList.toggle('scened', state.scene !== 'mix');
   if (state.scene === 'mix') return;
   drawStageScene();
@@ -4778,7 +4851,7 @@ async function saveIt(viaShare) {
 function openKeep() {
   if (K.open) return;
   hideHint();
-  K.spec = stageSpec(); K.open = true;
+  K.spec = stageSpec(); K.open = true; refreshScene();
   K.fmt = FORMATS[load('fw.kfmt', 'png')] ? load('fw.kfmt', 'png') : 'png';
   K.shape = KEEP.SHAPES[load('fw.kshape', 'square')] ? load('fw.kshape', 'square') : 'square';
   for (const r of radios('kpFmt')) r.checked = r.value === K.fmt;
@@ -4790,6 +4863,7 @@ function openKeep() {
 function closeKeep() {
   if (!K.open) return;
   K.open = false; K.prepSeq++; stopPreview(); if (K.job) K.job.stop = true;
+  refreshScene();
   clearResult();
   if (keepDlg.open) { try { keepDlg.close(); } catch (e) { keepDlg.removeAttribute('open'); } }
   try { keepBtn.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
