@@ -4549,11 +4549,16 @@ const KEEP = (() => {
     const moov = build(ftyp.length + build(0).length + 8);
     return new Blob([ftyp, moov, bytes(u32(8 + sizes.reduce((a, b) => a + b, 0))), enc.encode('mdat')].concat(chunks.map((c) => c.data)), { type: 'video/mp4' });
   }
+  /* H.264 levels: [level, most macroblocks in a frame, most macroblocks a second]. A level has to hold the
+     frame size AND the frame rate: 1080×1080 at 60 a second needs 4.2, where 30 a second fitted in 3.2 */
+  const AVC_LEVELS = [['1e', 1620, 40500], ['1f', 3600, 108000], ['20', 5120, 216000], ['28', 8192, 245760], ['2a', 8704, 522240], ['32', 22080, 589824]];
   async function videoConfig(w, h, fps) {
     if (typeof VideoEncoder !== 'function' || typeof VideoFrame !== 'function') return null;
-    const mbs = Math.ceil(w / 16) * Math.ceil(h / 16), lvl = mbs <= 1620 ? '1e' : mbs <= 3600 ? '1f' : mbs <= 5120 ? '20' : '28';
-    const bitrate = Math.round(Math.min(8e6, Math.max(2.5e6, w * h * fps * .12)));
-    const vpLevel = w * h <= 983040 ? 31 : 40;
+    const mbs = Math.ceil(w / 16) * Math.ceil(h / 16);
+    const lvl = (AVC_LEVELS.find((L) => mbs <= L[1] && mbs * fps <= L[2]) || AVC_LEVELS[AVC_LEVELS.length - 1])[0];
+    const bitrate = Math.round(Math.min(10e6, Math.max(2.5e6, w * h * fps * .08)));
+    /* VP9 levels likewise: 3.1 and 4.0 by picture size and pixels a second */
+    const px = w * h, vpLevel = px <= 983040 && px * fps <= 36864000 ? 31 : px <= 2228224 && px * fps <= 83558400 ? 40 : 41;
     const cands = [['avc1.4200' + lvl, 'avc'], ['avc1.42E0' + lvl, 'avc'], ['vp09.00.' + vpLevel + '.08', 'vp9']];
     for (const [codec, kind] of cands) {
       const config = { codec, width: w, height: h, bitrate, framerate: fps, latencyMode: 'quality' };
@@ -4600,7 +4605,7 @@ const KEEP = (() => {
     const mime = types.filter((x) => { try { return MediaRecorder.isTypeSupported(x); } catch (e) { return false; } })[0];
     if (!mime) throw new Error('no format');
     const c = cv.getContext('2d', { alpha: false }), sim = confettiSim(R), stream = cv.captureStream(fps);
-    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5e6 }), parts = [];
+    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8e6 }), parts = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) parts.push(e.data); };
     const stopped = new Promise((r) => { rec.onstop = r; });
     drawFrame(c, R, 0, k, sim); rec.start(250);
@@ -4622,7 +4627,7 @@ const KEEP = (() => {
     return { blob: new Blob(parts, { type }), ext: type === 'video/mp4' ? 'mp4' : 'webm', codec: mime };
   }
   async function encodeVideo(R, pw, ph, k, onProgress, abort) {
-    const fps = 30, cfg = await videoConfig(pw, ph, fps);
+    const fps = 60, cfg = await videoConfig(pw, ph, fps); /* as smooth as the stage */
     if (cfg) { try { return await encodeWebCodecs(R, cfg, pw, ph, k, fps, onProgress, abort); } catch (e) { if (abort.stop) throw e; } }
     return encodeRecorder(R, pw, ph, k, fps, onProgress, abort);
   }

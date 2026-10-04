@@ -73,7 +73,7 @@ Saw one you love? Tap **📸** on the stage. You keep exactly what was playing: 
 
 - The preview shows what you will get. Tap **✨ Make**, watch it appear, then **⬇️ Save it!** The dialog remembers your last format and shape.
 - On a phone or tablet, **📤 Share** can put it straight into Photos or a message.
-- Videos are H.264 MP4 in Chrome, Edge and Safari. A browser without an H.264 encoder (some Linux builds) writes the MP4 with VP9 instead, and one with no video encoder at all records a WebM.
+- Videos play at 60 frames a second, as smooth as the stage (GIFs stay at 15, to keep them small). They are H.264 MP4 in Chrome, Edge and Safari. A browser without an H.264 encoder (some Linux builds) writes the MP4 with VP9 instead, and one with no video encoder at all records a WebM.
 - Everything happens on your device: nothing is uploaded.
 
 ## Style show (auto play)
