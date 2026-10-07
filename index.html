@@ -749,6 +749,45 @@ html.calm .kp-make.pop { animation: none; }
 html.short .tab { flex-direction: row; min-height: 44px; }
 html.short .tab .tl { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 html.short .tab .ti { font-size: 21px; }
+
+/* ---------- ⛶ full screen ---------- */
+#fsBtn, #fsPlay {
+  position: absolute; left: 12px; bottom: 12px; z-index: 5; width: 54px; height: 54px; padding: 0; border-radius: 50%;
+  background: #fff; color: var(--ink); border: 3px solid var(--ink); box-shadow: 3px 4px 0 var(--ink); font: 700 24px/1 var(--font);
+  display: grid; place-items: center; cursor: pointer; touch-action: manipulation; transform: rotate(6deg); transition: transform 90ms;
+}
+#fsPlay { left: 78px; transform: rotate(-4deg); }
+#fsBtn svg { width: 26px; height: 26px; }
+#fsBtn .fs-out, html.fs #fsBtn .fs-in { display: none; }
+html.fs #fsBtn .fs-out { display: block; }
+#fsBtn:active, #fsPlay:active { translate: 2px 3px; box-shadow: 1px 1px 0 var(--ink); }
+@media (hover: hover) { #fsBtn:hover { transform: rotate(-4deg) scale(1.07); } #fsPlay:hover { transform: rotate(4deg) scale(1.07); } }
+#fsBtn:focus-visible, #fsPlay:focus-visible { outline: 4px solid #fff; outline-offset: 2px; box-shadow: 3px 4px 0 var(--ink), 0 0 0 9px var(--ink); }
+#fsPlay[aria-pressed="true"] { background: var(--sun); }
+html.short #fsBtn, html.short #fsPlay { width: 44px; height: 44px; font-size: 19px; left: 10px; bottom: 10px; }
+html.short #fsPlay { left: 62px; }
+html.short #fsBtn svg { width: 21px; height: 21px; }
+#stage.cam #fsBtn, #stage.cam #fsPlay { display: none; }
+/* the first-visit hint points at the word box, right where the button sits: the button waits until it has gone */
+.play:has(#hint:not([hidden])) #fsBtn { visibility: hidden; }
+
+/* in full screen the stage is the whole screen; the word box floats on it and the toy box steps aside */
+html.fs body { padding-inline: 0; }
+html.fs .app { padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); gap: 0; }
+html.fs #toybox, html.fs #hint { display: none !important; }
+html.fs .play { gap: 0; }
+html.fs #stage { border-radius: 0; box-shadow: none; }
+html.fs #f {
+  position: absolute; left: 50%; bottom: 78px; translate: -50% 0; z-index: 6; width: min(640px, calc(100% - 32px));
+  padding: 8px; border-radius: 999px; background: rgba(255, 255, 255, .55); box-shadow: 0 6px 24px rgba(27, 27, 58, .25);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+html.fs.short #f { bottom: 8px; width: min(560px, calc(100% - 260px)); padding: 5px; }
+html.fs.short #toast { bottom: 60px; }
+html.fs #f, html.fs #fsBtn, html.fs #fsPlay, html.fs #keepBtn, html.fs #badge, html.fs #stars { transition: opacity 350ms ease, transform 90ms; }
+/* three quiet seconds: only the show is left */
+html.fs.fs-idle #f, html.fs.fs-idle #fsBtn, html.fs.fs-idle #fsPlay, html.fs.fs-idle #keepBtn, html.fs.fs-idle #badge, html.fs.fs-idle #stars { opacity: 0; pointer-events: none; }
+html.fs.fs-idle #stage { cursor: none; }
 </style>
 </head>
 <body>
@@ -771,6 +810,8 @@ html.short .tab .ti { font-size: 21px; }
         <button id="camFlip" class="cam-b" type="button" aria-label="Use another camera" title="Use another camera" hidden><span aria-hidden="true">🔄</span></button>
       </div>
       <div id="camCount" aria-hidden="true"></div>
+      <button id="fsBtn" type="button" aria-pressed="false" aria-label="Full screen" title="Full screen"><svg class="fs-in" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="fs-out" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button id="fsPlay" type="button" aria-pressed="false" aria-label="Auto Play" title="Auto Play" hidden><span aria-hidden="true">▶️</span></button>
       <div id="announce" class="sr-only" aria-live="polite"></div>
     </div>
     <div id="hint" hidden>👇 Type a word and press <b>GO!</b></div>
@@ -5154,6 +5195,65 @@ camBar.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventD
 document.addEventListener('visibilitychange', () => { if (document.hidden && cam.on) stopCamera(); });
 window.addEventListener('pagehide', () => { if (cam.on) stopCamera(); });
 
+/* ---------- ⛶ full screen: the stage fills the screen, and the controls fade away while the show plays.
+   The browser goes properly full screen where it may; where it may not (an iPhone, a page framed by another
+   site such as claude.ai), the page fills its window instead, which looks the same. ---------- */
+const fsBtn = $('#fsBtn'), fsPlay = $('#fsPlay');
+const fs = { on: false, api: false, timer: 0 };
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+const fsCan = () => { const d = document.documentElement; return !!((d.requestFullscreen || d.webkitRequestFullscreen) && (document.fullscreenEnabled || document.webkitFullscreenEnabled)); };
+function markFs() {
+  const label = fs.on ? 'Leave full screen' : 'Full screen';
+  fsBtn.setAttribute('aria-pressed', String(fs.on)); fsBtn.setAttribute('aria-label', label); fsBtn.title = label;
+  fsPlay.hidden = !fs.on;
+}
+function markFsPlay() {
+  const on = !!state.autoplay, label = on ? 'Stop the show' : 'Auto Play';
+  fsPlay.setAttribute('aria-pressed', String(on)); fsPlay.setAttribute('aria-label', label); fsPlay.title = label;
+  fsPlay.firstElementChild.textContent = on ? '⏸️' : '▶️';
+}
+/* the controls stay while anyone is using them, and slip away after three quiet seconds */
+const fsControls = () => [form, fsBtn, fsPlay, keepBtn];
+function fsWake() {
+  root.classList.remove('fs-idle'); clearTimeout(fs.timer);
+  if (fs.on) fs.timer = setTimeout(fsSleep, 3000);
+}
+function fsSleep() {
+  if (!fs.on) return;
+  let busy = (keepDlg && keepDlg.open) || cam.on;
+  try { busy = busy || fsControls().some((el) => el.matches(':hover')); } catch (e) { /* no :hover here */ }
+  if (busy) { fs.timer = setTimeout(fsSleep, 3000); return; }
+  root.classList.add('fs-idle');
+}
+async function enterFs() {
+  if (fs.on) return;
+  fs.on = true; root.classList.add('fs'); hideHint(); markFs(); onViewport(); fsWake();
+  announceEl.textContent = 'Full screen. Press Escape to leave.';
+  if (fsCan() && !fsEl()) {
+    const d = document.documentElement;
+    try { await (d.requestFullscreen ? d.requestFullscreen({ navigationUI: 'hide' }) : d.webkitRequestFullscreen()); fs.api = !!fsEl(); }
+    catch (e) { fs.api = false; /* not allowed here: the page fills the window instead */ }
+  }
+}
+function exitFs() {
+  if (!fs.on) return;
+  fs.on = false; clearTimeout(fs.timer); root.classList.remove('fs', 'fs-idle'); markFs(); onViewport();
+  if (fs.api && fsEl()) { try { const p = (document.exitFullscreen || document.webkitExitFullscreen).call(document); if (p && p.catch) p.catch(() => {}); } catch (e) { /* already out */ } }
+  fs.api = false;
+}
+fsBtn.addEventListener('click', (e) => { if (fs.on) exitFs(); else enterFs(); sound.pop(); if (e.detail > 0) refocus(); });
+fsPlay.addEventListener('click', (e) => { setAuto(!state.autoplay); fsWake(); if (e.detail > 0) refocus(); });
+/* the browser's own way out (Esc, a swipe, its menu) takes the page out of full screen too */
+for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, () => { if (!fsEl() && fs.on && fs.api) exitFs(); else onViewport(); });
+for (const ev of ['pointermove', 'pointerdown', 'keydown', 'focusin', 'wheel']) document.addEventListener(ev, () => { if (fs.on) fsWake(); }, { passive: true, capture: true });
+/* Esc leaves full screen (before the word box hears it and clears the word); a live camera and the Keep-it dialog keep theirs */
+document.addEventListener('keydown', (e) => {
+  if (!fs.on || e.key !== 'Escape' || (keepDlg && keepDlg.open) || cam.on) return;
+  e.preventDefault(); e.stopPropagation(); exitFs();
+}, true);
+new MutationObserver(markFsPlay).observe(playBtn, { attributes: true, attributeFilter: ['aria-pressed'] });
+markFs(); markFsPlay();
+
 /* ---------- debug / testing API ---------- */
 window.FW = {
   version: 'v1',
@@ -5177,6 +5277,7 @@ window.FW = {
   setTab(name) { setTab(name); },
   setScene(id) { setScene(id); },
   scenes: SCENE_ORDER.slice(),
+  fullscreen: { enter: () => enterFs(), exit: () => exitFs(), state: () => ({ on: fs.on, api: fs.api, idle: root.classList.contains('fs-idle') }) },
   __drawScene: (c, id, w, h, t) => drawScene(c, id, w, h, t),
   photos: {
     list: () => photos.map((p) => ({ id: p.id, full: !!p.cv, w: p.cv ? p.cv.width : 0, h: p.cv ? p.cv.height : 0, sw: p.small.width, sh: p.small.height, saved: !!p.blob })),

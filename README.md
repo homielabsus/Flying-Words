@@ -17,7 +17,8 @@ Works on phones, tablets and desktops. Tap a letter to make it hop; double-tap t
 
 ## How the page is laid out
 
-- **The stage** shows your word. The yellow sticker says which style and move are playing; the ⭐ counter in the other corner is your score. Tap the counter and it takes you to a tile you haven't found yet. The **📸** button in the bottom corner keeps what is on stage (see below).
+- **The stage** shows your word. The yellow sticker says which style and move are playing; the ⭐ counter in the other corner is your score. Tap the counter and it takes you to a tile you haven't found yet. The **📸** button in the bottom corner keeps what is on stage (see below), and **⛶** in the other corner goes full screen.
+- **⛶ Full screen** makes the stage fill the whole screen, which is good for a tablet, a TV or a projector. The word box floats over the stage with 🎲 and **GO!**, and a **▶️** button starts and stops Auto Play. After three quiet seconds the buttons fade and only the show is left. A tap, a mouse move or a key brings them back. **Esc** or **⛶** again leaves full screen. Where the browser isn't allowed to go full screen (an iPhone, or inside the claude.ai preview), the stage fills the page's window instead.
 - **The word box** has 🎲 (a random style and move) and **GO!** Pressing GO! with the box empty plays the example the box is showing (🦖🦖🦖, pizza …).
 - **The toy box** has tabs. On a phone it sits under the word box as a row of big tiles you can swipe (two rows on a tablet held upright); on a wide screen it is a side panel of grids.
   - 🎨 **Styles** — every style draws "Wow" in itself, so you can see it before you pick it. Tap one and your word wears it straight away; tap it again to replay the word. 🎲 **Mix** goes back to a new style every time.
@@ -87,6 +88,6 @@ Type a new word while the show is running and it carries on with the new word. T
 ## Extras
 
 - 🔊 sound (a few tiny synthesized sounds, off by default), 🐢 Calm mode for gentler motion (also follows your system's reduced-motion setting); with Calm on, scenes stand still too.
-- Keyboard: **Enter** = go, **Esc** clears the box (or closes the camera), **↑/↓** in the word box change the move, **←/→** move between the toy box tabs, and ↑/↓ step through the ⏱ menu while it has the focus.
+- Keyboard: **Enter** = go, **Esc** clears the box (or closes the camera, or leaves full screen), **↑/↓** in the word box change the move, **←/→** move between the toy box tabs, and ↑/↓ step through the ⏱ menu while it has the focus.
 - Any input works: emoji families, flags, accents, CJK, Arabic, long phrases. An empty box plays the example it shows, or replays your last word.
 - A first-time hint points at the word box until the first word is typed.
