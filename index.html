@@ -7293,7 +7293,7 @@ async function restorePhotos() {
   const want = load('fw.scene', 'mix');
   if (!sceneTouched && SCENES[want] && state.scene !== want) setScene(want, true);
   /* the cut-outs that were on the stage step back in, each to its place */
-  if (!cutTouched) { for (const [id, x, y, h] of load('fw.cuts', [])) { const r = cutRec(id); if (r && !cutOn(id)) { r.x = x; r.y = y; r.h = h; state.cuts.push(id); } } focusPhotos(); markScene(); drawCut(); }
+  if (!cutTouched) { for (const q of [].concat(load('fw.cuts', []))) { const r = Array.isArray(q) && q.slice(1, 4).every(Number.isFinite) && q.length > 3 ? cutRec(q[0]) : null; if (r && !cutOn(r.id)) { r.x = q[1]; r.y = q[2]; r.h = q[3]; state.cuts.push(r.id); } } focusPhotos(); markScene(); drawCut(); }
 }
 
 /* picking a file: a hidden input the Add Photo tile clicks, and the same for a dropped picture */
@@ -7396,9 +7396,9 @@ function cutAt(px, py) {
 /* the frame and its grip, around the picked cut-out; the grip stays inside the stage however big the cut-out is */
 function placeBox() {
   const r = !cam.on && cutOn(sel) ? cutRec(sel) : null; meBox.hidden = meGrip.hidden = !r; if (!r) return;
-  const w = stage.clientWidth, h = stage.clientHeight, b = cutBox(r, w, h);
+  const w = stage.clientWidth, h = stage.clientHeight, b = cutBox(r, w, h), rows = Math.min(92, h / 2); /* the top and bottom rows belong to the stage's own buttons */
   meBox.style.cssText = 'left:' + b[0] + 'px;top:' + b[1] + 'px;width:' + b[2] + 'px;height:' + b[3] + 'px';
-  meGrip.style.cssText = 'left:' + (within(b[0] + b[2], 26, w - 26) - 22) + 'px;top:' + (within(b[1] + b[3], 26, h - 26) - 22) + 'px';
+  meGrip.style.cssText = 'left:' + (within(b[0] + b[2], 26, w - 26) - 22) + 'px;top:' + (within(b[1] + b[3], rows, h - rows) - 22) + 'px';
 }
 /* the frame shows for three seconds after the last touch, then gets out of the way */
 function pick(id) {
@@ -7408,7 +7408,9 @@ function pick(id) {
 const grab = { r: null, pts: new Map(), far: 0 }; let grip = null;
 const inStage = (e) => { const b = stage.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top, b.width, b.height]; };
 stage.addEventListener('pointerdown', (e) => {
-  if (cam.on || e.target.closest('button') || grab.pts.size > 1) return;
+  if (cam.on || e.button || e.target.closest('button')) return;
+  if (e.isPrimary && grab.pts.size) { grab.pts.clear(); grab.r = null; } /* a finger whose lift-off never arrived is forgotten */
+  if (grab.pts.size > 1) return;
   const [x, y] = inStage(e);
   if (!grab.r) {
     const r = cutAt(x, y); if (!r) { pick(''); return; }
@@ -7419,25 +7421,31 @@ stage.addEventListener('pointerdown', (e) => {
   grab.pts.set(e.pointerId, [x, y]);
 });
 /* a touch that holds a cut-out must not scroll or zoom the page as well */
-stage.addEventListener('touchstart', (e) => { if (grab.r) e.preventDefault(); }, { passive: false });
+stage.addEventListener('touchstart', (e) => { if (grab.r && !e.target.closest('button')) e.preventDefault(); }, { passive: false });
 window.addEventListener('pointermove', (e) => {
   const p = grab.pts.get(e.pointerId); if (!p) return;
+  if (e.pointerType === 'mouse' && !(e.buttons & 1)) { dropGrab(e); return; } /* the button came up where the page could not see it */
   const [x, y, w, h] = inStage(e), r = grab.r, dx = x - p[0], dy = y - p[1];
   let q = null; for (const [k, v] of grab.pts) if (k !== e.pointerId) q = v;
   if (q) { r.h = within(r.h * Math.hypot(x - q[0], y - q[1]) / Math.max(1, Math.hypot(p[0] - q[0], p[1] - q[1])), .08, 3); r.x += dx / 2 / w; r.y += dy / 2 / h; } /* the middle of two fingers moves half as far as one of them */
   else { r.x += dx / w; r.y += dy / h; }
   r.x = within(r.x, 0, 1); r.y = within(r.y, 0, 1); grab.far += Math.hypot(dx, dy);
+  /* a real drag holds on to the stage: the letter it started on may be gone by the next trick */
+  if (grab.far > 6) { try { if (!stage.hasPointerCapture(e.pointerId)) stage.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } }
   p[0] = x; p[1] = y; drawCut();
 }, true);
 /* letting go. After a real drag the stage is not told: that was no tap on a letter, and no half of a double-tap */
 function dropGrab(e) {
-  if (!grab.pts.delete(e.pointerId) || grab.pts.size) return;
-  if (grab.far > 6) { e.stopPropagation(); saveCuts(); }
+  if (!grab.pts.delete(e.pointerId)) return;
+  if (grab.far > 6) e.stopPropagation();
+  if (grab.pts.size) return;
+  if (grab.far > 6) saveCuts();
   grab.r = null; pick(sel);
 }
 window.addEventListener('pointerup', dropGrab, true); window.addEventListener('pointercancel', dropGrab, true);
+meGrip.addEventListener('mousedown', (e) => e.preventDefault()); /* the word box keeps the keyboard */
 meGrip.addEventListener('pointerdown', (e) => {
-  const r = cutRec(sel); if (!r) return;
+  const r = cutRec(sel); if (!r || e.button) return;
   const [x, y, w, h] = inStage(e);
   grip = { r, id: e.pointerId, h0: r.h, d0: Math.max(10, Math.hypot(x - r.x * w, y - r.y * h)) };
   try { meGrip.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
@@ -7447,7 +7455,7 @@ meGrip.addEventListener('pointermove', (e) => {
   const [x, y, w, h] = inStage(e), r = grip.r;
   r.h = within(grip.h0 * Math.hypot(x - r.x * w, y - r.y * h) / grip.d0, .08, 3); drawCut();
 });
-for (const ev of ['pointerup', 'pointercancel']) meGrip.addEventListener(ev, () => { if (!grip) return; grip = null; saveCuts(); pick(sel); });
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) meGrip.addEventListener(ev, () => { if (!grip) return; grip = null; saveCuts(); pick(sel); });
 
 /* --- finding the person: MediaPipe's image segmenter with its "selfie multiclass" model, which tells hair, skin,
    clothes and worn things from the room. It is fetched when "Just me" is switched on. Every file of it is checked
@@ -7464,34 +7472,37 @@ const SEG = {
     'wasm/vision_wasm_nosimd_internal.wasm': 'sha384-4TZi4A8vwDwAdUuCp/TZFPzVRWERk0T4QnOxMCMY9qFnzvDnndjdiIHzBZ0xu/oB',
     model: 'sha384-LPLPyzBZ6TTE8146rnDx8CZ5LykB8memkmeO8FNVbGlNthvlUltn3W3KeJmtq9bL'
   },
-  state: 'idle', wait: null, seg: null,
+  state: 'idle', wait: null, seg: null, lab: new Int32Array(0), stack: null,
 };
 const inTime = (p, ms) => new Promise((res, rej) => { const slow = setTimeout(() => rej(new Error('slow')), ms); p.then((v) => { clearTimeout(slow); res(v); }, (e) => { clearTimeout(slow); rej(e); }); });
 /* `src` is drawn into the canvas `out`, and everything that is not the person is made see-through. The model's
    answer is how sure it is, pixel by pixel, that this is the room: the edge is the narrow band where it is unsure,
    and specks it kept that stand apart from the person are dropped. */
-function segCut(src, out) {
+function segCut(src, out, seg) {
   const w = out.width, h = out.height, n = w * h, c = cx2(out);
   c.globalCompositeOperation = 'copy'; c.drawImage(src, 0, 0, w, h); c.globalCompositeOperation = 'source-over';
-  const res = SEG.seg.segment(out), room = res.confidenceMasks[0].getAsFloat32Array(), im = c.getImageData(0, 0, w, h), d = im.data;
-  const lab = new Int32Array(n), stack = new Int32Array(n), sizes = [0]; let big = 0;
-  for (let i = 0; i < n; i++) {
-    if (room[i] > .7 || lab[i]) continue;
-    const id = sizes.length; let top = 0, size = 0; stack[top++] = i; lab[i] = id;
-    while (top) {
-      const j = stack[--top], x = j % w; size++;
-      if (x > 0 && !lab[j - 1] && room[j - 1] <= .7) { lab[j - 1] = id; stack[top++] = j - 1; }
-      if (x < w - 1 && !lab[j + 1] && room[j + 1] <= .7) { lab[j + 1] = id; stack[top++] = j + 1; }
-      if (j >= w && !lab[j - w] && room[j - w] <= .7) { lab[j - w] = id; stack[top++] = j - w; }
-      if (j < n - w && !lab[j + w] && room[j + w] <= .7) { lab[j + w] = id; stack[top++] = j + w; }
+  if (SEG.lab.length !== n) { SEG.lab = new Int32Array(n); SEG.stack = new Int32Array(n); } else SEG.lab.fill(0);
+  const im = c.getImageData(0, 0, w, h), d = im.data, lab = SEG.lab, stack = SEG.stack, sizes = [0]; let big = 0;
+  (seg || SEG.seg).segment(out, (res) => { /* the masks are only lent for the length of this call */
+    const room = res.confidenceMasks[0].getAsFloat32Array(); if (room.length !== n) throw new Error('mask');
+    for (let i = 0; i < n; i++) {
+      if (room[i] > .7 || lab[i]) continue;
+      const id = sizes.length; let top = 0, size = 0; stack[top++] = i; lab[i] = id;
+      while (top) {
+        const j = stack[--top], x = j % w; size++;
+        if (x > 0 && !lab[j - 1] && room[j - 1] <= .7) { lab[j - 1] = id; stack[top++] = j - 1; }
+        if (x < w - 1 && !lab[j + 1] && room[j + 1] <= .7) { lab[j + 1] = id; stack[top++] = j + 1; }
+        if (j >= w && !lab[j - w] && room[j - w] <= .7) { lab[j - w] = id; stack[top++] = j - w; }
+        if (j < n - w && !lab[j + w] && room[j + w] <= .7) { lab[j + w] = id; stack[top++] = j + w; }
+      }
+      sizes.push(size); if (size > big) big = size;
     }
-    sizes.push(size); if (size > big) big = size;
-  }
-  for (let i = 0; i < n; i++) {
-    const t = lab[i] && sizes[lab[i]] >= big * .05 ? Math.min(1, (.7 - room[i]) / .4) : 0;
-    d[i * 4 + 3] = 255 * t * t * (3 - 2 * t);
-  }
-  c.putImageData(im, 0, 0); res.close();
+    for (let i = 0; i < n; i++) {
+      const t = lab[i] && sizes[lab[i]] >= big * .05 ? Math.min(1, (.7 - room[i]) / .4) : 0;
+      d[i * 4 + 3] = 255 * t * t * (3 - 2 * t);
+    }
+  });
+  c.putImageData(im, 0, 0);
 }
 /* `box` holds what has to be cleared away again; `box.dead` says nobody is waiting any more */
 async function segBoot(box) {
@@ -7509,7 +7520,11 @@ async function segBoot(box) {
   if (box.dead) throw new Error('late');
   const lib = await import(box.urls[code]), files = { wasmLoaderPath: box.urls[bin + '.js'], wasmBinaryPath: box.urls[bin + '.wasm'] };
   const make = (delegate) => lib.ImageSegmenter.createFromOptions(files, { baseOptions: { modelAssetBuffer: weights, delegate }, runningMode: 'IMAGE', outputCategoryMask: false, outputConfidenceMasks: true });
-  box.seg = await make('GPU').catch(() => make('CPU')); /* no graphics card to borrow: slower, but it works */
+  /* each is tried on a first picture (the slow one: better here than in the kid's face). No graphics card to borrow,
+     or one that can not do it: the plain processor is slower, but it works */
+  const try1 = document.createElement('canvas'); try1.width = try1.height = 64;
+  const warm = (seg) => { try { segCut(try1, try1, seg); return seg; } catch (e) { seg.close(); throw e; } };
+  box.seg = await make('GPU').then(warm).catch(() => make('CPU').then(warm));
   if (box.dead) { box.seg.close(); throw new Error('late'); }
   return box.seg;
 }
@@ -7518,9 +7533,7 @@ function loadSeg() {
   SEG.state = 'loading';
   const box = { urls: {}, seg: null, dead: false }, tidy = () => { for (const f in box.urls) URL.revokeObjectURL(box.urls[f]); box.urls = {}; };
   return (SEG.wait = inTime(segBoot(box), 120000).then((seg) => {
-    tidy(); SEG.seg = seg;
-    const try1 = document.createElement('canvas'); try1.width = try1.height = 64; segCut(try1, try1); /* the first picture is the slow one: it is done here, not in the kid's face */
-    SEG.state = 'ready'; return true;
+    tidy(); SEG.seg = seg; SEG.state = 'ready'; return true;
   }).catch(() => { box.dead = true; tidy(); try { if (box.seg) box.seg.close(); } catch (e) { /* ignore */ } SEG.seg = null; SEG.state = 'failed'; return false; }));
 }
 /* a person finder that broke is thrown away; the next "Just me" builds a new one */
@@ -7578,7 +7591,7 @@ function markBooth() {
 }
 function boothBusy(on) { boothMe.classList.toggle('busy', on); if (on) boothMe.setAttribute('aria-busy', 'true'); else boothMe.removeAttribute('aria-busy'); }
 function boothOn(on) {
-  cam.booth = !!(on && cam.on && cam.stream); cam.cutOK = false; cam.goodAt = performance.now();
+  cam.booth = !!(on && cam.on && cam.stream); cam.cutOK = false; cam.goodAt = performance.now(); cam.nextAt = 0; cam.slow = false;
   cam.key = null; cam.warned = false; cam.keyAt = 0; cam.keyUntil = performance.now() + 2000;
   stage.classList.toggle('booth', cam.booth);
   refreshScene(); drawCut();
@@ -7608,22 +7621,25 @@ async function setBooth(mode, quiet) {
   if (!quiet) toast(mode === 'me' ? '✂️ Just you! Now pick a scene' : mode === 'green' ? '🟩 Stand in front of a green or blue cloth' : '🖼️ The whole picture', 2800);
   announceEl.textContent = mode === 'me' ? 'Just you, in the scene.' : mode === 'green' ? 'Green screen on.' : 'The whole camera picture.';
 }
-/* every new camera picture is cut out and shown; a slow device simply shows fewer of them */
+/* every new camera picture is cut out and shown, as far as the device keeps up */
 function boothLoop() {
   if (cam.looping) return; cam.looping = true;
   let seen = -1;
   const tick = () => {
     if (!cam.booth) { cam.looping = false; return; }
     const vw = camVid.videoWidth, vh = camVid.videoHeight, now = camVid.currentTime;
-    if (vw && vh && camVid.readyState >= 2 && now !== seen && !document.hidden) {
+    if (vw && vh && camVid.readyState >= 2 && now !== seen && !document.hidden && performance.now() >= cam.nextAt) {
       seen = now;
-      const green = cam.mode === 'green', s = Math.min(1, (green ? 640 : 960) / Math.max(vw, vh)), w = Math.max(2, Math.round(vw * s)), h = Math.max(2, Math.round(vh * s));
+      const green = cam.mode === 'green', t0 = performance.now(), s = Math.min(1, (green ? 640 : cam.slow ? 480 : 960) / Math.max(vw, vh)), w = Math.max(2, Math.round(vw * s)), h = Math.max(2, Math.round(vh * s));
       const cv = green ? (cam.keyCv || (cam.keyCv = document.createElement('canvas'))) : (cam.cutCv || (cam.cutCv = document.createElement('canvas')));
       if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
       try {
         if (green) greenCut(camVid, cv, true); else segCut(camVid, cv);
         cam.goodAt = performance.now();
         cam.cutOK = true; drawCut();
+        /* the cutting takes at most half of the time: the word and the buttons get the rest. A device that needs
+           long for a picture gets smaller ones. */
+        const took = cam.goodAt - t0; cam.nextAt = cam.goodAt + took; if (took > 50) cam.slow = true;
       } catch (e) {
         /* one picture lost is nothing; six seconds without any means the cutting has broken */
         if (!green && performance.now() - cam.goodAt > 6000) { dropSeg(); tell('✂️ The scissors got stuck. Here is the whole picture', 4200); setBooth('all', true); }
