@@ -73,6 +73,14 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+### 5. Search Before Building
+
+**For unfamiliar or new features, don't write from scratch.**
+
+- You MUST first search GitHub for open-source projects with a free-to-use license and at least 500 stars.
+- Compare their approaches.
+- Then get started.
+
 ---
 
 These guidelines are working if: fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
