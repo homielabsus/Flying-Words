@@ -895,6 +895,13 @@ html.short #stage.cam #toast { bottom: auto; top: 6px; } /* a short stage has no
 /* a cut-out says so on its tile, and lies on a checked cloth so the see-through part shows */
 .tile.cutout .sw { position: relative; background: repeating-conic-gradient(#dfe4f2 0 25%, #fff 0 50%) 0 0 / 14px 14px; }
 .tile.cutout .sw::after { content: '✂️'; position: absolute; right: 2px; bottom: 1px; font-size: 14px; line-height: 1; }
+/* a picked cut-out: a frame, and a grip to pull it bigger or smaller */
+#meBox { position: absolute; z-index: 5; box-sizing: border-box; border: 3px dashed #fff; border-radius: 10px; outline: 2px solid var(--ink); pointer-events: none; }
+#meGrip {
+  position: absolute; z-index: 6; width: 44px; height: 44px; padding: 0; border-radius: 50%; background: var(--sun); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink);
+  display: grid; place-items: center; font: 800 18px/1 var(--font); cursor: nwse-resize; touch-action: none;
+}
+#meGrip span { transform: rotate(45deg); pointer-events: none; }
 </style>
 </head>
 <body>
@@ -912,6 +919,8 @@ html.short #stage.cam #toast { bottom: auto; top: 6px; } /* a short stage has no
       <button id="stars" type="button" aria-label="Tricks found"><span class="st" aria-hidden="true">⭐</span><span class="num" aria-hidden="true">0/70</span><span class="bar" aria-hidden="true"><i></i></span></button>
       <div id="toast" aria-hidden="true"></div>
       <button id="keepBtn" type="button" aria-label="Keep it! Save a picture or a video" title="Keep it!"><span aria-hidden="true">📸</span></button>
+      <div id="meBox" aria-hidden="true" hidden></div>
+      <button id="meGrip" type="button" tabindex="-1" aria-hidden="true" title="Pull to make it bigger or smaller" hidden><span>↔️</span></button>
       <div id="boothBar" role="group" aria-label="What the camera keeps" hidden>
         <button type="button" class="booth-b" data-mode="all" aria-pressed="true" aria-label="The whole picture" title="Keep the whole picture"><span aria-hidden="true">🖼️</span><span aria-hidden="true">All</span></button>
         <button type="button" class="booth-b" data-mode="me" aria-pressed="false" aria-label="Just me: cut me out and stand me in the scene" title="Just me: cut me out and stand me in the scene"><span aria-hidden="true">✂️</span><span aria-hidden="true">Just me</span></button>
@@ -1115,7 +1124,7 @@ function split(text) {
 
 /* ---------- state, bags, rng, palettes ---------- */
 const state = { seq: 0, lastText: '', lastCombo: null, pinnedMove: null, pinnedLook: null, runCount: 0, calm: false, sound: false, ctx: null, breathe: null, paletteIdx: -1,
-  autoplay: false, autoShuffle: true, autoEvery: 2000, scene: 'mix', cut: '' };
+  autoplay: false, autoShuffle: true, autoEvery: 2000, scene: 'mix', cuts: [] };
 const isReduced = () => !!(mq.matches || state.calm);
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 function makeBag(ids) {
@@ -6340,7 +6349,7 @@ const KEEP = (() => {
       const scene = SCENES[spec.scene] && SCENES[spec.scene].draw ? spec.scene : 'mix';
       const dark = lay.look === 'neon' && scene === 'mix';
       return {
-        W, H, spec, lay, U: lay.U, fs: lay.fs, h, n, lookId: lay.look, look, move, reduced, palette: spec.palette, scene, dark, cut: ((me) => (me ? me.cv || me.small : null))(cutRec(spec.cut || '')),
+        W, H, spec, lay, U: lay.U, fs: lay.fs, h, n, lookId: lay.look, look, move, reduced, palette: spec.palette, scene, dark, cuts: (spec.cuts || []).map((q) => { const me = cutRec(q.id); return me && { img: me.cv || me.small, r: Object.assign({ small: me.small }, q) }; }).filter(Boolean),
         targets, line, ring, flash, sweeps, classes, fx, runEnd, tEnd, tStill: runEnd + 900, font: fontOf(lay.fs),
         glow: 'hsl(' + h + ' 100% 60%)', Wl: lay.box.w, sprites: new Map(),
         pad: Math.ceil(lay.fs * .45 + 16) + (lay.look === 'neon' ? 96 : 0)
@@ -6551,7 +6560,7 @@ const KEEP = (() => {
     c.setTransform(k, 0, 0, k, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; if (CTX_FILTER) c.filter = 'none';
     c.shadowColor = 'transparent'; c.shadowBlur = 0;
     drawScene(c, R.scene, R.W, R.H, t / 1000, R.palette, R.dark);
-    if (R.cut) { c.save(); coverDraw(c, R.cut, R.W, R.H); c.restore(); } /* the kid from the photo booth stands in the scene */
+    if (R.cuts.length) { c.save(); c.imageSmoothingQuality = 'high'; for (const q of R.cuts) c.drawImage(q.img, ...cutBox(q.r, R.W, R.H)); c.restore(); } /* the cut-outs from the photo booth stand in the scene */
     const LT = R.targets.get(R.line), box = R.lay.box;
     const LM = about(box.cx, box.cy, toM(valueAt(LT, 'transform', t))), lineO = valueAt(LT, 'opacity', t), lineF = valueAt(LT, 'filter', t), clip = valueAt(LT, 'clipPath', t);
     const lineHue = fval(lineF, 'hue-rotate', [0])[0], lineBlur = fval(lineF, 'blur', [0])[0], glow = fval(lineF, 'drop-shadow', null);
@@ -6860,7 +6869,7 @@ const KEEP = (() => {
     const [W, H] = SHAPES[shape] || SHAPES.square;
     if (document.fonts && document.fonts.load && /^https?:$/.test(location.protocol)) { try { await document.fonts.load('700 40px Fredoka'); } catch (e) { /* the fallback font is fine */ } }
     const S = SCENES[spec.scene]; if (S && S.ready) { try { await S.ready(); } catch (e) { /* the small picture will do */ } } /* a photo wakes at full size */
-    const me = cutRec(spec.cut || ''); if (me) { try { await wakePhoto(me); } catch (e) { /* the small picture will do */ } }
+    for (const q of spec.cuts || []) { const me = cutRec(q.id); if (me) { try { await wakePhoto(me); } catch (e) { /* the small picture will do */ } } }
     return record(spec, W, H);
   }
   async function make(R, fmt, shape, onProgress, abort) {
@@ -6938,8 +6947,8 @@ function refreshScene() {
 }
 function markScene() {
   for (const t of scenesEl.querySelectorAll('.tile[data-scene]')) { const on = t.dataset.scene === state.scene; t.classList.toggle('on', on); t.setAttribute('aria-pressed', String(on)); }
-  for (const t of scenesEl.querySelectorAll('.tile[data-cut]')) { const on = t.dataset.cut === state.cut; t.classList.toggle('on', on); t.setAttribute('aria-pressed', String(on)); }
-  for (const d of scenesEl.querySelectorAll('.tile-del')) d.hidden = d.dataset.del !== state.scene && d.dataset.del !== state.cut; /* ✕ only on the photos in use */
+  for (const t of scenesEl.querySelectorAll('.tile[data-cut]')) { const on = cutOn(t.dataset.cut); t.classList.toggle('on', on); t.setAttribute('aria-pressed', String(on)); }
+  for (const d of scenesEl.querySelectorAll('.tile-del')) d.hidden = d.dataset.del !== state.scene && !cutOn(d.dataset.del); /* ✕ only on the photos in use */
 }
 function setScene(id, quiet) {
   state.scene = SCENES[id] ? id : 'mix';
@@ -6985,7 +6994,7 @@ scenesEl.addEventListener('click', (e) => {
   hideHint();
   if (b.dataset.act === 'camera') { if (cam.on) stopCamera(); else startCamera('', e.detail === 0); sound.pop(); return; }
   if (b.dataset.act === 'photo') { if (cam.on) stopCamera(); pickPhoto(); return; }
-  if (b.dataset.cut) { if (cam.on) stopCamera(); setCut(state.cut === b.dataset.cut ? '' : b.dataset.cut); bump(b, 'demo'); sound.pop(); if (e.detail > 0) refocus(); return; }
+  if (b.dataset.cut) { if (cam.on) stopCamera(); setCut(b.dataset.cut, !cutOn(b.dataset.cut)); bump(b, 'demo'); sound.pop(); if (e.detail > 0) refocus(); return; }
   if (cam.on && !cam.booth) stopCamera(); /* in the booth the camera stays on: the kid is picking where to stand */
   setScene(b.dataset.scene); bump(b, 'demo'); sound.pop();
   if (e.detail > 0) refocus();
@@ -7003,9 +7012,9 @@ const K = { open: false, spec: null, R: null, raf: 0, t0: 0, sim: null, job: nul
 /* what is on stage right now, down to the dice rolls, so the file is the very trick the kid saw */
 function stageSpec(text) {
   const ctx = state.ctx;
-  if (!ctx) return { text: text || currentText(), look: 'rainbow', move: 'bounce', seed: 1, palette: PALETTES[0], reduced: isReduced(), scene: state.scene, cut: state.cut || '', milestone: false, lookFromRng: false };
+  if (!ctx) return { text: text || currentText(), look: 'rainbow', move: 'bounce', seed: 1, palette: PALETTES[0], reduced: isReduced(), scene: state.scene, cuts: specCuts(), milestone: false, lookFromRng: false };
   return { text: text || ctx.text || state.lastText || 'Hello!', look: ctx.look.id, move: ctx.move.id, seed: ctx.combo.seed >>> 0, palette: ctx.palette, reduced: ctx.reduced,
-    scene: state.scene, cut: state.cut || '', milestone: !!ctx.combo.milestone, lookFromRng: !!ctx.lookFromRng };
+    scene: state.scene, cuts: specCuts(), milestone: !!ctx.combo.milestone, lookFromRng: !!ctx.lookFromRng };
 }
 const radios = (name) => Array.prototype.slice.call(keepDlg.querySelectorAll('input[name="' + name + '"]'));
 function markRadios() {
@@ -7197,13 +7206,13 @@ function registerPhoto(rec) {
 function wakePhoto(rec) {
   if (rec.cv) return Promise.resolve(rec.cv);
   if (!rec.waking) {
-    rec.waking = decodePhoto(rec.blob, PHOTO_SIDE).then((cv) => { rec.waking = null; rec.cv = cv; if (state.scene === rec.id) refreshScene(); if (state.cut === rec.id) drawCut(); return cv; },
+    rec.waking = decodePhoto(rec.blob, PHOTO_SIDE).then((cv) => { rec.waking = null; rec.cv = cv; if (state.scene === rec.id) refreshScene(); if (cutOn(rec.id)) drawCut(); return cv; },
       (e) => { rec.waking = null; throw e; });
   }
   return rec.waking;
 }
 /* the photo on stage gets its full size; the rest let theirs go (each can wake again from its JPEG) */
-function focusPhotos() { for (const p of photos) { if (p.id === state.scene || p.id === state.cut) wakePhoto(p).catch(() => {}); else if (p.blob) p.cv = null; } }
+function focusPhotos() { for (const p of photos) { if (p.id === state.scene || cutOn(p.id)) wakePhoto(p).catch(() => {}); else if (p.blob) p.cv = null; } }
 
 /* the tiles: 📷 Camera and 🖼️ Add Photo after Mix, then one tile per photo, newest first */
 const camTile = mkTile('scene act cam', 'Camera: take a photo of you');
@@ -7252,7 +7261,7 @@ function forgetPhoto(id) {
   photos.splice(i, 1); delete SCENES[id];
   photoDB.del(id).catch(() => {});
   if (state.scene === id) setScene('mix');
-  if (state.cut === id) setCut('');
+  if (cutOn(id)) setCut(id, false);
 }
 function removePhoto(id) {
   const tiles = Array.prototype.slice.call(scenesEl.querySelectorAll('.tile.photo')), at = tiles.findIndex((t) => (t.dataset.scene || t.dataset.cut) === id);
@@ -7274,7 +7283,7 @@ async function restorePhotos() {
   recs.sort((a, b) => b.t - a.t);
   for (const r of recs.slice(0, PHOTO_KEEP)) {
     if (SCENES[r.id] || photos.some((p) => p.id === r.id) || !r.blob) continue;
-    try { const rec = { id: r.id, blob: r.blob, cv: null, small: await decodePhoto(r.blob, PHOTO_SMALL), cut: !!r.cut }; registerPhoto(rec); photos.push(rec); }
+    try { const rec = { id: r.id, blob: r.blob, cv: null, small: await decodePhoto(r.blob, PHOTO_SMALL), cut: !!r.cut, x: .5, y: .55, h: .8 }; registerPhoto(rec); photos.push(rec); }
     catch (e) { photoDB.del(r.id).catch(() => {}); }
   }
   for (const r of recs.slice(PHOTO_KEEP)) photoDB.del(r.id).catch(() => {});
@@ -7283,8 +7292,8 @@ async function restorePhotos() {
   renderPhotoTiles();
   const want = load('fw.scene', 'mix');
   if (!sceneTouched && SCENES[want] && state.scene !== want) setScene(want, true);
-  const me = load('fw.cut', '');
-  if (!cutTouched && me && cutRec(me) && state.cut !== me) setCut(me, true);
+  /* the cut-outs that were on the stage step back in, each to its place */
+  if (!cutTouched) { for (const [id, x, y, h] of load('fw.cuts', [])) { const r = cutRec(id); if (r && !cutOn(id)) { r.x = x; r.y = y; r.h = h; state.cuts.push(id); } } focusPhotos(); markScene(); drawCut(); }
 }
 
 /* picking a file: a hidden input the Add Photo tile clicks, and the same for a dropped picture */
@@ -7313,49 +7322,132 @@ const cam = { on: false, stream: null, devices: [], deviceId: '', mirror: true, 
    "Just me" finds the person in the picture, and "Green screen" takes away a cloth of one colour behind them.
    Either way the kid is seen standing in the scene, live, and Snap! saves that cut-out. A cut-out is not a
    scene: it stands in front of whichever scene is picked, behind the word, until it is switched off. ---------- */
-const meCv = $('#me'), meCx = meCv.getContext('2d'), boothBar = $('#boothBar'), boothPick = $('#boothPick'), boothMe = boothBar.querySelector('[data-mode="me"]');
+const meCv = $('#me'), meCx = meCv.getContext('2d'), meBox = $('#meBox'), meGrip = $('#meGrip'), boothBar = $('#boothBar'), boothPick = $('#boothPick'), boothMe = boothBar.querySelector('[data-mode="me"]');
 const cx2 = (cv) => cv.getContext('2d', { willReadFrequently: true });
+const within = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const tell = (text, ms) => { toast(text, ms); announceEl.textContent = text; }; /* said out loud too: these are things a kid has to know */
-let cutTouched = false;
-function cutRec(id) { const want = id === undefined ? state.cut : id; return (want && photos.find((p) => p.cut && p.id === want)) || null; }
-/* the layer between the scene and the word: the live cut-out while the booth is on, else the saved one */
+/* Cut-outs on the stage are stickers: `state.cuts` lists the ones that are on, from the back to the front. Each
+   knows its place as parts of the stage (x, y: its middle; h: its height), so it sits the same in any size of stage
+   and in every shape of kept picture. */
+let cutTouched = false, sel = '', selT = 0;
+const cutRec = (id) => photos.find((p) => p.cut && p.id === id) || null;
+const cutOn = (id) => state.cuts.indexOf(id) >= 0;
+/* where a cut-out lies on a stage of w by h: [left, top, width, height] */
+const cutBox = (r, w, h) => { const dh = r.h * h, dw = dh * r.small.width / r.small.height; return [r.x * w - dw / 2, r.y * h - dh / 2, dw, dh]; };
+/* the layer between the scene and the word: the saved cut-outs, and in the booth the live one in front of them */
 function drawCut() {
-  const w = stage.clientWidth, h = stage.clientHeight, live = cam.booth && cam.cutOK, rec = cam.on ? null : cutRec();
-  const img = live ? (cam.mode === 'green' ? cam.keyCv : cam.cutCv) : rec && (rec.cv || rec.small);
-  stage.classList.toggle('has-me', !!img);
-  if (!img) { if (meCv.width > 1) meCv.width = meCv.height = 1; return; } /* nothing of the last picture is left lying about */
+  const w = stage.clientWidth, h = stage.clientHeight, live = cam.booth && cam.cutOK ? (cam.mode === 'green' ? cam.keyCv : cam.cutCv) : null;
+  stage.classList.toggle('has-me', !!(live || state.cuts.length));
+  placeBox();
+  if (!live && !state.cuts.length) { if (meCv.width > 1) meCv.width = meCv.height = 1; return; } /* nothing of the last picture is left lying about */
   if (!w || !h) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(w * dpr), H = Math.round(h * dpr);
   if (meCv.width !== W || meCv.height !== H) { meCv.width = W; meCv.height = H; }
-  meCx.setTransform(dpr, 0, 0, dpr, 0, 0); meCx.clearRect(0, 0, w, h);
-  if (live && cam.mirror) { meCx.translate(w, 0); meCx.scale(-1, 1); } /* a saved cut-out is already the way it was seen */
-  coverDraw(meCx, img, w, h);
+  meCx.setTransform(dpr, 0, 0, dpr, 0, 0); meCx.clearRect(0, 0, w, h); meCx.imageSmoothingQuality = 'high';
+  for (const id of state.cuts) { const r = cutRec(id); meCx.drawImage(r.cv || r.small, ...cutBox(r, w, h)); }
+  if (live) { if (cam.mirror) { meCx.translate(w, 0); meCx.scale(-1, 1); } coverDraw(meCx, live, w, h); }
 }
-function setCut(id, quiet) {
-  state.cut = id && cutRec(id) ? id : '';
-  if (!quiet) { cutTouched = true; save('fw.cut', state.cut); }
-  focusPhotos(); markScene(); drawCut();
+const specCuts = () => state.cuts.map((id) => { const r = cutRec(id); return { id, x: r.x, y: r.y, h: r.h }; }); /* for a kept picture */
+function saveCuts() { cutTouched = true; save('fw.cuts', state.cuts.map((id) => { const r = cutRec(id); return [id, r.x, r.y, r.h]; })); }
+/* on: into the picture, in front of the others. off: out of it (it remembers its place for this visit) */
+function setCut(id, on) {
+  state.cuts = state.cuts.filter((k) => k !== id); if (on && cutRec(id)) state.cuts.push(id);
+  saveCuts(); focusPhotos(); markScene(); drawCut();
 }
-/* six places for photos and cut-outs together: the oldest goes first, but never the newest, nor one that is on the stage */
+/* six places for photos and cut-outs together. The oldest goes first: one that is not on the stage if there is one,
+   and never the photo that is the scene, nor the newest */
 function trimPhotos() {
   while (photos.length > PHOTO_KEEP) {
-    let i = photos.length - 1; while (i > 0 && (photos[i].id === state.scene || photos[i].id === state.cut)) i--;
-    if (i <= 0) break;
-    forgetPhoto(photos[i].id);
+    const old = photos.slice(1).reverse();
+    forgetPhoto((old.find((p) => p.id !== state.scene && !cutOn(p.id)) || old.find((p) => p.id !== state.scene)).id);
   }
 }
 const toCutBlob = (cv) => new Promise((res) => { try { cv.toBlob(res, 'image/webp', .92); } catch (e) { res(null); } }); /* a browser that can not write WebP writes a PNG */
-function addCut(cv) {
-  const t = Date.now() * 1000 + photoN % 1000;
-  const id = 'cut-' + Date.now().toString(36) + '-' + (photoN++), rec = { id, cut: true, cv, blob: null, small: photoCanvas(cv, cv.width, cv.height, false, PHOTO_SMALL) };
+/* `full` is the camera picture with the background gone. It is trimmed to what is left, and put on the stage
+   exactly where the kid was just seen. */
+function addCut(full) {
+  const fw = full.width, fh = full.height, d = cx2(full).getImageData(0, 0, fw, fh).data;
+  let x0 = fw, y0 = fh, x1 = 0, y1 = 0;
+  for (let y = 0, i = 3; y < fh; y++) for (let x = 0; x < fw; x++, i += 4) if (d[i] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const bw = Math.max(1, x1 - x0 + 1), bh = Math.max(1, y1 - y0 + 1), cv = document.createElement('canvas'); cv.width = bw; cv.height = bh; cv.getContext('2d').drawImage(full, -x0, -y0);
+  const W = stage.clientWidth || fw, H = stage.clientHeight || fh, s = Math.max(W / fw, H / fh), ox = (fw - W / s) / 2, oy = (fh - H / s) * .42; /* as coverDraw showed it */
+  const t = Date.now() * 1000 + photoN % 1000, id = 'cut-' + Date.now().toString(36) + '-' + (photoN++);
+  const rec = { id, cut: true, cv, blob: null, small: photoCanvas(cv, bw, bh, false, PHOTO_SMALL), x: within((x0 + bw / 2 - ox) * s / W, 0, 1), y: within((y0 + bh / 2 - oy) * s / H, 0, 1), h: bh * s / H };
   photos.unshift(rec); trimPhotos();
-  renderPhotoTiles(); setCut(id);
+  renderPhotoTiles(); setCut(id, true);
   rec.saved = toCutBlob(cv).then(async (blob) => {
-    rec.blob = blob; if (blob && state.cut !== id) rec.cv = null;
+    rec.blob = blob; if (blob && !cutOn(id)) rec.cv = null;
     if (blob && photos.indexOf(rec) >= 0) { try { await photoDB.put({ id, blob, t, cut: true }); } catch (e) { /* it stays for this visit */ } }
   });
   return id;
 }
+
+/* --- moving and resizing. A finger or the mouse on the solid part of a cut-out picks it up (the front one, if
+   several lie there) and drags it; a second finger pinches it bigger or smaller. For a mouse, the picked cut-out
+   shows a frame with a round grip to pull: further from the middle is bigger. The same grip works by touch. --- */
+function cutAt(px, py) {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  for (let k = state.cuts.length - 1; k >= 0; k--) {
+    const r = cutRec(state.cuts[k]), b = cutBox(r, w, h), u = (px - b[0]) / b[2], v = (py - b[1]) / b[3];
+    if (u >= 0 && u < 1 && v >= 0 && v < 1 && r.small.getContext('2d').getImageData(Math.floor(u * r.small.width), Math.floor(v * r.small.height), 1, 1).data[3] > 40) return r;
+  }
+  return null;
+}
+/* the frame and its grip, around the picked cut-out; the grip stays inside the stage however big the cut-out is */
+function placeBox() {
+  const r = !cam.on && cutOn(sel) ? cutRec(sel) : null; meBox.hidden = meGrip.hidden = !r; if (!r) return;
+  const w = stage.clientWidth, h = stage.clientHeight, b = cutBox(r, w, h);
+  meBox.style.cssText = 'left:' + b[0] + 'px;top:' + b[1] + 'px;width:' + b[2] + 'px;height:' + b[3] + 'px';
+  meGrip.style.cssText = 'left:' + (within(b[0] + b[2], 26, w - 26) - 22) + 'px;top:' + (within(b[1] + b[3], 26, h - 26) - 22) + 'px';
+}
+/* the frame shows for three seconds after the last touch, then gets out of the way */
+function pick(id) {
+  sel = id; clearTimeout(selT); placeBox();
+  if (id) selT = setTimeout(() => { if (grab.r || grip) pick(sel); else pick(''); }, 3000);
+}
+const grab = { r: null, pts: new Map(), far: 0 }; let grip = null;
+const inStage = (e) => { const b = stage.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top, b.width, b.height]; };
+stage.addEventListener('pointerdown', (e) => {
+  if (cam.on || e.target.closest('button') || grab.pts.size > 1) return;
+  const [x, y] = inStage(e);
+  if (!grab.r) {
+    const r = cutAt(x, y); if (!r) { pick(''); return; }
+    grab.r = r; grab.far = 0;
+    if (state.cuts[state.cuts.length - 1] !== r.id) setCut(r.id, true); /* the one in hand comes to the front */
+    pick(r.id);
+  }
+  grab.pts.set(e.pointerId, [x, y]);
+});
+/* a touch that holds a cut-out must not scroll or zoom the page as well */
+stage.addEventListener('touchstart', (e) => { if (grab.r) e.preventDefault(); }, { passive: false });
+window.addEventListener('pointermove', (e) => {
+  const p = grab.pts.get(e.pointerId); if (!p) return;
+  const [x, y, w, h] = inStage(e), r = grab.r, dx = x - p[0], dy = y - p[1];
+  let q = null; for (const [k, v] of grab.pts) if (k !== e.pointerId) q = v;
+  if (q) { r.h = within(r.h * Math.hypot(x - q[0], y - q[1]) / Math.max(1, Math.hypot(p[0] - q[0], p[1] - q[1])), .08, 3); r.x += dx / 2 / w; r.y += dy / 2 / h; } /* the middle of two fingers moves half as far as one of them */
+  else { r.x += dx / w; r.y += dy / h; }
+  r.x = within(r.x, 0, 1); r.y = within(r.y, 0, 1); grab.far += Math.hypot(dx, dy);
+  p[0] = x; p[1] = y; drawCut();
+}, true);
+/* letting go. After a real drag the stage is not told: that was no tap on a letter, and no half of a double-tap */
+function dropGrab(e) {
+  if (!grab.pts.delete(e.pointerId) || grab.pts.size) return;
+  if (grab.far > 6) { e.stopPropagation(); saveCuts(); }
+  grab.r = null; pick(sel);
+}
+window.addEventListener('pointerup', dropGrab, true); window.addEventListener('pointercancel', dropGrab, true);
+meGrip.addEventListener('pointerdown', (e) => {
+  const r = cutRec(sel); if (!r) return;
+  const [x, y, w, h] = inStage(e);
+  grip = { r, id: e.pointerId, h0: r.h, d0: Math.max(10, Math.hypot(x - r.x * w, y - r.y * h)) };
+  try { meGrip.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+});
+meGrip.addEventListener('pointermove', (e) => {
+  if (!grip || e.pointerId !== grip.id) return;
+  const [x, y, w, h] = inStage(e), r = grip.r;
+  r.h = within(grip.h0 * Math.hypot(x - r.x * w, y - r.y * h) / grip.d0, .08, 3); drawCut();
+});
+for (const ev of ['pointerup', 'pointercancel']) meGrip.addEventListener(ev, () => { if (!grip) return; grip = null; saveCuts(); pick(sel); });
 
 /* --- finding the person: MediaPipe's image segmenter with its "selfie multiclass" model, which tells hair, skin,
    clothes and worn things from the room. It is fetched when "Just me" is switched on. Every file of it is checked
@@ -7644,7 +7736,6 @@ async function snap(quick) {
   if (!isReduced() && FEAT.animate) { try { flashEl.animate([{ opacity: .95 }, { opacity: 0 }], { duration: 380, easing: 'ease-out' }); } catch (e) { /* ignore */ } }
   sound.pop();
   stopCamera();
-  if (!cut && state.cut) setCut(''); /* a whole picture of the kid needs no second kid in front of it */
   const id = cut ? addCut(cut.cv) : addPhoto(cv);
   toast('📸 Snap! You are in the scene!', 3000); announceEl.textContent = cut ? 'Photo taken. You are standing in the scene.' : 'Photo taken. It is the scene now.';
   if (!state.autoplay) again();
@@ -7781,7 +7872,8 @@ window.FW = {
     mode: () => cam.mode, set: (m) => setBooth(m, true), on: () => !!cam.booth, live: () => !!cam.cutOK, seg: () => SEG.state,
     key: () => (cam.key ? { rgb: [cam.key.r, cam.key.g, cam.key.b].map(Math.round), weak: !!cam.key.weak } : null),
     canvas: () => (cam.mode === 'green' ? cam.keyCv : cam.cutCv) || null, layer: () => meCv,
-    cut: () => state.cut || '', setCut: (id) => setCut(id), cuts: () => photos.filter((p) => p.cut).map((p) => p.id),
+    cuts: () => state.cuts.slice(), all: () => photos.filter((p) => p.cut).map((p) => p.id), setCut: (id, on) => setCut(id, !!on), picked: () => sel,
+    place: (id) => { const r = cutRec(id); return r ? { x: r.x, y: r.y, h: r.h, box: cutBox(r, stage.clientWidth, stage.clientHeight) } : null; },
     async add(url) { return addCut(await decodePhoto(await (await fetch(url)).blob(), PHOTO_SIDE)); }
   },
   three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv, worlds: () => Object.keys(G3.worlds), memory: () => (G3.r ? Object.assign({}, G3.r.info.memory) : null) },
