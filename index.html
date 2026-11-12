@@ -786,8 +786,10 @@ html.fs.short #f { bottom: 8px; width: min(560px, calc(100% - 260px)); padding: 
 html.fs.short #toast { bottom: 60px; }
 html.fs #f, html.fs #fsBtn, html.fs #fsPlay, html.fs #keepBtn, html.fs #badge, html.fs #stars { transition: opacity 350ms ease, transform 90ms; }
 /* three quiet seconds: only the show is left */
-html.fs.fs-idle #f, html.fs.fs-idle #fsBtn, html.fs.fs-idle #fsPlay, html.fs.fs-idle #keepBtn, html.fs.fs-idle #badge, html.fs.fs-idle #stars { opacity: 0; pointer-events: none; }
+html.fs.fs-idle #fsBtn, html.fs.fs-idle #fsPlay, html.fs.fs-idle #keepBtn, html.fs.fs-idle #badge, html.fs.fs-idle #stars { opacity: 0; pointer-events: none; }
 html.fs.fs-idle #stage { cursor: none; }
+/* the word box keeps its own time: away as full screen starts, back for a tap or a key, and it waits 30 seconds after typing */
+html.fs.fs-nofield #f { opacity: 0; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -5199,7 +5201,7 @@ window.addEventListener('pagehide', () => { if (cam.on) stopCamera(); });
    The browser goes properly full screen where it may; where it may not (an iPhone, a page framed by another
    site such as claude.ai), the page fills its window instead, which looks the same. ---------- */
 const fsBtn = $('#fsBtn'), fsPlay = $('#fsPlay');
-const fs = { on: false, api: false, timer: 0 };
+const fs = { on: false, api: false, timer: 0, field: 0, until: 0 };
 const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement || null;
 const fsCan = () => { const d = document.documentElement; return !!((d.requestFullscreen || d.webkitRequestFullscreen) && (document.fullscreenEnabled || document.webkitFullscreenEnabled)); };
 function markFs() {
@@ -5221,13 +5223,42 @@ function fsWake() {
 function fsSleep() {
   if (!fs.on) return;
   let busy = (keepDlg && keepDlg.open) || cam.on;
-  try { busy = busy || fsControls().some((el) => el.matches(':hover')); } catch (e) { /* no :hover here */ }
+  try { busy = busy || (hoverable() && fsControls().some((el) => el.matches(':hover'))); } catch (e) { /* no :hover here */ }
   if (busy) { fs.timer = setTimeout(fsSleep, 3000); return; }
   root.classList.add('fs-idle');
 }
+/* The word box is not part of the show, so it is gone the moment full screen starts. A tap on the stage or a
+   typed key brings it back; a tap gives it three seconds, and typing gives it thirty from the last letter. */
+function fsField(ms) {
+  if (!fs.on) return;
+  const until = Date.now() + ms;
+  if (until < fs.until && !root.classList.contains('fs-nofield')) return; /* a tap never cuts short the time typing earned */
+  fs.until = until; root.classList.remove('fs-nofield'); clearTimeout(fs.field); fs.field = setTimeout(fsFieldOff, ms);
+}
+function fsFieldOff() {
+  if (!fs.on) return;
+  let busy = false;
+  try { busy = hoverable() && form.matches(':hover'); } catch (e) { /* no :hover here */ }
+  if (busy) { fs.until = Date.now() + 3000; fs.field = setTimeout(fsFieldOff, 3000); return; }
+  root.classList.add('fs-nofield');
+}
+const fsTyped = (e) => !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Backspace' || e.key === 'Delete' || (e.key.length === 1 && !(e.key === ' ' && e.target.closest && e.target.closest('button'))));
+function fsStir(e) {
+  if (!fs.on) return;
+  fsWake();
+  if ((keepDlg && keepDlg.open) || cam.on) return;
+  if (e.type === 'pointerdown') { if (!(e.target.closest && e.target.closest('#fsBtn, #fsPlay, #keepBtn, #badge, #stars'))) fsField(3000); }
+  else if (e.type === 'keydown' && typeof e.key === 'string' && fsTyped(e)) {
+    /* a key typed anywhere lands in the word box */
+    if (document.activeElement !== input && !(e.target.matches && e.target.matches('input, select, textarea'))) { try { input.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }
+    fsField(30000);
+  }
+}
 async function enterFs() {
   if (fs.on) return;
-  fs.on = true; root.classList.add('fs'); hideHint(); markFs(); onViewport(); fsWake();
+  fs.on = true; fs.until = 0; clearTimeout(fs.field);
+  form.style.transition = 'none'; root.classList.add('fs', 'fs-nofield'); void form.offsetWidth; form.style.transition = ''; /* gone at once, with no fade */
+  hideHint(); markFs(); onViewport(); fsWake();
   announceEl.textContent = 'Full screen. Press Escape to leave.';
   if (fsCan() && !fsEl()) {
     const d = document.documentElement;
@@ -5237,7 +5268,7 @@ async function enterFs() {
 }
 function exitFs() {
   if (!fs.on) return;
-  fs.on = false; clearTimeout(fs.timer); root.classList.remove('fs', 'fs-idle'); markFs(); onViewport();
+  fs.on = false; clearTimeout(fs.timer); clearTimeout(fs.field); root.classList.remove('fs', 'fs-idle', 'fs-nofield'); markFs(); onViewport();
   if (fs.api && fsEl()) { try { const p = (document.exitFullscreen || document.webkitExitFullscreen).call(document); if (p && p.catch) p.catch(() => {}); } catch (e) { /* already out */ } }
   fs.api = false;
 }
@@ -5245,7 +5276,8 @@ fsBtn.addEventListener('click', (e) => { if (fs.on) exitFs(); else enterFs(); so
 fsPlay.addEventListener('click', (e) => { setAuto(!state.autoplay); fsWake(); if (e.detail > 0) refocus(); });
 /* the browser's own way out (Esc, a swipe, its menu) takes the page out of full screen too */
 for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, () => { if (!fsEl() && fs.on && fs.api) exitFs(); else onViewport(); });
-for (const ev of ['pointermove', 'pointerdown', 'keydown', 'focusin', 'wheel']) document.addEventListener(ev, () => { if (fs.on) fsWake(); }, { passive: true, capture: true });
+for (const ev of ['pointermove', 'pointerdown', 'keydown', 'focusin', 'wheel']) document.addEventListener(ev, fsStir, { passive: true, capture: true });
+input.addEventListener('input', () => { fsField(30000); });
 /* Esc leaves full screen (before the word box hears it and clears the word); a live camera and the Keep-it dialog keep theirs */
 document.addEventListener('keydown', (e) => {
   if (!fs.on || e.key !== 'Escape' || (keepDlg && keepDlg.open) || cam.on) return;
@@ -5277,7 +5309,7 @@ window.FW = {
   setTab(name) { setTab(name); },
   setScene(id) { setScene(id); },
   scenes: SCENE_ORDER.slice(),
-  fullscreen: { enter: () => enterFs(), exit: () => exitFs(), state: () => ({ on: fs.on, api: fs.api, idle: root.classList.contains('fs-idle') }) },
+  fullscreen: { enter: () => enterFs(), exit: () => exitFs(), state: () => ({ on: fs.on, api: fs.api, idle: root.classList.contains('fs-idle'), field: !root.classList.contains('fs-nofield') }) },
   __drawScene: (c, id, w, h, t) => drawScene(c, id, w, h, t),
   photos: {
     list: () => photos.map((p) => ({ id: p.id, full: !!p.cv, w: p.cv ? p.cv.width : 0, h: p.cv ? p.cv.height : 0, sw: p.small.width, sh: p.small.height, saved: !!p.blob })),
