@@ -7357,80 +7357,82 @@ function addCut(cv) {
   return id;
 }
 
-/* --- finding the person: MediaPipe's selfie segmentation, fetched when "Just me" is switched on. Every file of it
-   is checked against the hash written here before it is used: the first one by the browser, the others by fetch,
-   which then hands them over as blobs. A file that does not match is not run, and "Just me" says it can not start. --- */
+/* --- finding the person: MediaPipe's image segmenter with its "selfie multiclass" model, which tells hair, skin,
+   clothes and worn things from the room. It is fetched when "Just me" is switched on. Every file of it is checked
+   against the hash written here before it is used (fetch does the checking and hands the files over as blobs):
+   a file that does not match is not run, and "Just me" says it can not start. --- */
 const SEG = {
-  src: 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/',
+  lib: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/',
+  model: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/1/selfie_multiclass_256x256.tflite',
   sri: {
-    'selfie_segmentation.js': 'sha384-J/3LshwuX+2viPOY3En4QiZvdvlffDhZYH5MsMuLGdwcoGcYSA7EV1jXFsys0gIb',
-    'selfie_segmentation_solution_simd_wasm_bin.js': 'sha384-xIX6ryHo3rUlj65NPL4chQmGdxre0lhQgbLxuiFPLdIWo8fTRQJlj7GIGXti54Q3',
-    'selfie_segmentation_solution_simd_wasm_bin.wasm': 'sha384-cceBeRPjr7qYiOjqqsQ0LszvtPcMLLd5WK+KrqJIC/7/e3AMb9+ISw0AU1sFGnVP',
-    'selfie_segmentation_solution_wasm_bin.js': 'sha384-vCokyqNes9sZdEbsmv1tuNsUsrbLFZCLWgRAq6NKTNVPBpHAj0HbKFdc1cT5NcSW',
-    'selfie_segmentation_solution_wasm_bin.wasm': 'sha384-Zu5Kh7e3gHmKeo1qktdo1iyMS67Iqigue89LNW8HhId7xW5YHH6LgmYGxny4XbFh',
-    'selfie_segmentation.binarypb': 'sha384-BFwb8DuJ1f176o9tEFTyIB3+QHSLjQxG9oYt+S04EhwMNV9yGzZl0tG5yS2j68oh',
-    'selfie_segmentation.tflite': 'sha384-QTt0Xx5FhJzqvOea2yx22m7Nq2MHX93UxKcXyItRs/bt5wR4Te/c3KWLlo2IkvJr'
+    'vision_bundle.mjs': 'sha384-pv/a53slpd9r+c7gv5R/Yx+690OjBKfh44t0YEEQi74uhGupAjv0NpiHrzlmhiVn',
+    'wasm/vision_wasm_internal.js': 'sha384-kqX2jGDkWeDYqzs7HpikHthiB1zh/xFyMJu6Fkp8UUMPwamqZBRwL39vNtSQwS5E',
+    'wasm/vision_wasm_internal.wasm': 'sha384-5znl2S0CAaFpqRz3rLzstYkWpBwEMzGDbWzlALJ20VPUX6VLjrVqAUdJEHcmXMdc',
+    'wasm/vision_wasm_nosimd_internal.js': 'sha384-BQunnb2RrWwTlqL/gGpV1KOoZnLcsIb8uWDD21uhLVtQuKG0HsmfmhlDSDjnA1iw',
+    'wasm/vision_wasm_nosimd_internal.wasm': 'sha384-4TZi4A8vwDwAdUuCp/TZFPzVRWERk0T4QnOxMCMY9qFnzvDnndjdiIHzBZ0xu/oB',
+    model: 'sha384-LPLPyzBZ6TTE8146rnDx8CZ5LykB8memkmeO8FNVbGlNthvlUltn3W3KeJmtq9bL'
   },
-  state: 'idle', wait: null, ss: null, target: null, chain: Promise.resolve(),
+  state: 'idle', wait: null, seg: null,
 };
 const inTime = (p, ms) => new Promise((res, rej) => { const slow = setTimeout(() => rej(new Error('slow')), ms); p.then((v) => { clearTimeout(slow); res(v); }, (e) => { clearTimeout(slow); rej(e); }); });
-/* the answer is a mask that is solid where the person is: the picture is poured into its shape. The mask's edge
-   is a soft guess, so it is firmed up and no halo of the room comes along. */
-function segResult(r) {
-  const out = SEG.target; if (!out) return;
-  const c = cx2(out), w = out.width, h = out.height;
-  c.save(); c.globalCompositeOperation = 'copy'; c.drawImage(r.segmentationMask, 0, 0, w, h);
-  c.globalCompositeOperation = 'source-in'; c.drawImage(r.image, 0, 0, w, h); c.restore();
-  const im = c.getImageData(0, 0, w, h), d = im.data;
-  for (let i = 3; i < d.length; i += 4) { const a = d[i]; d[i] = a <= 76 ? 0 : a >= 180 ? 255 : (a - 76) * 2.452; }
-  c.putImageData(im, 0, 0);
-}
-function segScript() {
-  return new Promise((res, rej) => {
-    const s = document.createElement('script'), f = 'selfie_segmentation.js';
-    s.src = SEG.src + f; s.integrity = SEG.sri[f]; s.crossOrigin = 'anonymous'; s.referrerPolicy = 'no-referrer';
-    s.onload = () => (window.SelfieSegmentation ? res() : rej(new Error('empty'))); s.onerror = () => { s.remove(); rej(new Error('offline')); };
-    document.head.appendChild(s);
-  });
+/* `src` is drawn into the canvas `out`, and everything that is not the person is made see-through. The model's
+   answer is how sure it is, pixel by pixel, that this is the room: the edge is the narrow band where it is unsure,
+   and specks it kept that stand apart from the person are dropped. */
+function segCut(src, out) {
+  const w = out.width, h = out.height, n = w * h, c = cx2(out);
+  c.globalCompositeOperation = 'copy'; c.drawImage(src, 0, 0, w, h); c.globalCompositeOperation = 'source-over';
+  const res = SEG.seg.segment(out), room = res.confidenceMasks[0].getAsFloat32Array(), im = c.getImageData(0, 0, w, h), d = im.data;
+  const lab = new Int32Array(n), stack = new Int32Array(n), sizes = [0]; let big = 0;
+  for (let i = 0; i < n; i++) {
+    if (room[i] > .7 || lab[i]) continue;
+    const id = sizes.length; let top = 0, size = 0; stack[top++] = i; lab[i] = id;
+    while (top) {
+      const j = stack[--top], x = j % w; size++;
+      if (x > 0 && !lab[j - 1] && room[j - 1] <= .7) { lab[j - 1] = id; stack[top++] = j - 1; }
+      if (x < w - 1 && !lab[j + 1] && room[j + 1] <= .7) { lab[j + 1] = id; stack[top++] = j + 1; }
+      if (j >= w && !lab[j - w] && room[j - w] <= .7) { lab[j - w] = id; stack[top++] = j - w; }
+      if (j < n - w && !lab[j + w] && room[j + w] <= .7) { lab[j + w] = id; stack[top++] = j + w; }
+    }
+    sizes.push(size); if (size > big) big = size;
+  }
+  for (let i = 0; i < n; i++) {
+    const t = lab[i] && sizes[lab[i]] >= big * .05 ? Math.min(1, (.7 - room[i]) / .4) : 0;
+    d[i * 4 + 3] = 255 * t * t * (3 - 2 * t);
+  }
+  c.putImageData(im, 0, 0); res.close();
 }
 /* `box` holds what has to be cleared away again; `box.dead` says nobody is waiting any more */
 async function segBoot(box) {
-  if (!window.SelfieSegmentation) await segScript();
   /* the same question MediaPipe asks to pick its fast or its plain build, so the right one is fetched */
   let simd = true;
-  try { await WebAssembly.instantiate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 4, 1, 96, 0, 0, 3, 2, 1, 0, 10, 9, 1, 7, 0, 65, 0, 253, 15, 26, 11])); } catch (e) { simd = false; }
-  const bin = 'selfie_segmentation_solution_' + (simd ? 'simd_' : '') + 'wasm_bin', TYPE = { js: 'text/javascript', wasm: 'application/wasm' };
-  await Promise.all([bin + '.js', bin + '.wasm', 'selfie_segmentation.binarypb', 'selfie_segmentation.tflite'].map(async (f) => {
-    const r = await fetch(SEG.src + f, { integrity: SEG.sri[f], mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+  try { await WebAssembly.instantiate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11])); } catch (e) { simd = false; }
+  const code = 'vision_bundle.mjs', bin = 'wasm/vision_wasm_' + (simd ? '' : 'nosimd_') + 'internal', model = 'model', TYPE = { mjs: 'text/javascript', js: 'text/javascript', wasm: 'application/wasm' };
+  let weights = null;
+  await Promise.all([code, bin + '.js', bin + '.wasm', model].map(async (f) => {
+    const r = await fetch(f === model ? SEG.model : SEG.lib + f, { integrity: SEG.sri[f], mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
     if (!r.ok) throw new Error('missing');
-    const blob = new Blob([await r.arrayBuffer()], { type: TYPE[f.split('.').pop()] || 'application/octet-stream' });
-    if (!box.dead) box.urls[f] = URL.createObjectURL(blob);
+    const buf = await r.arrayBuffer();
+    if (f === model) weights = new Uint8Array(buf); else if (!box.dead) box.urls[f] = URL.createObjectURL(new Blob([buf], { type: TYPE[f.split('.').pop()] }));
   }));
   if (box.dead) throw new Error('late');
-  const ss = box.ss = new window.SelfieSegmentation({ locateFile: (f) => box.urls[f] || 'about:blank#' + f }); /* nothing unchecked is fetched */
-  ss.setOptions({ modelSelection: 0 }); ss.onResults(segResult);
-  await ss.initialize();
-  const try1 = document.createElement('canvas'); try1.width = try1.height = 64; cx2(try1).fillRect(0, 0, 64, 64);
-  await ss.send({ image: try1 }); /* the first picture is the slow one: it is done here, not in the kid's face */
-  if (box.dead) { try { ss.close(); } catch (e) { /* ignore */ } throw new Error('late'); }
-  return ss;
+  const lib = await import(box.urls[code]), files = { wasmLoaderPath: box.urls[bin + '.js'], wasmBinaryPath: box.urls[bin + '.wasm'] };
+  const make = (delegate) => lib.ImageSegmenter.createFromOptions(files, { baseOptions: { modelAssetBuffer: weights, delegate }, runningMode: 'IMAGE', outputCategoryMask: false, outputConfidenceMasks: true });
+  box.seg = await make('GPU').catch(() => make('CPU')); /* no graphics card to borrow: slower, but it works */
+  if (box.dead) { box.seg.close(); throw new Error('late'); }
+  return box.seg;
 }
 function loadSeg() {
   if (SEG.wait) return SEG.wait;
   SEG.state = 'loading';
-  const box = { urls: {}, ss: null, dead: false }, tidy = () => { for (const f in box.urls) URL.revokeObjectURL(box.urls[f]); box.urls = {}; };
-  return (SEG.wait = inTime(segBoot(box), 60000).then((ss) => { tidy(); SEG.ss = ss; SEG.chain = Promise.resolve(); SEG.state = 'ready'; return true; },
-    () => { box.dead = true; tidy(); try { if (box.ss) box.ss.close(); } catch (e) { /* ignore */ } SEG.ss = null; SEG.state = 'failed'; return false; }));
+  const box = { urls: {}, seg: null, dead: false }, tidy = () => { for (const f in box.urls) URL.revokeObjectURL(box.urls[f]); box.urls = {}; };
+  return (SEG.wait = inTime(segBoot(box), 120000).then((seg) => {
+    tidy(); SEG.seg = seg;
+    const try1 = document.createElement('canvas'); try1.width = try1.height = 64; segCut(try1, try1); /* the first picture is the slow one: it is done here, not in the kid's face */
+    SEG.state = 'ready'; return true;
+  }).catch(() => { box.dead = true; tidy(); try { if (box.seg) box.seg.close(); } catch (e) { /* ignore */ } SEG.seg = null; SEG.state = 'failed'; return false; }));
 }
-/* a person finder that stopped answering is thrown away; the next "Just me" builds a new one */
-function dropSeg() { try { if (SEG.ss) SEG.ss.close(); } catch (e) { /* ignore */ } SEG.ss = null; SEG.target = null; SEG.state = 'failed'; }
-/* one picture at a time goes through; `out` gets the person and nothing else */
-function segRun(src, out) {
-  const job = SEG.chain.then(() => { SEG.target = out; return inTime(SEG.ss.send({ image: src }), 8000); })
-    .then(() => { if (SEG.target === out) SEG.target = null; return out; }, (e) => { if (SEG.target === out) SEG.target = null; throw e; });
-  SEG.chain = job.then(() => {}, () => {});
-  return job;
-}
+/* a person finder that broke is thrown away; the next "Just me" builds a new one */
+function dropSeg() { try { if (SEG.seg) SEG.seg.close(); } catch (e) { /* ignore */ } SEG.seg = null; SEG.state = 'failed'; }
 
 /* --- the green screen: nothing to fetch, and it keeps everything that is not the cloth, toys and hats included --- */
 /* `ok`: a colour a cloth can be keyed on, clearly green or clearly blue. Walls, wood and skin are not: keying on
@@ -7492,7 +7494,7 @@ function boothOn(on) {
 }
 /* the camera is closing: nothing of the booth stays, not even the last picture it worked on */
 function boothOff() {
-  cam.booth = false; cam.cutOK = false; cam.snapping = false; stage.classList.remove('booth'); boothBar.hidden = true;
+  cam.booth = false; cam.cutOK = false; stage.classList.remove('booth'); boothBar.hidden = true;
   for (const k of ['cutCv', 'keyCv']) if (cam[k]) cam[k].width = cam[k].height = 1;
 }
 async function setBooth(mode, quiet) {
@@ -7518,21 +7520,21 @@ async function setBooth(mode, quiet) {
 function boothLoop() {
   if (cam.looping) return; cam.looping = true;
   let seen = -1;
-  const tick = async () => {
+  const tick = () => {
     if (!cam.booth) { cam.looping = false; return; }
     const vw = camVid.videoWidth, vh = camVid.videoHeight, now = camVid.currentTime;
-    if (vw && vh && camVid.readyState >= 2 && now !== seen && !cam.snapping && !document.hidden) {
+    if (vw && vh && camVid.readyState >= 2 && now !== seen && !document.hidden) {
       seen = now;
-      const seq = cam.seq, green = cam.mode === 'green', s = Math.min(1, (green ? 640 : 960) / Math.max(vw, vh)), w = Math.max(2, Math.round(vw * s)), h = Math.max(2, Math.round(vh * s));
+      const green = cam.mode === 'green', s = Math.min(1, (green ? 640 : 960) / Math.max(vw, vh)), w = Math.max(2, Math.round(vw * s)), h = Math.max(2, Math.round(vh * s));
       const cv = green ? (cam.keyCv || (cam.keyCv = document.createElement('canvas'))) : (cam.cutCv || (cam.cutCv = document.createElement('canvas')));
       if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
       try {
-        if (green) greenCut(camVid, cv, true); else await segRun(camVid, cv);
+        if (green) greenCut(camVid, cv, true); else segCut(camVid, cv);
         cam.goodAt = performance.now();
-        if (cam.booth && seq === cam.seq && !cam.snapping && (cam.mode === 'green') === green) { cam.cutOK = true; drawCut(); }
+        cam.cutOK = true; drawCut();
       } catch (e) {
         /* one picture lost is nothing; six seconds without any means the cutting has broken */
-        if (cam.booth && seq === cam.seq && !green && performance.now() - cam.goodAt > 6000) { dropSeg(); tell('✂️ The scissors got stuck. Here is the whole picture', 4200); setBooth('all', true); }
+        if (!green && performance.now() - cam.goodAt > 6000) { dropSeg(); tell('✂️ The scissors got stuck. Here is the whole picture', 4200); setBooth('all', true); }
       }
     }
     if (cam.booth) requestAnimationFrame(tick); else cam.looping = false;
@@ -7540,20 +7542,18 @@ function boothLoop() {
   requestAnimationFrame(tick);
 }
 /* the picture Snap! took, cut out at full size */
-async function cutOut(full) {
+function cutOut(full) {
   const out = document.createElement('canvas'); out.width = full.width; out.height = full.height;
-  if (cam.mode === 'green') greenCut(full, out, false); else await segRun(full, out);
+  if (cam.mode === 'green') greenCut(full, out, false); else segCut(full, out);
   const d = cx2(out).getImageData(0, 0, out.width, out.height).data;
   let on = 0, n = 0;
   for (let i = 3; i < d.length; i += 28) { n++; if (d[i] > 127) on++; }
   return { cv: out, cover: on / n }; /* cover: how much of the picture is left */
 }
 /* false: no photo this time (and it says why) */
-async function boothSnap(full, seq) {
-  let cut = null; const green = cam.mode === 'green'; cam.snapping = true;
-  try { cut = await cutOut(full); } catch (e) { /* told below */ }
-  cam.snapping = false;
-  if (seq !== cam.seq) return false;
+function boothSnap(full) {
+  let cut = null; const green = cam.mode === 'green';
+  try { cut = cutOut(full); } catch (e) { /* told below */ }
   const why = !cut ? '✂️ That did not work. Try again!'
     : green && ((cam.key && cam.key.weak) || cut.cover > .985) ? '🟩 I can not find the cloth. It has to fill the top corners. Then tap 🎯'
       : cut.cover < .004 ? (green ? '🟩 I only see the cloth. Step in!' : '✂️ I can not see you. Step in!') : '';
@@ -7640,7 +7640,7 @@ async function snap(quick) {
   camCount.textContent = ''; camCount.classList.remove('go');
   const w = camVid.videoWidth, h = camVid.videoHeight;
   if (!w || !h) { cam.counting = false; camSnap.disabled = false; toast('No picture yet. Try again!', 2600); return null; }
-  const cv = photoCanvas(camVid, w, h, cam.mirror); const cut = cam.booth ? await boothSnap(cv, seq) : null; if (cut === false) return null; /* the photo looks just like what the kid saw */
+  const cv = photoCanvas(camVid, w, h, cam.mirror); const cut = cam.booth ? boothSnap(cv) : null; if (cut === false) return null; /* the photo looks just like what the kid saw */
   if (!isReduced() && FEAT.animate) { try { flashEl.animate([{ opacity: .95 }, { opacity: 0 }], { duration: 380, easing: 'ease-out' }); } catch (e) { /* ignore */ } }
   sound.pop();
   stopCamera();
