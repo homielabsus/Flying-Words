@@ -1467,13 +1467,13 @@ defLook({ id: 'comic', name: 'Comic POW', emoji: '💥',
 defLook({ id: 'balloon', name: 'Balloons', emoji: '🎈', apply: clipLook('look-balloon', (ctx) => 'hsl(' + ctx.h + ' 95% 60%)') });
 defLook({ id: 'sprinkles', name: 'Sprinkles', emoji: '🍩', apply: clipLook('look-sprinkles', '#ff7ac6') });
 defLook({ id: 'tiger', name: 'Tiger', emoji: '🐯', apply: clipLook('look-tiger', '#ff8f1f') });
-defLook({ id: 'melon', name: 'Watermelon', emoji: '🍉', apply: clipLook('look-melon', '#ff3b5c') });
+defLook({ id: 'melon', name: 'Melon', emoji: '🍉', apply: clipLook('look-melon', '#ff3b5c') });
 defLook({ id: 'slime', name: 'Slime', emoji: '🫠', apply: clipLook('look-slime', '#5fe04a') });
 defLook({ id: 'lava', name: 'Lava', emoji: '🌋', apply: clipLook('look-lava', '#ff5a00') });
 defLook({ id: 'diamond', name: 'Diamond', emoji: '💎', apply: clipLook('look-diamond', '#9fdcff') });
 defLook({ id: 'choco', name: 'Chocolate', emoji: '🍫', apply: clipLook('look-choco', '#7a4220') });
 defLook({ id: 'dino', name: 'Dino Scales', emoji: '🦕', apply: clipLook('look-dino', '#45c25c') });
-defLook({ id: 'movie', name: 'Blockbuster', emoji: '🎬', apply: clipLook('look-movie', '#ffb02e') });
+defLook({ id: 'movie', name: 'Movie Star', emoji: '🎬', apply: clipLook('look-movie', '#ffb02e') });
 
 /* ---------- fit: shrink until the word fits the stage; wrap long single words; arch falls back to wavy ---------- */
 function layoutPass(ctx, fs) {
@@ -2060,7 +2060,7 @@ defMove({ id: 'glitch', name: 'Glitch', emoji: '📺', kind: 'emph', celebrate: 
     for (let j = 0; j < N; j++) {
       const on = j % 3 !== 2 && j < N - 1;
       kf.push({ transform: 'translateX(' + (on ? rng.range(-.14, .14) * fs * k : 0) + 'px) skewX(' + (on ? rng.range(-16, 16) * k : 0) + 'deg)' });
-      op.push({ opacity: on && j % 4 === 1 ? .45 : 1 });
+      op.push({ opacity: on && j % 4 === 1 && !ctx.reduced ? .45 : 1 });
     }
     kf.push({ transform: 'translateX(0px) skewX(0deg)' }); op.push({ opacity: 1 });
     const steps = 'steps(' + N + ', end)', anims = [ctx.anim(line, kf, { duration: d, easing: steps }), ctx.anim(line, op, { duration: d, easing: steps, fill: 'none' })];
@@ -2069,7 +2069,7 @@ defMove({ id: 'glitch', name: 'Glitch', emoji: '📺', kind: 'emph', celebrate: 
       const cl = []; for (let j = 0; j <= N; j++) cl.push({ clipPath: j % 4 === 2 && j < N ? band() : full });
       anims.push(ctx.anim(line, cl, { duration: d, easing: steps, fill: 'none' }));
     }
-    if (ctx.n <= 40) for (const c of ctx.letters) {
+    if (ctx.n <= 40 && !ctx.reduced) for (const c of ctx.letters) {
       if (c.isEmoji) continue; const b = baseFilter(c.g), hu = [];
       for (let j = 0; j < 6; j++) hu.push({ filter: b + 'hue-rotate(' + (j % 2 ? rng.pick([90, 180, 270]) : 0) + 'deg)' });
       hu.push({ filter: b + 'hue-rotate(0deg)' });
@@ -2182,11 +2182,11 @@ defMove({ id: 'stomp', name: 'Stomp', emoji: '👣', kind: 'enter', celebrate: t
 defMove({ id: 'jackpot', name: 'Jackpot', emoji: '🎰', kind: 'enter', celebrate: true,
   async run(ctx) {
     /* every letter is a spinning reel; they stop one by one, and when the last one stops the lights flash */
-    const turns = ctx.reduced ? 1 : 4, base = ctx.T(750), sg = ctx.stagger(160), P = 'perspective(500px) ';
+    const base = ctx.T(750), sg = ctx.stagger(160), P = 'perspective(500px) ';
     const anims = ctx.letters.map((c, k) => ctx.anim(c.g, [
-      { transform: P + 'rotateX(' + (-(turns + k % 3) * 360) + 'deg) scale(.9)', opacity: 0 },
+      { transform: P + 'rotateX(' + (ctx.reduced ? -90 : -(4 + k % 3) * 360) + 'deg) scale(.9)', opacity: 0 },
       { opacity: 1, offset: .12 },
-      { transform: P + 'rotateX(-18deg) scale(1.12)', offset: .86, easing: 'ease-out' },
+      { transform: P + 'rotateX(' + (ctx.reduced ? -6 : -18) + 'deg) scale(' + (ctx.reduced ? 1.04 : 1.12) + ')', offset: .86, easing: 'ease-out' },
       { transform: P + 'rotateX(0deg) scale(1)', opacity: 1 }], { duration: base + k * sg, easing: 'cubic-bezier(.1,.6,.3,1)' }));
     if (state.sound) ctx.letters.forEach((c, k) => ctx.hold((base + k * sg) * .86).then(() => sound.tick()));
     await done(anims); if (!ctx.alive()) return;
@@ -2733,6 +2733,8 @@ function setTabCount(name, n, label) {
 const TOTAL = LOOK_ORDER.length + MOVE_ORDER.length;
 const onlyKnown = (v, ok) => (Array.isArray(v) ? v.filter((x) => ok.indexOf(x) >= 0) : []);
 const seen = { looks: new Set(onlyKnown(load('fw.seenLooks', []), LOOK_ORDER)), moves: new Set(onlyKnown(load('fw.seenMoves', []), MOVE_ORDER)) };
+/* a trophy won when there were fewer tricks has to be won again, so the new finish gets its party too */
+if (seen.looks.size + seen.moves.size < TOTAL && load('fw.trophy', false)) save('fw.trophy', false);
 function toast(text, ms) {
   toastEl.textContent = text;
   toastEl.style.animationDuration = ms ? ms + 'ms' : '';
@@ -4634,7 +4636,7 @@ defScene({ id: 'train', name: 'Choo-Choo Train', emoji: '🚂',
 
 /* ---------- 3D scenes: three.js draws them, and it is only fetched the first time one is wanted ---------- */
 const G3 = {
-  bad: {}, capped: false, tiled: false,
+  bad: {}, lost: false, capped: false, tiled: false,
   src: 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
   sri: 'sha512-dLxUelApnYxpLt6K2iomGngnHO83iUvZytA3YjDUCjT0HDOHKXnVYdf3hU4JjM8uEhxf9nD1/ey98U3t2vZ0qQ==',
   state: 'idle', why: '', wait: null, r: null, cv: null, kit: null, w: 0, h: 0, defs: {}, worlds: {}, live: 1.3e6, max: 2560,
@@ -4650,13 +4652,17 @@ function load3D() {
         const T = window.THREE, cv = document.createElement('canvas');
         const r = new T.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' });
         r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap;
-        G3.r = r; G3.cv = cv; G3.kit = kit3D(T); G3.state = 'ready'; done(true);
+        /* a lost graphics context comes back by itself; until then, and for a world that broke meanwhile, the posters stand in */
+        cv.addEventListener('webglcontextlost', () => { G3.lost = true; });
+        cv.addEventListener('webglcontextrestored', () => { G3.lost = false; G3.bad = {}; });
+        G3.r = r; G3.cv = cv; G3.kit = kit3D(T); G3.why = ''; G3.state = 'ready'; done(true);
       } catch (e) { fail('nogl'); }
     };
     if (window.THREE) return boot();
     const s = document.createElement('script');
     s.src = G3.src; s.integrity = G3.sri; s.crossOrigin = 'anonymous'; s.referrerPolicy = 'no-referrer';
-    s.onload = boot; s.onerror = () => { s.remove(); fail('offline'); };
+    const slow = setTimeout(() => { s.onload = s.onerror = null; s.remove(); fail('offline'); }, 20000); /* a request that hangs counts as no internet */
+    s.onload = () => { clearTimeout(slow); boot(); }; s.onerror = () => { clearTimeout(slow); s.remove(); fail('offline'); };
     document.head.appendChild(s);
   }));
 }
@@ -4963,7 +4969,8 @@ def3D('blocks3d', (T, K) => {
     }
     g.scale.setScalar(1.5); K.shade(g, true, false); pets.push({ g, b, legs, r0, sp, ph, kind });
   };
-  pet('pig', 2.6, .5, 0); pet('sheep', 4.4, -.36, 2); pet('cow', 6, .26, 4.2); pet('chick', 1.2, .9, 1); pet('chick', 3.5, -.7, 3.3); pet('sheep', 6.2, .3, 1.2);
+  /* each keeps to its own ring of the meadow, so nobody walks through anybody or up the mountain */
+  pet('chick', 1, .9, 1); pet('pig', 1.9, .5, 0); pet('chick', 2.7, -.7, 3.3); pet('sheep', 3.4, -.36, 2); pet('cow', 4.15, .26, 4.2); pet('sheep', 4.15, .26, 4.2 + Math.PI);
   /* block clouds, and a little boat that sails round */
   const clouds = [];
   for (let i = 0; i < 9; i++) {
@@ -4979,8 +4986,9 @@ def3D('blocks3d', (T, K) => {
     step(t) {
       pets.forEach(p => {
         const a = p.ph + t * p.sp, hop = Math.abs(Math.sin(t * (p.kind === 'chick' ? 7 : 4.2) + p.ph));
-        p.g.position.set(Math.cos(a) * p.r0, 1 + hop * (p.kind === 'chick' ? .35 : .22), Math.sin(a) * p.r0);
-        p.g.rotation.y = -a + (p.sp > 0 ? Math.PI : 0);
+        const x = Math.cos(a) * p.r0, z = Math.sin(a) * p.r0;
+        p.g.position.set(x, hAt(x, z) - .66 + hop * (p.kind === 'chick' ? .35 : .22), z);
+        p.g.rotation.y = -a + (p.sp > 0 ? 0 : Math.PI);
         p.b.rotation.x = .06 * Math.sin(t * 4.2 + p.ph);
         p.legs.forEach((l, i) => { l.rotation.x = .5 * Math.sin(t * 8.4 + p.ph + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI : 0)); });
       });
@@ -5179,9 +5187,9 @@ def3D('dragon3d', (T, K) => {
    where it cannot come (no internet, no WebGL), the scene paints a flat poster of itself instead. */
 const scene3D = (id, name, emoji, at, poster) => defScene({ id, name, emoji, three: true, at,
   draw(c, w, h, t, D, u) {
-    if (G3.state === 'ready' && !G3.bad[id]) {
+    if (G3.state === 'ready' && !G3.lost && !G3.bad[id]) {
       try { const k = pxScale(c), cv = draw3D(id, w * k, h * k, t, !G3.capped); c.drawImage(cv, 0, 0, w, h); return; }
-      catch (e) { G3.bad[id] = true; /* a world that will not build keeps its poster */ }
+      catch (e) { if (!G3.lost) G3.bad[id] = true; /* a world that will not build keeps its poster */ }
     }
     poster(c, w, h, t, u);
   } });
@@ -6221,7 +6229,7 @@ function paint3DTiles() {
   let k = 0;
   scenesEl.querySelectorAll('.tile.scene').forEach((b) => {
     const S = SCENES[b.dataset.scene], cv = b.querySelector('.scv'); if (!S || !S.three || !cv) return;
-    setTimeout(() => { const c = cv.getContext('2d'); c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, 78, 56); drawScene(c, S.id, 78, 56, S.at || 2.5); }, 90 * k++);
+    setTimeout(() => { const c = cv.getContext('2d'); c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, 78, 56); drawScene(c, S.id, 78, 56, S.at || 2.5); }, 350 * k++); /* one world at a time, so the tab stays quick */
   });
 }
 function want3D(say) {
@@ -6295,6 +6303,8 @@ function fitPreview() {
 function stopPreview() { if (K.raf) { cancelAnimationFrame(K.raf); K.raf = 0; } }
 function previewTick(now) {
   K.raf = 0; if (!K.open || !K.R) return;
+  /* while a 3D scene is being kept, the one renderer belongs to the file being made: the preview waits */
+  if (K.job && SCENES[K.R.scene] && SCENES[K.R.scene].three) { K.raf = requestAnimationFrame(previewTick); return; }
   const R = K.R, loop = R.tEnd + 700, c = kpCanvas.getContext('2d'), still = K.fmt === 'png' || K.fmt === 'jpg' || isReduced();
   /* a picture shows the one moment it will save; a GIF or a video plays on a loop */
   if (still) { KEEP.drawFrame(c, R, R.tStill, kpCanvas.width / R.W, null); return; }
@@ -6712,7 +6722,8 @@ function fsStir(e) {
   if (!fs.on) return;
   fsWake();
   if ((keepDlg && keepDlg.open) || cam.on) return;
-  if (e.type === 'pointerdown') { if (!(e.target.closest && e.target.closest('#fsBtn, #fsPlay, #keepBtn, #badge, #stars'))) fsField(3000); }
+  if (e.type === 'pointerdown') { if (!(e.target.closest && e.target.closest('#fsBtn, #fsPlay, #keepBtn, #badge, #stars'))) fsField(e.target === input ? 30000 : 3000); } /* a tap in the box means typing is coming */
+  else if (e.type === 'keydown' && e.key === 'Tab') setTimeout(() => { if (fs.on && form.contains(document.activeElement)) fsField(3000); }, 0); /* never leave the keyboard's focus on something unseen */
   else if (e.type === 'keydown' && typeof e.key === 'string' && fsTyped(e)) {
     /* a key typed anywhere lands in the word box */
     if (document.activeElement !== input && !(e.target.matches && e.target.matches('input, select, textarea'))) { try { input.focus({ preventScroll: true }); } catch (err) { /* ignore */ } }
@@ -6774,7 +6785,7 @@ window.FW = {
   setTab(name) { setTab(name); },
   setScene(id) { setScene(id); },
   scenes: SCENE_ORDER.slice(),
-  three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h] },
+  three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv },
   fullscreen: { enter: () => enterFs(), exit: () => exitFs(), state: () => ({ on: fs.on, api: fs.api, idle: root.classList.contains('fs-idle'), field: !root.classList.contains('fs-nofield') }) },
   __drawScene: (c, id, w, h, t) => drawScene(c, id, w, h, t),
   photos: {

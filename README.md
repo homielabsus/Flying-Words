@@ -4,7 +4,7 @@ A one-file website for kids. Type anything — a word, your name, `🦖🦖🦖`
 
 ## Open it
 
-Double-click `index.html`. That's it — no install, no build step, no server needed. It also works offline (the optional Fredoka web font is only fetched when the page is served from a website). Only the five 3D scenes need the internet, the first time they are used.
+Double-click `index.html`. That's it — no install, no build step, no server needed. It also works offline (the optional Fredoka web font is only fetched when the page is served from a website). Only the five 3D scenes need the internet (the browser usually keeps what it fetched, so after the first time they tend to work offline too).
 
 Works on phones, tablets and desktops. Tap a letter to make it hop; double-tap the stage to replay the last trick; tap 🎲 (or the yellow sticker) for a surprise. On a phone, **GO!** tucks the keyboard away so the show gets the whole screen; tap the word box to type again.
 
@@ -18,7 +18,7 @@ Works on phones, tablets and desktops. Tap a letter to make it hop; double-tap t
 ## How the page is laid out
 
 - **The stage** shows your word. The yellow sticker says which style and move are playing; the ⭐ counter in the other corner is your score. Tap the counter and it takes you to a tile you haven't found yet. The **📸** button in the bottom corner keeps what is on stage (see below), and **⛶** in the other corner goes full screen.
-- **⛶ Full screen** makes the stage fill the whole screen, which is good for a tablet, a TV or a projector. The word box tucks away the moment full screen starts, so nothing covers the show. Tap the stage or just start typing and it floats back over the stage with 🎲 and **GO!** A tap keeps it for three seconds; once you type, it waits 30 seconds after your last letter before it goes again. A **▶️** button starts and stops Auto Play. After three quiet seconds the buttons fade too, and a tap, a mouse move or a key brings them back. **Esc** or **⛶** again leaves full screen. Where the browser isn't allowed to go full screen (an iPhone, or inside the claude.ai preview), the stage fills the page's window instead.
+- **⛶ Full screen** makes the stage fill the whole screen, which is good for a tablet, a TV or a projector. The word box tucks away the moment full screen starts, so nothing covers the show. Tap the stage or just start typing and it floats back over the stage with 🎲 and **GO!** A tap keeps it for three seconds; once you tap into it or type, it waits 30 seconds after your last letter before it goes again. A **▶️** button starts and stops Auto Play. After three quiet seconds the buttons fade too, and a tap, a mouse move or a key brings them back. **Esc** or **⛶** again leaves full screen. Where the browser isn't allowed to go full screen (an iPhone, or inside the claude.ai preview), the stage fills the page's window instead.
 - **The word box** has 🎲 (a random style and move) and **GO!** Pressing GO! with the box empty plays the example the box is showing (🦖🦖🦖, pizza …).
 - **The toy box** has tabs. On a phone it sits under the word box as a row of big tiles you can swipe (two rows on a tablet held upright); on a wide screen it is a side panel of grids.
   - 🎨 **Styles** — every style draws "Wow" in itself, so you can see it before you pick it. Tap one and your word wears it straight away; tap it again to replay the word. 🎲 **Mix** goes back to a new style every time.
@@ -35,7 +35,7 @@ Every style and every move you make happen counts once toward the ⭐ counter (2
 
 ## Styles (WordArt)
 
-🌈 Rainbow · 🍬 Candy · 🧱 Chunky 3D · 🫧 Bubble Gum · ✏️ Outline · 🌃 Neon Sign · 🪙 Chrome · 🌉 Rainbow Arch · 〰️ Wavy · 🦄 Unicorn · 🍭 Lollipop · ✨ Glitter · 🔥 Fire · 🧊 Ice · 🌌 Galaxy · 💥 Comic POW · 🎈 Balloons · 🍩 Sprinkles · 🐯 Tiger · 🍉 Watermelon · 🫠 Slime · 🌋 Lava · 💎 Diamond · 🍫 Chocolate · 🦕 Dino Scales · 🎬 Blockbuster
+🌈 Rainbow · 🍬 Candy · 🧱 Chunky 3D · 🫧 Bubble Gum · ✏️ Outline · 🌃 Neon Sign · 🪙 Chrome · 🌉 Rainbow Arch · 〰️ Wavy · 🦄 Unicorn · 🍭 Lollipop · ✨ Glitter · 🔥 Fire · 🧊 Ice · 🌌 Galaxy · 💥 Comic POW · 🎈 Balloons · 🍩 Sprinkles · 🐯 Tiger · 🍉 Melon · 🫠 Slime · 🌋 Lava · 💎 Diamond · 🍫 Chocolate · 🦕 Dino Scales · 🎬 Movie Star
 
 The Mix stage colours change on every press, now from 14 colour pairs (strawberry lemonade, mermaid, cotton candy, ocean mint, grape soda and lemon-lime among them).
 
