@@ -4682,6 +4682,18 @@ function draw3D(id, wpx, hpx, t, full) {
   G3.r.render(W.scene, cam);
   return G3.cv;
 }
+/* let a world go, with everything it put on the graphics card. Only the world on stage is kept; the others are
+   built again when they are wanted, which takes a moment and saves a phone's memory. */
+function drop3D(id) {
+  const W = G3.worlds[id]; if (!W) return; delete G3.worlds[id];
+  const seen = new Set(), rid = x => { if (x && x.dispose && !x.shared && !seen.has(x)) { seen.add(x); x.dispose(); } };
+  W.scene.traverse(o => {
+    if (!o.isSprite) rid(o.geometry);
+    for (const m of [].concat(o.material || [])) { rid(m.map); rid(m); }
+    if (o.isInstancedMesh) o.dispose();
+    if (o.shadow && o.shadow.dispose) o.shadow.dispose();
+  });
+}
 /* the little toolbox every world is built with */
 function kit3D(T) {
   const K = {};
@@ -4725,6 +4737,23 @@ function kit3D(T) {
     }
     return l;
   };
+  K.white = K.lit(0xffffff); K.ink = K.lit(0x1b1b3a); K.white.shared = K.ink.shared = K.dot.shared = true;
+  /* the building blocks of every character: a unit ball, box, cone and rod, stretched to size and put in place */
+  K.parts = () => {
+    const S = K.orb(1, 16), B = K.box(1, 1, 1), C = K.cone(1, 1, 8), Y = K.tube(1, 1, 1, 10);
+    const put = geo => (p, m, sx, sy, sz, x, y, z) => { const o = K.add(p, geo, m, x, y, z); o.scale.set(sx, sy, sz); return o; };
+    const blob = put(S), block = put(B), cone = put(C), rod = put(Y);
+    return { S, blob, block, spike: (p, m, r, h, x, y, z) => cone(p, m, r, h, r, x, y, z), pole: (p, m, r, h, x, y, z) => rod(p, m, r, h, r, x, y, z),
+      /* two friendly eyes that look along +Z; they come back so they can blink */
+      eyes: (p, r, gap, x, y, z) => [-1, 1].map(s => { const e = blob(p, K.white, r, r, r, x + s * gap, y, z); e.userData.r = r; blob(e, K.ink, .52, .52, .4, s * -.1, .04, .7); blob(e, K.white, .15, .15, .1, s * -.1 + .22, .3, 1.02); return e; }) };
+  };
+  K.blink = (eyes, t, ph) => { const b = K.fr(t * .31 + ph) < .035 ? .12 : 1; for (const e of eyes) e.scale.y = e.userData.r * b; };
+  /* walk a ring round the middle, nose first */
+  K.ring = (o, t, r, sp, ph, y) => { const a = ph + t * sp, s = sp < 0 ? -1 : 1; o.position.set(Math.cos(a) * r, y || 0, Math.sin(a) * r); o.rotation.y = Math.atan2(-Math.sin(a) * s, Math.cos(a) * s); return a; };
+  /* the ground: a sheet pushed up into hills by hf(x, z) */
+  K.land = (parent, size, seg, hf, m) => { const g = new T.PlaneGeometry(size, size, seg, seg); g.rotateX(-Math.PI / 2); const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, hf(p.getX(i), p.getZ(i))); g.computeVertexNormals(); const o = K.add(parent, g, m); o.receiveShadow = true; return o; };
+  /* a chain of joints, each hanging off the one before: tails, necks, tentacles */
+  K.chain = (parent, n, dx, dy, dz, make) => { const js = []; let p = parent; for (let k = 0; k < n; k++) { p = K.grp(p, k ? dx : 0, k ? dy : 0, k ? dz : 0); make(p, k); js.push(p); } return js; };
   K.ease = x => x * x * (3 - 2 * x);
   K.fr = x => x - Math.floor(x);
   return K;
@@ -5183,6 +5212,616 @@ def3D('dragon3d', (T, K) => {
   };
 });
 
+/* 🦖 Dino Valley: a T-rex on patrol, a long-neck at lunch, a triceratops, a pterodactyl and an egg that hatches */
+def3D('dino3d', (T, K) => {
+  const R = K.rng(61), scene = new T.Scene(), cam = new T.PerspectiveCamera(50, 1, .5, 950), TAU = Math.PI * 2, { blob, block, spike, pole, eyes } = K.parts();
+  const sky = K.sky(scene, [[0, '#2aa6c9'], [.36, '#8fdcc8'], [.5, '#ffe9b0'], [.52, '#bfe0a0'], [1, '#7fb86a']]);
+  scene.fog = new T.Fog(0xd6ecc4, 60, 190);
+  scene.add(new T.HemisphereLight(0xfff3d6, 0x4f7a3a, .7)); K.sun(scene, 0xfff0c8, .62, 16, 28, 12, 28);
+  const hf = (x, z) => { const d = Math.hypot(x, z); return d < 20 ? 0 : Math.pow(d - 20, 1.2) * .13 * (1 + .4 * Math.sin(x * .21) * Math.cos(z * .17)); };
+  K.land(scene, 280, 70, hf, K.flat(0x6dbb4e));
+  /* the volcano smokes away at the back */
+  const vx = -42, vz = -56, vy = hf(vx, vz);
+  K.add(scene, K.cone(26, 34, 9), K.flat(0x7a5a4a), vx, vy + 15, vz);
+  K.add(scene, K.cone(8.4, 11, 9), K.lit(0xff7a1a), vx, vy + 26.6, vz);
+  const lava = K.glow(scene, 0xff9a3d, 40, vx, vy + 33, vz, .7);
+  const smoke = [0, 1, 2, 3, 4, 5].map(() => blob(scene, K.soft(0xf2ece6, { transparent: true, opacity: .8, fog: false }), 1, 1, 1, vx, 0, vz));
+  K.add(scene, new T.CircleGeometry(3.2, 20), K.lit(0x4fc3f0), -10.5, .06, 10).rotation.x = -Math.PI / 2;
+  K.add(scene, new T.RingGeometry(3.1, 3.7, 20), K.flat(0xe6d6a0), -10.5, .07, 10).rotation.x = -Math.PI / 2;
+  /* palms, ferns and rocks round the clearing */
+  const bark = K.flat(0x8a5a3c), leafA = K.flat(0x3fae4a), leafB = K.flat(0x2f9a45), nut = K.flat(0x7a4a22), stone = K.flat(0x9a9aa6), fern = K.flat(0x4cbf5a);
+  const palm = (x, z, s) => {
+    const g = K.grp(scene, x, hf(x, z), z); g.scale.setScalar(s); g.rotation.y = R() * TAU;
+    const js = K.chain(g, 5, .12, 1.25, 0, (p, k) => pole(p, bark, .3 - k * .03, 1.4, 0, .6, 0));
+    js.forEach((j, k) => { if (k) j.rotation.z = -.07; });
+    const top = K.grp(js[4], 0, 1.3, 0);
+    for (let k = 0; k < 7; k++) { const lf = K.grp(top); lf.rotation.y = k * TAU / 7; blob(lf, k % 2 ? leafA : leafB, 1.9, .12, .55, 1.6, -.25, 0).rotation.z = -.38; }
+    blob(top, nut, .28, .28, .28, .25, -.2, .1); blob(top, nut, .28, .28, .28, -.2, -.22, -.15);
+    K.shade(g, true, false);
+  };
+  [[-22, -4, 1.5], [-17, -21, 1.3], [19, -14, 1.6], [22, 2, 1.2], [-23, 8, 1.3], [7, -23, 1.4], [-4, -26, 1.2], [28, -24, 1.7], [-32, -16, 1.6], [19, 14, 1.1]].forEach(q => palm(q[0], q[1], q[2]));
+  for (let i = 0; i < 16; i++) {
+    const a = R() * TAU, d = 19 + R() * 14, x = Math.cos(a) * d, z = Math.sin(a) * d, g = K.grp(scene, x, hf(x, z), z);
+    if (i % 3) for (let k = 0; k < 6; k++) { const f = K.grp(g); f.rotation.y = k * TAU / 6; spike(f, fern, .28, 2.2, .5, .8, 0).rotation.z = -.55; }
+    else { const s = 1 + R() * 1.6; K.add(g, K.ball(s, 0), stone, 0, s * .4, 0).scale.set(1, .7, 1.2); }
+  }
+  /* the T-rex */
+  const G = K.flat(0x5fbf4a, { shininess: 18 }), G2 = K.flat(0x3f9a3a, { shininess: 18 }), cream = K.flat(0xffe9a8), tooth = K.lit(0xffffff);
+  const rex = K.grp(scene), rb = K.grp(rex, 0, 3.15, 0); rb.rotation.x = -.22;
+  blob(rb, G, 1.25, 1.35, 2.1, 0, 0, 0); blob(rb, cream, 1.02, 1.05, 1.75, 0, -.34, .3);
+  for (let k = 0; k < 4; k++) blob(rb, G2, .46 - k * .05, .18, .36, 0, 1.3 - k * .06, .7 - k * .75);
+  const rneck = K.grp(rb, 0, .95, 1.55); blob(rneck, G, .82, 1, .9, 0, .25, .15);
+  const rhead = K.grp(rneck, 0, .95, .55); rhead.rotation.x = .22;
+  block(rhead, G, 1.45, 1.05, 2, 0, .3, .85); block(rhead, G2, 1.5, .3, .9, 0, .86, .25);
+  const rjaw = K.grp(rhead, 0, -.22, .05); block(rjaw, G2, 1.25, .34, 1.75, 0, -.17, .85); block(rjaw, K.lit(0xff7a8a), 1, .06, 1.4, 0, .01, .85);
+  for (let i = 0; i < 5; i++) for (const s of [-1, 1]) { spike(rhead, tooth, .09, .26, s * .6, -.3, .35 + i * .34).rotation.x = Math.PI; if (i < 4) spike(rjaw, tooth, .08, .2, s * .52, .1, .5 + i * .34); }
+  const rEyes = eyes(rhead, .25, .56, 0, .98, .55); blob(rhead, K.ink, .07, .07, .07, .32, .55, 1.86); blob(rhead, K.ink, .07, .07, .07, -.32, .55, 1.86);
+  const rArms = [-1, 1].map(s => { const a = K.grp(rb, s * 1.05, -.25, 1.2); blob(a, G2, .17, .5, .17, 0, -.35, .12); blob(a, G2, .14, .14, .3, 0, -.75, .35); return a; });
+  const rLegs = [-1, 1].map(s => { const l = K.grp(rex, s * .92, 2.75, -.15); blob(l, G2, .62, 1.15, .85, 0, -.75, 0); blob(l, G2, .33, .9, .36, 0, -1.9, .12); block(l, G2, .78, .3, 1.3, 0, -2.6, .45); for (const tx of [-.26, 0, .26]) spike(l, tooth, .09, .3, tx, -2.62, 1.15).rotation.x = Math.PI / 2; return l; });
+  const rTail = K.chain(K.grp(rb, 0, .05, -1.75), 6, 0, .04, -.95, (p, k) => blob(p, k % 2 ? G2 : G, 1 - k * .15, 1 - k * .15, .8, 0, 0, 0));
+  K.shade(rex, true, false);
+  /* the long-neck, who never stops eating */
+  const P1 = K.flat(0x7a8cf0, { shininess: 18 }), P2 = K.flat(0x5a6ad8, { shininess: 18 }), pale = K.flat(0xdfe6ff);
+  const bro = K.grp(scene, -13.5, 0, -10.5); bro.rotation.y = 1.35;
+  blob(bro, P1, 2.1, 1.9, 3.2, 0, 3.6, 0); blob(bro, pale, 1.8, 1.4, 2.8, 0, 3.1, .1);
+  for (const [x, z] of [[-1.25, 1.7], [1.25, 1.7], [-1.25, -1.7], [1.25, -1.7]]) { pole(bro, P2, .56, 2.6, x, 1.3, z); pole(bro, pale, .6, .3, x, .15, z); }
+  const bNeck = K.chain(K.grp(bro, 0, 4.4, 2.6), 8, 0, .98, .42, (p, k) => blob(p, k % 2 ? P1 : P2, .82 - k * .05, .7, .82 - k * .05, 0, 0, 0));
+  const bHead = K.grp(bNeck[7], 0, .7, .5); blob(bHead, P1, .62, .52, .9, 0, 0, .2); blob(bHead, pale, .5, .3, .6, 0, -.2, .45);
+  const bEyes = eyes(bHead, .2, .46, 0, .28, .4); blob(bHead, K.ink, .05, .05, .05, .2, .12, 1.06); blob(bHead, K.ink, .05, .05, .05, -.2, .12, 1.06);
+  const bLeaf = blob(bHead, leafA, .5, .08, .3, 0, -.3, 1);
+  const bTail = K.chain(K.grp(bro, 0, 3.7, -2.9), 7, 0, -.34, -.95, (p, k) => blob(p, k % 2 ? P2 : P1, 1.05 - k * .14, 1.05 - k * .14, .85, 0, 0, 0));
+  K.shade(bro, true, false);
+  /* the triceratops */
+  const O1 = K.flat(0xff9a4a, { shininess: 18 }), O2 = K.flat(0xe8742a, { shininess: 18 }), horn = K.flat(0xfff3d6);
+  const tri = K.grp(scene), tb = K.grp(tri, 0, 1.75, 0);
+  blob(tb, O1, 1.25, 1.15, 2, 0, 0, 0); blob(tb, cream, 1.05, .8, 1.7, 0, -.4, .1);
+  const tHead = K.grp(tb, 0, .15, 1.9); blob(tHead, O1, .9, .82, 1.05, 0, 0, .35); block(tHead, horn, .5, .42, .5, 0, -.25, 1.3);
+  const frill = pole(tHead, O2, 1.5, .16, 0, .7, -.35); frill.rotation.x = Math.PI / 2 - .5;
+  for (let k = 0; k < 7; k++) { const a = -1.25 + k * 2.5 / 6; spike(tHead, horn, .14, .36, Math.sin(a) * 1.5, .72 + Math.cos(a) * 1.3, -.95 + Math.cos(a) * .7).rotation.z = -a; }
+  for (const s of [-1, 1]) spike(tHead, horn, .17, 1.3, s * .42, .75, .95).rotation.x = .95;
+  spike(tHead, horn, .14, .5, 0, .3, 1.35).rotation.x = .7;
+  const tEyes = eyes(tHead, .19, .62, 0, .22, .78);
+  const tLegs = [[-.75, 1.1], [.75, 1.1], [-.75, -1.1], [.75, -1.1]].map(q => { const l = K.grp(tri, q[0], 1.35, q[1]); pole(l, O2, .36, 1.25, 0, -.6, 0); pole(l, horn, .38, .2, 0, -1.25, 0); return l; });
+  const tTail = K.chain(K.grp(tb, 0, -.1, -1.8), 4, 0, -.08, -.6, (p, k) => blob(p, O2, .6 - k * .13, .55 - k * .12, .55, 0, 0, 0));
+  K.shade(tri, true, false);
+  /* the pterodactyl circles overhead */
+  const Q1 = K.flat(0xd9534f), Q2 = new T.MeshPhongMaterial({ color: 0xffb36b, flatShading: true, side: T.DoubleSide, shininess: 8 });
+  const pt = K.grp(scene), pb = K.grp(pt); blob(pb, Q1, .5, .45, 1.5, 0, 0, 0);
+  const pHead = K.grp(pb, 0, .25, 1.5); blob(pHead, Q1, .42, .4, .55, 0, 0, 0); spike(pHead, horn, .18, 1.5, 0, -.05, 1.05).rotation.x = Math.PI / 2; spike(pHead, Q1, .16, 1.2, 0, .3, -.7).rotation.x = -Math.PI / 2 + .3; eyes(pHead, .13, .34, 0, .12, .28);
+  const wshape = new T.Shape(); wshape.moveTo(0, .7); wshape.lineTo(5.2, 1.4); wshape.lineTo(4.2, .2); wshape.lineTo(3, -.1); wshape.lineTo(2.4, -.9); wshape.lineTo(1.2, -.6); wshape.lineTo(0, -1.1);
+  const wgeo = new T.ShapeGeometry(wshape); wgeo.rotateX(-Math.PI / 2);
+  const pWings = [-1, 1].map(s => { const w = K.grp(pb, s * .35, .1, 0), m = new T.Mesh(wgeo, Q2); m.scale.set(s, 1, 1); w.add(m); return { w, s }; });
+  /* and somebody is hatching */
+  const egg = K.grp(scene, 10.5, 0, 8), shellM = K.flat(0xfff3d6), spot = K.flat(0x9fd0ff);
+  K.add(egg, new T.SphereGeometry(1.1, 14, 8, 0, TAU, Math.PI * .45, Math.PI * .55), shellM, 0, 1.2, 0).scale.set(1, 1.2, 1);
+  for (let k = 0; k < 5; k++) blob(egg, spot, .2, .2, .08, Math.cos(k * 1.3) * .95, .55 + (k % 2) * .25, Math.sin(k * 1.3) * .95).lookAt(egg.position.x, .9, egg.position.z);
+  const baby = K.grp(egg, 0, .9, 0); blob(baby, K.flat(0x9be86a), .62, .6, .66, 0, 0, 0); blob(baby, K.flat(0x9be86a), .4, .3, .4, 0, -.12, .45);
+  const babyEyes = eyes(baby, .2, .3, 0, .18, .42);
+  const cap = K.add(baby, new T.SphereGeometry(.7, 12, 6, 0, TAU, 0, Math.PI * .38), shellM, 0, .25, -.05); cap.rotation.x = -.35;
+  K.shade(egg, true, false);
+  const v1 = new T.Vector3();
+  return {
+    scene, cam, fov: 50,
+    step(t) {
+      /* T-rex: stomp round the clearing, tail swinging, and now and then a roar */
+      K.ring(rex, t, 9, .17, .4, 0);
+      const st = t * 3.3; rb.position.y = 3.15 + .14 * Math.abs(Math.sin(st)); rb.rotation.z = .04 * Math.sin(st);
+      rLegs.forEach((l, i) => { l.rotation.x = .6 * Math.sin(st + i * Math.PI); });
+      rTail.forEach((j, k) => { j.rotation.y = .16 * Math.sin(st - k * .7); });
+      const roar = Math.max(0, Math.sin(t * .7 - 1)) > .86 ? 1 : 0;
+      rjaw.rotation.x = .1 + .08 * Math.sin(t * 2.4) + roar * .55; rhead.rotation.x = .22 - roar * .35; rhead.rotation.y = .25 * Math.sin(t * .6);
+      rArms.forEach((a, i) => { a.rotation.x = .3 * Math.sin(t * 5 + i * 2) + roar * -.8; }); K.blink(rEyes, t, 0);
+      /* long-neck: down to the leaves and up again, chewing */
+      const dip = .5 + .5 * Math.sin(t * .5);
+      bNeck.forEach((j, k) => { j.rotation.x = (k ? .1 : .25) + dip * .13 + .02 * Math.sin(t * 1.3 + k); j.rotation.z = .03 * Math.sin(t * .8 + k * .5); });
+      bHead.rotation.x = -.9 - dip * .1 + .08 * Math.sin(t * 7); bLeaf.rotation.z = .3 * Math.sin(t * 7);
+      bTail.forEach((j, k) => { j.rotation.y = .12 * Math.sin(t * 1.4 - k * .6); }); K.blink(bEyes, t, .4);
+      /* triceratops: a slow walk the other way */
+      K.ring(tri, t, 4.2, -.2, 2, 0);
+      const tt = t * 3.6; tb.position.y = 1.75 + .06 * Math.abs(Math.sin(tt)); tHead.rotation.y = .2 * Math.sin(t * .9); tHead.rotation.x = .08 * Math.sin(tt);
+      tLegs.forEach((l, i) => { l.rotation.x = .45 * Math.sin(tt + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI : 0)); });
+      tTail.forEach((j, k) => { j.rotation.y = .2 * Math.sin(tt * .5 - k * .8); }); K.blink(tEyes, t, .7);
+      /* pterodactyl */
+      K.ring(pt, t, 17, .34, 3, 15 + 1.6 * Math.sin(t * .5)); pb.rotation.z = -.3;
+      const fl = Math.sin(t * 4.4); pWings.forEach(q => { q.w.rotation.z = q.s * (.25 + .6 * fl); });
+      /* the egg wobbles, and the baby pops up for a look */
+      const up = K.ease(Math.max(0, Math.min(1, Math.sin(t * 1.1) * 1.6 + .5)));
+      baby.position.y = .75 + up * .95; baby.rotation.y = .5 * Math.sin(t * 1.7); egg.rotation.z = .07 * Math.sin(t * 5) * (1 - up); K.blink(babyEyes, t, .2);
+      smoke.forEach((s, k) => { const q = K.fr(t * .1 + k / 6); s.position.set(vx + Math.sin(q * 5 + k) * 3 + q * 9, vy + 32 + q * 26, vz); s.scale.setScalar(3 + q * 8); s.material.opacity = .8 * (1 - q); });
+      lava.material.opacity = .55 + .2 * Math.sin(t * 3);
+      cam.position.set(9 * Math.sin(t * .09), 7.4 + .6 * Math.sin(t * .2), 26); cam.lookAt(v1.set(0, 7.2, 0));
+      sky.position.copy(cam.position);
+    },
+  };
+});
+
+/* 🐠 Coral Reef: clownfish in a school, a turtle, a whale, an octopus, jellyfish, a crab and a little submarine */
+def3D('reef3d', (T, K) => {
+  const R = K.rng(83), scene = new T.Scene(), cam = new T.PerspectiveCamera(52, 1, .5, 950), TAU = Math.PI * 2, { blob, block, spike, pole, eyes } = K.parts();
+  const sky = K.sky(scene, [[0, '#7fe0f0'], [.2, '#2fb4dc'], [.5, '#1487c4'], [.75, '#0c5f9e'], [1, '#083b6e']]);
+  scene.fog = new T.Fog(0x1487c4, 16, 95);
+  scene.add(new T.HemisphereLight(0xcff6ff, 0x1a5f8a, .82)); K.sun(scene, 0xe6fbff, .4, 5, 30, 8);
+  const hf = (x, z) => .9 * Math.sin(x * .19) * Math.cos(z * .15) + .5 * Math.sin(x * .07 + z * .11);
+  K.land(scene, 240, 60, hf, K.flat(0xdcc98c));
+  /* sunbeams come down through the water */
+  const beams = [];
+  for (let i = 0; i < 7; i++) {
+    const p = K.grp(scene, -24 + i * 8 + R() * 3, 34, -14 + R() * 12), g = new T.ConeGeometry(4.2, 44, 14, 1, true); g.translate(0, -22, 0);
+    p.add(new T.Mesh(g, new T.MeshBasicMaterial({ color: 0xcffaff, transparent: true, opacity: .07, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending, fog: false }))); beams.push(p);
+  }
+  /* corals, weeds and rocks */
+  const cols = [0xff6fa8, 0xff9a4a, 0xb47bff, 0xffd23f, 0xff5f6d, 0x4fe0c0].map(c => K.flat(c, { shininess: 20 })), rock = K.flat(0x6f7f9a), weedM = K.flat(0x2fbf6a);
+  const weeds = [];
+  const coral = (x, z, kind, s) => {
+    const g = K.grp(scene, x, hf(x, z) - .2, z); g.scale.setScalar(s); g.rotation.y = R() * TAU;
+    if (kind === 0) for (let k = 0; k < 6; k++) { const h = 1.2 + R() * 2.4, a = k * TAU / 6, d = k ? .8 : 0, m = cols[(k + (x > 0 ? 1 : 0)) % 2 ? 0 : 4]; pole(g, m, .34, h, Math.cos(a) * d, h / 2, Math.sin(a) * d); blob(g, cols[3], .28, .1, .28, Math.cos(a) * d, h, Math.sin(a) * d); }
+    else if (kind === 1) { blob(g, cols[2], 1.5, 1.1, 1.5, 0, .8, 0); for (let k = 0; k < 9; k++) { const a = R() * TAU, b = R() * 1.2; blob(g, cols[0], .3, .3, .3, Math.sin(b) * Math.cos(a) * 1.45, .8 + Math.cos(b) * 1.05, Math.sin(b) * Math.sin(a) * 1.45); } }
+    else if (kind === 2) for (let k = 0; k < 3; k++) { const f = blob(g, cols[k % 2], 1.5 - k * .3, 1.9 - k * .3, .14, (k - 1) * .5, 1.7 - k * .2, (k - 1) * .5); f.rotation.y = k * 1.1; }
+    else { const js = K.chain(g, 4, .25, 1.05, 0, (p, k) => pole(p, cols[4], .3 - k * .05, 1.2, 0, .5, 0)); js.forEach((j, k) => { j.rotation.z = k ? .35 * (k % 2 ? 1 : -1) : 0; if (k) { const b = K.grp(j, 0, .5, 0); b.rotation.z = (k % 2 ? -1 : 1) * 1; pole(b, cols[4], .16, .9, 0, .45, 0); } }); }
+    K.add(g, K.ball(1.2, 0), rock, .9, .1, -.8).scale.set(1.2, .6, 1);
+  };
+  [[-13, -3, 0, 1.2], [-17, -10, 1, 1.5], [-8, -9, 2, 1.3], [12, -4, 3, 1.3], [16, -9, 0, 1.4], [8, -11, 1, 1.2], [19, 2, 2, 1.2], [-20, 3, 3, 1.4], [0, -15, 0, 1.5], [-26, -14, 2, 1.8], [26, -15, 1, 1.9], [-11, 7, 1, .8], [11, 8, 3, .8]].forEach(q => coral(q[0], q[1], q[2], q[3]));
+  for (let i = 0; i < 12; i++) {
+    const x = -24 + R() * 48, z = -16 + R() * 20, n = 5 + (R() * 3 | 0);
+    weeds.push({ js: K.chain(K.grp(scene, x, hf(x, z), z), n, 0, 1.15, 0, p => blob(p, weedM, .3, .75, .1, 0, .6, 0)), ph: R() * TAU });
+  }
+  for (let i = 0; i < 5; i++) { const x = -12 + R() * 24, z = 2 + R() * 9, g = K.grp(scene, x, hf(x, z) + .12, z); g.rotation.y = R() * TAU; for (let k = 0; k < 5; k++) { const a = K.grp(g); a.rotation.y = k * TAU / 5; blob(a, cols[i % 2 ? 1 : 0], .5, .14, .18, .42, 0, 0); } }
+  const bub = []; for (let i = 0; i < 90; i++) bub.push(-30 + R() * 60, R() * 36, -22 + R() * 30);
+  const bubbles = K.points(scene, bub.slice(), .55, 0xdffaff, { opacity: .7, blending: T.NormalBlending }), bubV = bub.map(() => .8 + R() * 1.6);
+  /* a fish, nose along +Z */
+  const fish = (bodyM, tailM, stripes, s) => {
+    const g = K.grp(scene), b = K.grp(g); b.scale.setScalar(s);
+    blob(b, bodyM, .42, .5, .95, 0, 0, 0);
+    if (stripes) { blob(b, K.white, .44, .51, .1, 0, 0, .32); blob(b, K.white, .4, .46, .09, 0, 0, -.3); }
+    const tail = K.grp(b, 0, 0, -.9); const tf = spike(tail, tailM, .5, .7, 0, 0, -.3); tf.rotation.x = Math.PI / 2; tf.scale.x = .12;
+    const top = spike(b, tailM, .3, .5, 0, .55, -.1); top.scale.x = .1; top.rotation.x = -.4;
+    const fins = [-1, 1].map(q => { const f = K.grp(b, q * .4, -.12, .2); blob(f, tailM, .3, .06, .18, q * .25, 0, 0); return f; });
+    const e = eyes(b, .16, .36, 0, .14, .55); e.forEach((o, i) => { o.rotation.y = (i ? 1 : -1) * .9; });
+    return { g, tail, fins, e };
+  };
+  const clownM = K.flat(0xff7a2a, { shininess: 30 }), clownT = K.flat(0xff9a4a), tangM = K.flat(0x2f6bff, { shininess: 30 }), tangT = K.flat(0xffd23f);
+  const school = []; for (let i = 0; i < 7; i++) school.push(Object.assign(fish(clownM, clownT, true, .75 + R() * .35), { du: i * .13 + R() * .05, dy: R() * 2.4 - 1.2, dz: R() * 2.6 - 1.3 }));
+  const tangs = []; for (let i = 0; i < 4; i++) tangs.push(Object.assign(fish(tangM, tangT, false, .9 + R() * .3), { du: i * .16, dy: R() * 2 - 1, dz: R() * 2 - 1 }));
+  /* the puffer keeps puffing up */
+  const puff = K.grp(scene, 14, 6, 2), puffB = K.grp(puff); blob(puffB, K.flat(0xffe14d, { shininess: 30 }), 1, 1, 1, 0, 0, 0); blob(puffB, K.white, .8, .7, .8, 0, -.28, .1);
+  for (let k = 0; k < 22; k++) { const a = R() * TAU, b = Math.acos(R() * 1.6 - .8); const sp = spike(puffB, K.flat(0xff9a2a), .1, .4, Math.sin(b) * Math.cos(a), Math.cos(b), Math.sin(b) * Math.sin(a)); sp.lookAt(0, 0, 0); sp.rotateX(-Math.PI / 2); }
+  const puffEyes = eyes(puffB, .24, .42, 0, .3, .82); blob(puffB, K.lit(0xff5f7a), .16, .1, .1, 0, -.12, .98);
+  const puffTail = spike(puffB, K.flat(0xff9a2a), .4, .6, 0, 0, -1.15); puffTail.rotation.x = Math.PI / 2; puffTail.scale.x = .15;
+  /* the turtle */
+  const TG = K.flat(0x4fbf6a, { shininess: 20 }), TS = K.flat(0x2f8f55, { shininess: 30 }), turtle = K.grp(scene);
+  K.add(turtle, new T.SphereGeometry(1, 14, 8, 0, TAU, 0, Math.PI / 2), TS).scale.set(1.5, .85, 1.9); blob(turtle, K.flat(0xffe9a8), 1.4, .25, 1.8, 0, -.05, 0);
+  for (let k = 0; k < 7; k++) { const a = k * TAU / 6; blob(turtle, K.flat(0x6fd98a), .36, .1, .36, k < 6 ? Math.cos(a) * .85 : 0, k < 6 ? .55 : .82, k < 6 ? Math.sin(a) * 1.05 : 0); }
+  const tuHead = K.grp(turtle, 0, .1, 1.95); blob(tuHead, TG, .5, .45, .6, 0, 0, .25); const tuEyes = eyes(tuHead, .16, .34, 0, .18, .52);
+  const flip = [[-1, 1, 1.5, .9], [1, 1, 1.5, .9], [-1, -1, .9, .6], [1, -1, .9, .6]].map(q => { const f = K.grp(turtle, q[0] * 1.3, -.05, q[1] * 1.1); blob(f, TG, q[2], .1, q[3] * .5, q[0] * q[2] * .8, 0, q[1] * .2); return { f, s: q[0], back: q[1] < 0 }; });
+  /* the whale goes by far behind */
+  const WB = K.flat(0x4a7fd8, { shininess: 30 }), whale = K.grp(scene), wb = K.grp(whale);
+  blob(wb, WB, 3.2, 3, 7.5, 0, 0, 0); blob(wb, K.flat(0xdff0ff), 2.9, 2.2, 6.6, 0, -.9, .5);
+  const wEyes = eyes(wb, .4, 2.6, 0, .2, 4.6); wEyes.forEach((o, i) => { o.rotation.y = (i ? 1 : -1) * 1.1; });
+  for (const s of [-1, 1]) blob(wb, WB, 2.2, .25, 1, s * 3.6, -1.4, 2).rotation.z = s * -.5;
+  const wTail = K.chain(K.grp(wb, 0, .3, -6.6), 3, 0, .1, -1.9, (p, k) => blob(p, WB, 1.7 - k * .5, 1.5 - k * .45, 1.4, 0, 0, 0));
+  for (const s of [-1, 1]) blob(wTail[2], WB, 2.4, .22, 1.2, s * 2, 0, -1.4).rotation.y = s * .5;
+  /* the octopus sits on her rock and waves */
+  const OC = K.flat(0xc77bff, { shininess: 40 }), OC2 = K.flat(0xff9ad8, { shininess: 40 }), octo = K.grp(scene, -8.5, hf(-8.5, 4) + 1.5, 4);
+  K.add(scene, K.ball(2, 1), rock, -8.5, hf(-8.5, 4) + .2, 4).scale.set(1.3, .8, 1.2);
+  const oHead = K.grp(octo, 0, 1.2, 0); blob(oHead, OC, 1.25, 1.45, 1.25, 0, .5, 0); const oEyes = eyes(oHead, .34, .52, 0, .35, 1.02); blob(oHead, K.lit(0x7a2a9a), .22, .1, .08, 0, -.2, 1.2);
+  for (const s of [-1, 1]) blob(oHead, OC2, .2, .13, .08, s * .85, -.05, .92);
+  const arms = []; for (let k = 0; k < 8; k++) { const base = K.grp(octo, 0, .55, 0); base.rotation.y = k * TAU / 8 + .2; arms.push(K.chain(K.grp(base, .85, 0, 0), 6, .62, -.1, 0, (p, j) => blob(p, j % 2 ? OC2 : OC, .42 - j * .05, .36 - j * .045, .36 - j * .045, 0, 0, 0))); }
+  /* jellyfish */
+  const jellies = [[5, 12, -6, 0xff9ad8], [-3, 15, -12, 0x9ad8ff], [18, 14, -10, 0xd8b4ff]].map((q, i) => {
+    const g = K.grp(scene, q[0], q[1], q[2]), m = new T.MeshPhongMaterial({ color: q[3], transparent: true, opacity: .72, shininess: 60, side: T.DoubleSide });
+    const dome = K.add(g, new T.SphereGeometry(1.3, 14, 8, 0, TAU, 0, Math.PI * .55), m); blob(g, K.lit(0xffffff, { transparent: true, opacity: .5 }), .6, .5, .6, 0, .3, 0);
+    const legs = []; for (let k = 0; k < 6; k++) { const a = k * TAU / 6; legs.push(K.chain(K.grp(g, Math.cos(a) * .7, -.2, Math.sin(a) * .7), 4, 0, -.85, 0, p => pole(p, m, .08, .85, 0, -.42, 0))); }
+    eyes(g, .16, .32, 0, .45, 1.02); return { g, dome, legs, y: q[1], ph: i * 2.1 };
+  });
+  /* the crab scuttles sideways, of course */
+  const CR = K.flat(0xff4d4d, { shininess: 30 }), crab = K.grp(scene); blob(crab, CR, .8, .45, .6, 0, .55, 0);
+  const cEyes = [-1, 1].map(s => { pole(crab, CR, .05, .45, s * .28, 1.05, .3); const e = blob(crab, K.white, .15, .15, .15, s * .28, 1.32, .32); e.userData.r = .15; blob(e, K.ink, .5, .5, .4, 0, 0, .72); return e; });
+  const claws = [-1, 1].map(s => { const a = K.grp(crab, s * .8, .6, .25); blob(a, CR, .3, .14, .14, s * .28, .1, .2); const c = K.grp(a, s * .6, .2, .35); blob(c, CR, .32, .26, .3, 0, 0, 0); blob(c, CR, .1, .24, .2, s * .1, .28, .1); return c; });
+  const cLegs = []; for (let k = 0; k < 6; k++) { const s = k < 3 ? -1 : 1, l = K.grp(crab, s * .7, .45, .25 - (k % 3) * .3); pole(l, CR, .06, .7, s * .25, -.2, 0).rotation.z = s * .9; cLegs.push(l); }
+  /* and a little submarine putters through */
+  const sub = K.grp(scene), SY = K.flat(0xffd23f, { shininess: 50 }); blob(sub, SY, 1.5, 1.4, 3.4, 0, 0, 0); block(sub, SY, 1.3, 1.1, 1.5, 0, 1.5, .2); pole(sub, K.flat(0x8f96a8), .12, 1.3, 0, 2.6, .4); block(sub, K.flat(0x8f96a8), .2, .2, .5, 0, 3.2, .6);
+  for (const z of [1.6, .2, -1.2]) for (const s of [-1, 1]) { blob(sub, K.flat(0x8f96a8), .12, .5, .5, s * 1.36, .15, z); blob(sub, K.lit(0x9fe9ff), .1, .38, .38, s * 1.42, .15, z); }
+  const prop = K.grp(sub, 0, 0, -3.5); block(prop, K.flat(0xff5f6d), 1.9, .28, .1, 0, 0, 0); block(prop, K.flat(0xff5f6d), .28, 1.9, .1, 0, 0, 0);
+  const pathA = (u, v) => v.set(Math.cos(u) * 12, 6.5 + 2.2 * Math.sin(2 * u), Math.sin(u) * 6.5 - 2), pathB = (u, v) => v.set(Math.cos(u) * 15, 11 + 1.5 * Math.sin(3 * u), Math.sin(u) * 5 - 6);
+  const v1 = new T.Vector3(), v2 = new T.Vector3();
+  const swim = (f, path, u, t, k) => { path(u, f.g.position); f.g.position.y += f.dy + .15 * Math.sin(t * 2 + k); f.g.position.z += f.dz; path(u + .06, v1); v1.y += f.dy; v1.z += f.dz; f.g.lookAt(v1); f.tail.rotation.y = .5 * Math.sin(t * 9 + k * 1.7); f.fins.forEach((q, i) => { q.rotation.z = (i ? 1 : -1) * (.3 + .3 * Math.sin(t * 6 + k)); }); K.blink(f.e, t, k * .17); };
+  return {
+    scene, cam, fov: 52,
+    step(t) {
+      school.forEach((f, k) => swim(f, pathA, t * .33 - f.du, t, k));
+      tangs.forEach((f, k) => swim(f, pathB, -t * .26 - f.du - 2, t, k + 9));
+      const pf = .5 + .5 * Math.sin(t * .9); puffB.scale.setScalar(.8 + .5 * K.ease(pf)); puff.position.y = 6 + .5 * Math.sin(t * .7); puff.rotation.y = -.6 + .4 * Math.sin(t * .4); puffTail.rotation.y = .5 * Math.sin(t * 8); K.blink(puffEyes, t, .5);
+      const tu = t * .13 + 1; turtle.position.set(Math.cos(tu) * 17, 9 + 1.5 * Math.sin(t * .4), Math.sin(tu) * 5.5 - 3); turtle.lookAt(v1.set(Math.cos(tu + .05) * 17, 9 + 1.5 * Math.sin(t * .4 + .1), Math.sin(tu + .05) * 5.5 - 3));
+      flip.forEach(q => { q.f.rotation.z = q.s * (q.back ? .2 : .45) * Math.sin(t * 2.2 + (q.back ? 1.5 : 0)); }); tuHead.rotation.x = .12 * Math.sin(t * 1.1); K.blink(tuEyes, t, .3);
+      whale.position.set(-75 + (t * 2.2 + 40) % 150, 13 + 1.5 * Math.sin(t * .3), -40); whale.rotation.y = Math.PI / 2; wb.rotation.x = .06 * Math.sin(t * .8);
+      wTail.forEach((j, k) => { j.rotation.x = .22 * Math.sin(t * 1.6 - k * .7); }); K.blink(wEyes, t, .8);
+      oHead.rotation.z = .08 * Math.sin(t * 1.2); oHead.position.y = 1.2 + .12 * Math.sin(t * 1.8); K.blink(oEyes, t, .1);
+      arms.forEach((js, k) => js.forEach((j, n) => { j.rotation.z = (n ? .3 : -.5) + .32 * Math.sin(t * 1.9 - n * .7 + k * 1.3) + (k === 1 && n < 3 ? .5 + .3 * Math.sin(t * 5) : 0); }));
+      jellies.forEach(j => { const p = Math.sin(t * 2 + j.ph); j.dome.scale.set(1 + .14 * p, 1 - .12 * p, 1 + .14 * p); j.g.position.y = j.y + 1.6 * Math.sin(t * .5 + j.ph) + .25 * p; j.legs.forEach((js, k) => js.forEach((q, n) => { q.rotation.x = .2 * Math.sin(t * 2 - n * .8 + k); q.rotation.z = .2 * Math.cos(t * 2 - n * .8 + k + j.ph); })); });
+      const cx = 3 + 5 * Math.sin(t * .5); crab.position.set(cx, hf(cx, 10) - .1 + .06 * Math.abs(Math.sin(t * 12)), 10); crab.rotation.z = .05 * Math.sin(t * 12);
+      cLegs.forEach((l, k) => { l.rotation.z = .3 * Math.sin(t * 12 + k * 2.1); }); claws.forEach((c, i) => { c.rotation.z = (i ? -1 : 1) * (.2 + .35 * Math.max(0, Math.sin(t * 3 + i * 2))); c.position.y = .2 + .25 * Math.max(0, Math.sin(t * 1.5 + i * 3)); });
+      cEyes.forEach(e => { e.scale.y = e.userData.r * (K.fr(t * .31 + .6) < .035 ? .12 : 1); });
+      sub.position.set(70 - (t * 3 + 20) % 140, 17 + Math.sin(t * .5), -24); sub.rotation.y = -Math.PI / 2; sub.rotation.z = .04 * Math.sin(t * 1.3); prop.rotation.z = t * 9;
+      weeds.forEach(w => w.js.forEach((j, n) => { j.rotation.z = .16 * Math.sin(t * 1.4 - n * .6 + w.ph); j.rotation.x = .08 * Math.cos(t * 1.1 - n * .5 + w.ph); }));
+      beams.forEach((b, i) => { b.rotation.z = .16 + .08 * Math.sin(t * .3 + i * 1.7); b.rotation.x = .06 * Math.sin(t * .23 + i); b.children[0].material.opacity = .05 + .035 * Math.sin(t * .7 + i * 2.2); });
+      const bp = bubbles.geometry.attributes.position; for (let i = 0; i < bubV.length / 3; i++) { bp.setY(i, (bub[i * 3 + 1] + t * bubV[i * 3]) % 36); bp.setX(i, bub[i * 3] + .4 * Math.sin(t * 1.5 + i)); } bp.needsUpdate = true;
+      cam.position.set(4 * Math.sin(t * .12), 6 + .5 * Math.sin(t * .23), 23); cam.lookAt(v2.set(0, 7.2, 0));
+      sky.position.copy(cam.position);
+    },
+  };
+});
+
+/* 🐧 Penguin Party: penguins skating on a frozen pond, one sliding down the hill, a polar bear, a seal and a snowman */
+def3D('snow3d', (T, K) => {
+  const R = K.rng(29), scene = new T.Scene(), cam = new T.PerspectiveCamera(50, 1, .5, 950), TAU = Math.PI * 2, { blob, block, spike, pole, eyes } = K.parts();
+  const sky = K.sky(scene, [[0, '#06112e'], [.3, '#10306a'], [.47, '#2f6f9a'], [.5, '#9fd3e6'], [.52, '#dfeef8'], [1, '#eef6fb']], (c, w, h) => {
+    /* the northern lights, and stars behind them */
+    c.fillStyle = '#fff'; for (let i = 0; i < 520; i++) { c.globalAlpha = .3 + R() * .7; const s = R() < .9 ? 1 : 2; c.fillRect(R() * w, R() * h * .45, s, s); }
+    c.globalAlpha = 1;
+    for (let b = 0; b < 3; b++) for (let x = 0; x < w; x += 4) {
+      const u = x / w * TAU, y0 = h * (.27 + b * .045) + Math.sin(u * 3 + b * 2) * h * .03 + Math.sin(u * 7 + b) * h * .012, hh = h * (.14 + .04 * Math.sin(u * 5 + b * 3));
+      const g = c.createLinearGradient(0, y0, 0, y0 + hh); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(.3, ['rgba(90,255,170,.5)', 'rgba(120,220,255,.38)', 'rgba(255,120,220,.34)'][b]); g.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = g; c.fillRect(x, y0, 4, hh);
+    }
+  });
+  scene.fog = new T.Fog(0xa9cfe6, 45, 160);
+  scene.add(new T.HemisphereLight(0xcfe6ff, 0x8fb0d8, .72)); K.sun(scene, 0xe6f0ff, .42, -14, 24, 12, 26);
+  const hf = (x, z) => { const d = Math.hypot(x, z); return d < 18 ? 0 : Math.pow(d - 18, 1.2) * .075 * (1 + .4 * Math.sin(x * .19) * Math.cos(z * .23)); };
+  K.land(scene, 280, 70, hf, K.flat(0xe9f2fb));
+  K.add(scene, new T.CircleGeometry(5.4, 28), K.lit(0x9fdcf2), 0, .05, 0).rotation.x = -Math.PI / 2;
+  K.add(scene, new T.RingGeometry(5.3, 5.9, 28), K.flat(0xffffff), 0, .06, 0).rotation.x = -Math.PI / 2;
+  for (let k = 0; k < 7; k++) { const a = R() * TAU, d = R() * 4; const sc = K.add(scene, new T.PlaneGeometry(1.6, .06), K.lit(0xe6f8ff), Math.cos(a) * d, .07, Math.sin(a) * d); sc.rotation.x = -Math.PI / 2; sc.rotation.z = R() * TAU; }
+  /* igloo, snowman, pines */
+  const ice = K.flat(0xdcedfa, { shininess: 30 }), snowM = K.flat(0xffffff), coal = K.lit(0x1b1b3a), carrot = K.flat(0xff8a1a), wood = K.flat(0x6b4226), redM = K.flat(0xff4d6d), pineM = K.flat(0x2f8f5a);
+  const igloo = K.grp(scene, -11.5, 0, -8.5); igloo.rotation.y = .9;
+  K.add(igloo, K.ball(3.5, 1), ice).scale.set(1, .85, 1); pole(igloo, ice, 1.3, 2, 0, .15, 3.3).rotation.x = Math.PI / 2; pole(igloo, K.lit(0x23345a), 1, .1, 0, .15, 4.32).rotation.x = Math.PI / 2;
+  const hearth = K.glow(igloo, 0xffc86b, 3.4, 0, .7, 4.5, .7);
+  const sm = K.grp(scene, 11.5, 0, -7.5); sm.rotation.y = -.5;
+  blob(sm, snowM, 1.5, 1.4, 1.5, 0, 1.2, 0); blob(sm, snowM, 1.1, 1.05, 1.1, 0, 3.1, 0); const smHead = K.grp(sm, 0, 4.55, 0); blob(smHead, snowM, .82, .8, .82, 0, 0, 0);
+  spike(smHead, carrot, .14, .8, 0, -.02, 1.1).rotation.x = Math.PI / 2; for (const s of [-1, 1]) blob(smHead, coal, .1, .1, .08, s * .28, .22, .72);
+  for (let k = 0; k < 5; k++) blob(smHead, coal, .06, .06, .05, (k - 2) * .14, -.28 - .08 * (1 - Math.abs(k - 2) / 2), .72);
+  pole(smHead, coal, .56, .85, 0, 1.1, 0); pole(smHead, coal, .9, .08, 0, .7, 0); pole(smHead, redM, .58, .16, 0, .84, 0);
+  K.add(sm, new T.TorusGeometry(.82, .17, 6, 14), redM, 0, 3.95, 0).rotation.x = Math.PI / 2; block(sm, redM, .3, .9, .12, .45, 3.5, .78);
+  for (let k = 0; k < 3; k++) blob(sm, coal, .1, .1, .08, 0, 2.6 + k * .5, 1.02 + (k === 1 ? .06 : 0));
+  const smArms = [-1, 1].map(s => { const a = K.grp(sm, s * 1, 3.3, 0); pole(a, wood, .07, 1.7, s * .8, .25, 0).rotation.z = -s * 1.25; pole(a, wood, .05, .5, s * 1.45, .6, 0).rotation.z = -s * .4; return a; });
+  K.shade(sm, true, false);
+  const pine = (x, z, s) => { const g = K.grp(scene, x, hf(x, z), z); g.scale.setScalar(s); pole(g, wood, .3, 1.2, 0, .6, 0); for (let k = 0; k < 3; k++) { spike(g, pineM, 1.8 - k * .45, 2, 0, 1.9 + k * 1.3, 0); spike(g, snowM, 1.25 - k * .32, 1.1, 0, 2.5 + k * 1.3, 0); } K.shade(g, true, false); };
+  [[-21, -3, 1.5], [-17, -19, 1.8], [20, -15, 1.7], [23, 0, 1.3], [-24, 9, 1.4], [5, -24, 1.6], [-6, -27, 2], [30, -24, 2.2], [-33, -18, 2.2], [21, 13, 1.2]].forEach(q => pine(q[0], q[1], q[2]));
+  const fl = []; for (let i = 0; i < 280; i++) fl.push(-34 + R() * 68, R() * 28, -30 + R() * 46);
+  const flakes = K.points(scene, fl.slice(), .42, 0xffffff, { opacity: .9, blending: T.NormalBlending }), flV = fl.map(() => 1.4 + R() * 1.8);
+  /* a penguin, beak along +Z */
+  const BK = K.flat(0x2a2f45, { shininess: 40 }), WH = K.flat(0xffffff, { shininess: 20 }), OR = K.flat(0xffa520);
+  const penguin = (extra) => {
+    const g = K.grp(scene), b = K.grp(g);
+    blob(b, BK, .58, .82, .52, 0, .9, 0); blob(b, WH, .44, .64, .3, 0, .82, .26);
+    const head = K.grp(b, 0, 1.78, 0); blob(head, BK, .44, .42, .44, 0, 0, 0); blob(head, WH, .3, .27, .2, 0, -.04, .28);
+    spike(head, OR, .12, .34, 0, -.06, .52).rotation.x = Math.PI / 2; const e = eyes(head, .11, .17, 0, .08, .36);
+    const flips = [-1, 1].map(s => { const f = K.grp(b, s * .55, 1.3, 0); blob(f, BK, .12, .5, .28, s * .06, -.42, 0); return f; });
+    for (const s of [-1, 1]) blob(b, OR, .2, .07, .32, s * .22, .07, .14);
+    if (extra === 1) { spike(head, K.flat(0xff5fa8), .3, .7, 0, .68, 0); blob(head, K.lit(0xffd23f), .1, .1, .1, 0, 1.06, 0); }
+    if (extra === 2) { K.add(b, new T.TorusGeometry(.42, .11, 6, 12), redM, 0, 1.42, 0).rotation.x = Math.PI / 2; block(b, redM, .16, .5, .08, .3, 1.15, .42); }
+    if (extra === 3) { blob(head, K.flat(0x3cb4ff), .46, .22, .46, 0, .34, 0); blob(head, K.flat(0xffffff), .13, .13, .13, 0, .6, 0); }
+    if (extra === 4) for (const s of [-1, 1]) blob(b, K.flat(0xffd23f), .16, .12, .08, s * .15, 1.42, .44);
+    K.shade(g, true, false); return { g, b, head, flips, e };
+  };
+  const skaters = [2, 3, 4, 0].map((x, k) => Object.assign(penguin(x), { ph: k * TAU / 4 })), star = penguin(1), slider = penguin(0);
+  const A = new T.Vector3(17.5, 6.4, -5), B = new T.Vector3(9.5, .35, 5.5), C = new T.Vector3(6.6, .35, 9.2), ramp = block(scene, snowM, 3, 1, A.distanceTo(B) + 1.5, (A.x + B.x) / 2, (A.y + B.y) / 2 - .75, (A.z + B.z) / 2);
+  ramp.lookAt(B.x, B.y - .75, B.z); ramp.receiveShadow = true;
+  /* the polar bear waves from her seat */
+  const BW = K.flat(0xfafcff, { shininess: 10 }), BS = K.flat(0xdde8f4), bear = K.grp(scene, -12.5, 0, 6.5); bear.rotation.y = 1.15;
+  blob(bear, BW, 1.7, 1.75, 1.6, 0, 1.65, 0); blob(bear, BS, 1.2, 1.2, .9, 0, 1.45, .85);
+  for (const s of [-1, 1]) { blob(bear, BW, .6, .55, 1, s * 1.05, .55, 1.25); blob(bear, BS, .34, .34, .1, s * 1.05, .55, 2.22); }
+  const bh = K.grp(bear, 0, 3.65, .3); blob(bh, BW, 1.05, .95, 1, 0, 0, 0); blob(bh, BS, .5, .4, .5, 0, -.2, .8); blob(bh, K.ink, .17, .13, .12, 0, -.08, 1.25);
+  for (const s of [-1, 1]) { blob(bh, BW, .3, .3, .16, s * .75, .75, 0); blob(bh, K.flat(0xffc2d8), .16, .16, .08, s * .75, .75, .1); }
+  const bearEyes = eyes(bh, .14, .4, 0, .2, .86);
+  K.add(bear, new T.TorusGeometry(1, .2, 6, 14), K.flat(0x3cb4ff), 0, 2.95, .1).rotation.x = Math.PI / 2;
+  const bearArms = [-1, 1].map(s => { const a = K.grp(bear, s * 1.5, 2.65, .35); blob(a, BW, .42, .95, .45, 0, -.75, 0); blob(a, BS, .3, .2, .3, 0, -1.6, .1); return a; });
+  K.shade(bear, true, false);
+  /* the seal keeps a ball in the air */
+  const SG = K.flat(0x8f9bb4, { shininess: 50 }), seal = K.grp(scene, 8.5, 0, 9.5); seal.rotation.y = -1.75;
+  pole(seal, K.flat(0xbfe6f7, { shininess: 60 }), 2.6, .3, 0, .1, .2);
+  const sb = K.grp(seal, 0, .9, 0); sb.rotation.x = -.5; blob(sb, SG, .8, .72, 1.9, 0, 0, 0); blob(sb, K.flat(0xc9d2e2), .6, .5, 1.5, 0, -.2, .3);
+  const sh = K.grp(sb, 0, .35, 1.75); sh.rotation.x = -.6; blob(sh, SG, .62, .58, .64, 0, 0, 0); blob(sh, K.flat(0xc9d2e2), .34, .26, .3, 0, -.12, .46); blob(sh, K.ink, .1, .08, .08, 0, 0, .74); const sealEyes = eyes(sh, .12, .28, 0, .2, .46);
+  const sealFlips = [-1, 1].map(s => { const f = K.grp(sb, s * .75, -.3, .7); blob(f, SG, .5, .1, .3, s * .4, 0, 0); return f; });
+  for (const s of [-1, 1]) blob(sb, SG, .36, .08, .5, s * .3, .1, -2.05).rotation.y = s * .5;
+  const ballMap = K.tex(8, 64, (c, w, h) => { ['#ff4d6d', '#ffffff', '#ffd23f', '#3cb4ff', '#ffffff', '#4cd964'].forEach((col, k) => { c.fillStyle = col; c.fillRect(0, k * h / 6, w, h / 6 + 1); }); });
+  const ball = K.add(seal, K.orb(.6, 16), K.soft(0xffffff, { map: ballMap }), 0, 0, 0);
+  K.shade(seal, true, false);
+  const v1 = new T.Vector3(), v2 = new T.Vector3();
+  return {
+    scene, cam, fov: 50,
+    step(t) {
+      skaters.forEach((p, k) => {
+        K.ring(p.g, t, 3.7, .55, p.ph, .06); p.b.rotation.z = .2 + .06 * Math.sin(t * 3 + k); p.b.rotation.x = .12;
+        p.flips.forEach((f, i) => { f.rotation.z = (i ? 1 : -1) * (.9 + .25 * Math.sin(t * 3 + k * 2)); }); p.head.rotation.y = .3 * Math.sin(t * 1.3 + k); K.blink(p.e, t, k * .23);
+      });
+      star.g.position.set(0, .06 + .25 * Math.abs(Math.sin(t * 2)), 0); star.g.rotation.y = t * 3.2; star.flips.forEach((f, i) => { f.rotation.z = (i ? 1 : -1) * 2.2; }); K.blink(star.e, t, .5);
+      /* down the slope on his tummy, a glide across the flat, then back to the top */
+      const q = K.fr(t * .2), down = Math.min(1, q / .7), go = down * down, on = Math.max(0, (q - .7) / .3), glide = 1 - (1 - on) * (1 - on);
+      if (q < .7) slider.g.position.lerpVectors(A, B, go); else slider.g.position.lerpVectors(B, C, glide);
+      slider.g.position.y += .55; slider.g.lookAt(q < .7 ? v1.copy(B).setY(B.y + .55) : v1.copy(C).setY(C.y + .55)); slider.b.rotation.x = Math.PI / 2;
+      slider.flips.forEach((f, i) => { f.rotation.z = (i ? 1 : -1) * (1.5 + .3 * Math.sin(t * 9)); }); K.blink(slider.e, t, .8);
+      smArms[1].rotation.z = .5 + .35 * Math.sin(t * 4); smHead.rotation.z = .06 * Math.sin(t * 1.3);
+      bh.rotation.z = .1 * Math.sin(t * 1.1); bh.rotation.y = .25 * Math.sin(t * .6); bearArms[0].rotation.z = -.25; bearArms[1].rotation.z = 2.3 + .45 * Math.sin(t * 4.5); K.blink(bearEyes, t, .35);
+      const bn = Math.abs(Math.sin(t * 2.6)); ball.position.set(0, 3.2 + bn * 1.3, 1.75); ball.rotation.set(t * 3, t * 2, 0);
+      sh.rotation.x = -.6 - .12 * (1 - bn); sealFlips.forEach((f, i) => { f.rotation.z = (i ? 1 : -1) * (.3 + .5 * (1 - bn)); }); K.blink(sealEyes, t, .65);
+      hearth.material.opacity = .55 + .2 * Math.sin(t * 6) * Math.sin(t * 2.3);
+      const fp = flakes.geometry.attributes.position; for (let i = 0; i < flV.length / 3; i++) { fp.setY(i, 28 - (fl[i * 3 + 1] + t * flV[i * 3]) % 28); fp.setX(i, fl[i * 3] + .6 * Math.sin(t * .9 + i)); } fp.needsUpdate = true;
+      cam.position.set(7 * Math.sin(t * .1), 6 + .5 * Math.sin(t * .21), 22); cam.lookAt(v2.set(0, 5.9, 0));
+      sky.position.copy(cam.position);
+    },
+  };
+});
+
+/* 👨‍🚀 Moon Buddies: an astronaut bounding about, little green aliens, a rover with eyes, and the Earth in the sky */
+def3D('moon3d', (T, K) => {
+  const R = K.rng(47), scene = new T.Scene(), cam = new T.PerspectiveCamera(50, 1, .5, 950), TAU = Math.PI * 2, { blob, block, spike, pole, eyes } = K.parts(), UP = new T.Vector3(0, 1, 0);
+  const sky = K.sky(scene, [[0, '#00000a'], [.5, '#0b0b26'], [.52, '#15151f'], [1, '#15151f']], (c, w, h) => {
+    for (let i = 0; i < 1100; i++) { c.globalAlpha = .3 + R() * .7; c.fillStyle = ['#fff', '#fff', '#cfe4ff', '#ffe9c2'][i % 4]; const s = R() < .88 ? 1 : 2; c.fillRect(R() * w, R() * h * .5, s, s); }
+  });
+  scene.fog = new T.Fog(0x0c0c1a, 75, 230);
+  scene.add(new T.AmbientLight(0x8f98c8, .5)); K.sun(scene, 0xffffff, .95, -20, 22, 10, 26);
+  const hf = (x, z) => { const d = Math.hypot(x, z); return d < 18 ? 0 : Math.pow(d - 18, 1.15) * .055 * (1 + .5 * Math.sin(x * .21) * Math.cos(z * .17)); };
+  K.land(scene, 300, 70, hf, K.flat(0xb4b8c6));
+  const dust = K.flat(0xcfd3df), dark = K.lit(0x7c8094), stone = K.flat(0x9a9eae);
+  const crater = (x, z, r) => { const y = hf(x, z), ring = K.add(scene, new T.TorusGeometry(r, r * .17, 6, 20), dust, x, y + .04, z); ring.rotation.x = Math.PI / 2; ring.scale.z = .5; K.add(scene, new T.CircleGeometry(r * .93, 20), dark, x, y + .03, z).rotation.x = -Math.PI / 2; };
+  [[0, 0, 2.7], [-10, -11, 2.1], [11, -13, 2.6], [-15.5, 3, 1.5], [14.5, 7, 1.3], [-26, -22, 4], [28, -30, 5], [3, -22, 1.8]].forEach(q => crater(q[0], q[1], q[2]));
+  for (let i = 0; i < 22; i++) { const a = R() * TAU, d = 13 + R() * 26, x = Math.cos(a) * d, z = Math.sin(a) * d, s = .3 + R() * .9; K.add(scene, K.ball(s, 0), stone, x, hf(x, z) + s * .3, z).scale.set(1, .7, 1.2); }
+  /* home, up in the sky */
+  const earth = K.add(scene, K.orb(15, 30), K.soft(0xffffff, { fog: false, map: K.tex(256, 128, (c, w, h) => {
+    c.fillStyle = '#2f7fe0'; c.fillRect(0, 0, w, h); c.fillStyle = '#4fd07a';
+    for (let i = 0; i < 26; i++) { c.beginPath(); c.ellipse(R() * w, h * (.15 + R() * .7), 8 + R() * 22, 5 + R() * 12, R() * 3, 0, TAU); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,.75)'; for (let i = 0; i < 16; i++) { c.beginPath(); c.ellipse(R() * w, R() * h, 10 + R() * 20, 2 + R() * 4, 0, 0, TAU); c.fill(); }
+    c.fillStyle = '#f4fbff'; c.fillRect(0, 0, w, 9); c.fillRect(0, h - 8, w, 8);
+  }) }), -38, 36, -140);
+  K.glow(scene, 0x6fb4ff, 62, -38, 36, -141, .35);
+  /* the lander and its flag */
+  const goldM = K.flat(0xe8b84a, { shininess: 60 }), grey = K.flat(0xc9d2e6, { shininess: 40 }), steel = K.flat(0x7f879c, { shininess: 40 });
+  const strut = (p, m, r, a, b) => { const d = b.clone().sub(a), o = pole(p, m, r, d.length(), (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); o.quaternion.setFromUnitVectors(UP, d.normalize()); return o; };
+  const lander = K.grp(scene, 12.5, 0, -10.5); lander.rotation.y = .5;
+  pole(lander, goldM, 1.75, 1.5, 0, 2.7, 0); block(lander, grey, 1.7, 1.3, 1.7, 0, 4.05, 0); spike(lander, steel, .9, 1.1, 0, 1.5, 0); blob(lander, K.lit(0x7fe9ff), .5, .5, .1, 0, 4.1, .86);
+  for (const [x, z] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { strut(lander, steel, .09, new T.Vector3(x * 1.3, 2.5, z * 1.3), new T.Vector3(x * 2.7, .15, z * 2.7)); strut(lander, steel, .06, new T.Vector3(x * 1.3, 3.2, z * 1.3), new T.Vector3(x * 2.2, 1, z * 2.2)); pole(lander, goldM, .5, .12, x * 2.7, .08, z * 2.7); }
+  const dish = K.grp(lander, .9, 4.9, 0); pole(dish, steel, .05, .6, 0, 0, 0); K.add(dish, new T.SphereGeometry(.7, 12, 6, 0, TAU, 0, Math.PI * .4), new T.MeshPhongMaterial({ color: 0xc9d2e6, side: T.DoubleSide, flatShading: true }), 0, 1, 0).rotation.x = Math.PI;
+  K.shade(lander, true, false);
+  const flagP = K.grp(scene, 6.5, 0, -12.5); pole(flagP, steel, .06, 4, 0, 2, 0);
+  const flag = K.add(flagP, new T.PlaneGeometry(2, 1.2, 8, 1), new T.MeshBasicMaterial({ side: T.DoubleSide, map: K.tex(8, 48, (c, w, h) => { ['#ff4d6d', '#ff9f1c', '#ffd60a', '#4cd964', '#3cb4ff', '#b45cff'].forEach((col, k) => { c.fillStyle = col; c.fillRect(0, k * h / 6, w, h / 6 + 1); }); }) }), 1.05, 3.35, 0);
+  /* the rover has a face, and a lot of wheels */
+  const rover = K.grp(scene), rv = K.grp(rover, 0, 0, 0), tyre = K.flat(0x3b4058), hub = K.lit(0xffd23f);
+  block(rv, grey, 2.3, .55, 3.4, 0, 1.2, 0); block(rv, goldM, 1.6, .5, 1.4, 0, 1.75, -.6);
+  const wheels = []; for (const x of [-1.4, 1.4]) for (const z of [-1.3, 0, 1.3]) { const w = K.grp(rv, x, .6, z); pole(w, tyre, .6, .45, 0, 0, 0).rotation.z = Math.PI / 2; block(w, hub, .5, .16, .9, 0, 0, 0); block(w, hub, .5, .9, .16, 0, 0, 0); wheels.push(w); }
+  const mast = K.grp(rv, 0, 1.5, 1.2); pole(mast, steel, .09, 1.5, 0, .75, 0);
+  const rHead = K.grp(mast, 0, 1.7, 0); block(rHead, grey, 1.1, .6, .6, 0, 0, 0); const rvEyes = eyes(rHead, .2, .28, 0, 0, .32);
+  const panel = block(rv, K.flat(0x2f6bff, { shininess: 80 }), 2.6, .08, 1.5, 0, 2.2, -1.3); panel.rotation.x = -.3;
+  const rDish = K.grp(rv, .8, 2, -.2); pole(rDish, steel, .04, .8, 0, .4, 0); blob(rDish, K.lit(0xff4d6d), .1, .1, .1, 0, .85, 0);
+  K.shade(rover, true, false);
+  /* the astronaut */
+  const AW = K.flat(0xf4f6fb, { shininess: 30 }), AG = K.flat(0x9aa3b8, { shininess: 30 }), visor = new T.MeshPhongMaterial({ color: 0xffc23a, shininess: 140, specular: 0xffffff }), redM = K.flat(0xff4d6d);
+  const astro = K.grp(scene), ab = K.grp(astro);
+  blob(ab, AW, .62, .72, .5, 0, 1.75, 0); block(ab, AG, .9, 1.05, .42, 0, 1.9, -.55); block(ab, AG, .5, .34, .1, 0, 1.8, .46);
+  for (let k = 0; k < 3; k++) blob(ab, K.lit([0xff4d6d, 0xffd23f, 0x4cd964][k]), .06, .06, .04, (k - 1) * .14, 1.8, .52);
+  const helm = K.grp(ab, 0, 2.85, 0); blob(helm, AW, .62, .6, .62, 0, 0, 0); blob(helm, visor, .48, .4, .32, 0, .02, .36); pole(helm, steel, .03, .5, .35, .7, -.1); blob(helm, K.lit(0xff4d6d), .08, .08, .08, .35, .98, -.1);
+  const aArms = [-1, 1].map(s => { const a = K.grp(ab, s * .72, 2.2, 0); blob(a, AW, .22, .5, .22, 0, -.4, 0); blob(a, redM, .24, .08, .24, 0, -.3, 0); blob(a, AG, .2, .2, .2, 0, -.9, 0); return a; });
+  const aLegs = [-1, 1].map(s => { const l = K.grp(ab, s * .3, 1.15, 0); blob(l, AW, .26, .55, .28, 0, -.45, 0); block(l, AG, .36, .3, .62, 0, -1, .1); return l; });
+  K.shade(astro, true, false);
+  /* the aliens live in the middle crater and keep popping up to look */
+  const lime = K.flat(0x7dff6a, { shininess: 40 }), lime2 = K.flat(0x4fd95a, { shininess: 40 }), pinkL = K.lit(0xff7ad9);
+  const alien = (x, z, kind) => {
+    const g = K.grp(scene, x, 0, z), b = K.grp(g); blob(b, lime, .55, .7, .5, 0, .7, 0); blob(b, lime2, .4, .3, .3, 0, .35, .25);
+    const e = kind ? eyes(b, .2, .24, 0, 1, .34) : [(() => { const o = blob(b, K.white, .34, .34, .34, 0, 1, .28); o.userData.r = .34; blob(o, K.ink, .5, .5, .4, 0, 0, .72); blob(o, K.white, .15, .15, .1, .2, .28, 1.02); return o; })()];
+    blob(b, K.lit(0x2a7a3a), .16, .05, .05, 0, .55, .5);
+    for (const s of [-1, 1]) { pole(b, lime2, .03, .5, s * .22, 1.55, 0).rotation.z = -s * .3; blob(b, pinkL, .09, .09, .09, s * .3, 1.82, 0); }
+    const armsA = [-1, 1].map(s => { const a = K.grp(b, s * .5, .85, 0); blob(a, lime2, .1, .34, .1, s * .12, .25, 0); return a; });
+    K.shade(g, true, false); return { g, b, e, arms: armsA, ph: x * 2.1 + z, kind };
+  };
+  const aliens = [alien(-1.1, .5, 0), alien(1.1, .3, 1), alien(0, -1, 1)];
+  const ufo = K.grp(scene); blob(ufo, grey, 1.4, .3, 1.4, 0, 0, 0); blob(ufo, new T.MeshPhongMaterial({ color: 0x9fe9ff, transparent: true, opacity: .55, shininess: 100 }), .78, .7, .78, 0, .3, 0);
+  blob(ufo, lime, .34, .4, .32, 0, .42, 0); const ufoEyes = eyes(ufo, .12, .15, 0, .58, .24);
+  const lamps = []; for (let k = 0; k < 8; k++) lamps.push(blob(ufo, K.lit(0xffd23f), .13, .13, .13, Math.cos(k * TAU / 8) * 1.2, -.1, Math.sin(k * TAU / 8) * 1.2));
+  const beam = K.glow(ufo, 0x9bffe0, 3, 0, -.5, 0, .5), shoot = K.glow(scene, 0xffffff, 2.2, 0, 0, 0, 0);
+  const v1 = new T.Vector3();
+  return {
+    scene, cam, fov: 50,
+    step(t) {
+      /* low gravity: long slow bounds */
+      const h = K.fr(t * .55), air = 4 * h * (1 - h), land = Math.max(0, 1 - Math.min(h, 1 - h) * 9);
+      K.ring(astro, t, 6.6, .2, 1, 2 * air); ab.scale.set(1 + .1 * land, 1 - .14 * land, 1 + .1 * land); ab.rotation.x = .12 + .1 * air;
+      aArms.forEach((a, i) => { a.rotation.z = (i ? 1 : -1) * (.3 + 1.5 * air); a.rotation.x = -.3 * air; }); aLegs.forEach((l, i) => { l.rotation.x = (i ? 1 : -1) * .45 * air - .2 * air; });
+      helm.rotation.y = .3 * Math.sin(t * .9);
+      aliens.forEach((a, k) => {
+        const up = K.ease(Math.max(0, Math.min(1, Math.sin(t * .9 + a.ph) * 1.4 + .55)));
+        a.g.position.y = -1.7 + up * 1.9; a.b.rotation.y = .6 * Math.sin(t * 1.3 + k * 2); a.b.rotation.z = .1 * Math.sin(t * 3 + k);
+        a.arms.forEach((q, i) => { q.rotation.z = (i ? -1 : 1) * (.4 + .9 * up + .4 * Math.sin(t * 7 + k)); }); K.blink(a.e, t, k * .31);
+      });
+      const ra = K.ring(rover, t, 12.6, .09, 4, 0); wheels.forEach(w => { w.rotation.x = ra * 12.6 / .6; }); rv.position.y = .04 * Math.sin(t * 9); rv.rotation.z = .015 * Math.sin(t * 7);
+      rHead.rotation.y = .9 * Math.sin(t * .7); rHead.rotation.x = .15 * Math.sin(t * 1.1); rDish.rotation.y = t * 1.5; K.blink(rvEyes, t, .2);
+      const ua = t * .5; ufo.position.set(Math.cos(ua) * 4.2, 6 + .6 * Math.sin(t * 1.3), Math.sin(ua) * 4.2 - .5); ufo.rotation.set(.15 * Math.sin(t * 1.7), -ua, .16 * Math.cos(t * 1.1));
+      lamps.forEach((l, i) => l.material.color.setHex((Math.floor(t * 5) + i) % 2 ? 0xffd23f : 0xff4d9d)); beam.material.opacity = .35 + .2 * Math.sin(t * 3); K.blink(ufoEyes, t, .9);
+      dish.rotation.y = t * .4; earth.rotation.y = t * .04;
+      const fpos = flag.geometry.attributes.position; for (let j = 0; j < fpos.count; j++) fpos.setZ(j, .08 * Math.sin(fpos.getX(j) * 4 - t * 2.5) * (fpos.getX(j) + 1)); fpos.needsUpdate = true;
+      const sq = K.fr(t * .11); shoot.position.set(-60 + sq * 420, 60 - sq * 150, -200); shoot.material.opacity = sq < .16 ? Math.sin(sq / .16 * Math.PI) : 0;
+      cam.position.set(9 * Math.sin(t * .08), 5.8 + .5 * Math.sin(t * .19), 21); cam.lookAt(v1.set(0, 5.7, 0));
+      sky.position.copy(cam.position);
+    },
+  };
+});
+
+/* 🦄 Unicorn Land: three unicorns gallop round a meadow under a rainbow, a winged one flies over, and bunnies hop */
+def3D('unicorn3d', (T, K) => {
+  const R = K.rng(71), scene = new T.Scene(), cam = new T.PerspectiveCamera(50, 1, .5, 950), TAU = Math.PI * 2, { S, blob, block, spike, pole, eyes } = K.parts();
+  const sky = K.sky(scene, [[0, '#6fb0ff'], [.3, '#c4b6ff'], [.46, '#ffd1ec'], [.5, '#fff3d0'], [.52, '#c8f0c0'], [1, '#9fe0a8']]);
+  scene.fog = new T.Fog(0xffe6f2, 55, 190);
+  scene.add(new T.HemisphereLight(0xffffff, 0xf0b8e0, .74)); K.sun(scene, 0xfff3e0, .46, 12, 26, 14, 24);
+  const hf = (x, z) => { const d = Math.hypot(x, z); return d < 18 ? 0 : Math.pow(d - 18, 1.15) * .07 * (1 + .5 * Math.sin(x * .16) * Math.cos(z * .19)); };
+  K.land(scene, 280, 70, hf, K.flat(0x92dc98));
+  /* the rainbow, with a cloud at each end */
+  ['#ff4d6d', '#ff9f1c', '#ffd60a', '#4cd964', '#3cb4ff', '#b45cff'].forEach((c, k) => K.add(scene, new T.TorusGeometry(36 - k * 1.5, .78, 6, 56, Math.PI), K.lit(c, { fog: false }), 0, 1, -38));
+  const puffM = K.soft(0xffffff), puffs = [];
+  const puff = (x, y, z, s) => { const g = K.grp(scene, x, y, z); for (let j = 0; j < 5; j++) { const q = .9 + R() * .9; blob(g, puffM, q * 1.2, q * .8, q, (j - 2) * 1.25 + R() * .5, R() * .5, R() * 1.2 - .6); } g.scale.setScalar(s); return g; };
+  puff(-32, 3, -37, 3.2); puff(32, 3, -37, 3.2);
+  for (let i = 0; i < 9; i++) puffs.push({ g: puff(0, 16 + R() * 16, -70 + R() * 50, 2 + R() * 2.4), x0: R() * 220, v: 1 + R() * 1.4 });
+  /* lollipop trees, flowers and a little castle on the hill */
+  const swirl = cols => K.tex(8, 64, (c, w, h) => { for (let k = 0; k < 8; k++) { c.fillStyle = cols[k % cols.length]; c.fillRect(0, k * h / 8, w, h / 8 + 1); } });
+  const lolly = (x, z, s, cols) => { const g = K.grp(scene, x, hf(x, z), z); g.scale.setScalar(s); pole(g, K.flat(0xffffff), .18, 3.4, 0, 1.7, 0); const b = K.add(g, K.orb(1.35, 18), K.soft(0xffffff, { map: swirl(cols) }), 0, 4.2, 0); b.rotation.set(.5, 0, .6); K.shade(g, true, false); };
+  [[-21, -4, 1.5, ['#ff8fd0', '#fff']], [20, -13, 1.6, ['#8fd3ff', '#fff']], [22, 3, 1.2, ['#ffd23f', '#ff9f1c']], [-23, 9, 1.3, ['#b6f36b', '#fff']], [6, -23, 1.5, ['#c79bff', '#fff']], [-8, -25, 1.3, ['#ff8fd0', '#ffd23f']], [-30, -18, 1.9, ['#8fd3ff', '#c79bff']]].forEach(q => lolly(q[0], q[1], q[2], q[3]));
+  const dots = new T.InstancedMesh(S, K.soft(0xffffff), 90), M = new T.Matrix4(), C = new T.Color();
+  for (let i = 0; i < 90; i++) {
+    let x, z, d; do { const a = R() * TAU; d = 1 + R() * 34; x = Math.cos(a) * d; z = Math.sin(a) * d; } while (Math.abs(d - 8) < 1.9 || (d < 3.6 && d > 1.4));
+    M.makeScale(.24, .2, .24).setPosition(x, hf(x, z) + .16, z); dots.setMatrixAt(i, M); dots.setColorAt(i, C.setHex([0xff7ac6, 0xffd23f, 0xffffff, 0xb47bff, 0xff9f6b][i % 5]));
+  }
+  scene.add(dots);
+  const cx = 26, cz = -32, cy = hf(cx, cz), wall = K.flat(0xfff0f7), roofs = [0xff7ac6, 0xb47bff, 0x8fd3ff];
+  block(scene, wall, 7, 3.4, 4, cx, cy + 1.7, cz); [[-3.6, 0, 1.3, 6], [3.6, 0, 1.3, 6], [0, -1, 1.6, 9]].forEach((q, k) => { pole(scene, wall, q[2], q[3], cx + q[0], cy + q[3] / 2, cz + q[1]); spike(scene, K.flat(roofs[k]), q[2] * 1.3, q[2] * 2.3, cx + q[0], cy + q[3] + q[2] * 1.15, cz + q[1]); });
+  /* a unicorn, nose along +Z */
+  const WHt = K.flat(0xffffff, { shininess: 30 }), hornM = new T.MeshPhongMaterial({ color: 0xffd23f, shininess: 110 }), hoofM = K.flat(0xffb3d9), noseM = K.flat(0xffd9ec);
+  const wsh = new T.Shape(); wsh.moveTo(0, .5); wsh.lineTo(1.4, 1.5); wsh.lineTo(3.6, 1.7); wsh.lineTo(3, .9); wsh.lineTo(2.9, .1); wsh.lineTo(2.1, -.2); wsh.lineTo(1.9, -.9); wsh.lineTo(1, -.8); wsh.lineTo(0, -1);
+  const wgeo = new T.ShapeGeometry(wsh); wgeo.rotateX(-Math.PI / 2);
+  const unicorn = (c1, c2, winged) => {
+    const g = K.grp(scene), b = K.grp(g, 0, 2.05, 0), m1 = K.flat(c1, { shininess: 30 }), m2 = K.flat(c2, { shininess: 30 });
+    blob(b, WHt, .78, .82, 1.45, 0, 0, 0); blob(b, m1, .16, .16, .05, .72, .15, -.5); blob(b, m1, .16, .16, .05, -.72, .15, -.5);
+    const neck = K.grp(b, 0, .45, 1.05); neck.rotation.x = .55; blob(neck, WHt, .42, .95, .48, 0, .6, 0);
+    for (let k = 0; k < 6; k++) blob(neck, k % 2 ? m1 : m2, .2, .27, .3, 0, .15 + k * .3, -.42);
+    const head = K.grp(neck, 0, 1.5, .05); head.rotation.x = -.15;
+    blob(head, WHt, .44, .46, .62, 0, 0, .25); blob(head, noseM, .33, .3, .36, 0, -.1, .74); for (const s of [-1, 1]) { blob(head, K.ink, .04, .04, .04, s * .12, -.06, 1.08); spike(head, WHt, .12, .34, s * .26, .5, -.05); }
+    spike(head, hornM, .12, 1, 0, .85, .32).rotation.x = .35; blob(head, m2, .22, .2, .26, 0, .42, .18); blob(head, m1, .18, .2, .2, 0, .3, .5);
+    const e = eyes(head, .13, .37, 0, .12, .42); e.forEach((o, i) => { o.rotation.y = (i ? 1 : -1) * .7; });
+    const legs = [[-.42, .9], [.42, .9], [-.42, -.9], [.42, -.9]].map(q => { const l = K.grp(b, q[0], -.35, q[1]); pole(l, WHt, .17, 1.3, 0, -.65, 0); blob(l, hoofM, .21, .18, .25, 0, -1.4, .03); return l; });
+    const tail = K.chain(K.grp(b, 0, .3, -1.4), 5, 0, -.3, -.36, (p, k) => blob(p, k % 2 ? m1 : m2, .3 - k * .03, .3, .4, 0, 0, 0));
+    const wings = winged ? [-1, 1].map(s => { const w = K.grp(b, s * .5, .5, .2), m = new T.Mesh(wgeo, new T.MeshPhongMaterial({ color: 0xfff0fb, flatShading: true, side: T.DoubleSide, shininess: 20 })); m.scale.set(s, 1, 1); w.add(m); return { w, s }; }) : [];
+    K.shade(g, true, false); return { g, b, neck, head, legs, tail, e, wings };
+  };
+  const herd = [[0xff7ac6, 0xb47bff], [0x5fd0ff, 0x7dff9a], [0xffd23f, 0xff7a5a]].map((c, k) => Object.assign(unicorn(c[0], c[1]), { ph: k * TAU / 3, col: c[0] })), pega = unicorn(0xff7ac6, 0x5fd0ff, true);
+  const trail = herd.map(u => [0, 1, 2, 3, 4].map(() => K.glow(scene, u.col, 1.1, 0, 0, 0, 0)));
+  /* bunnies */
+  const bunny = (col) => {
+    const g = K.grp(scene), b = K.grp(g), m = K.flat(col, { shininess: 10 });
+    blob(b, m, .42, .4, .58, 0, .45, 0); blob(b, K.flat(0xffffff), .18, .18, .18, 0, .5, -.6);
+    const head = K.grp(b, 0, .88, .4); blob(head, m, .32, .3, .32, 0, 0, 0); blob(head, K.lit(0xff8fb0), .06, .05, .05, 0, -.03, .32);
+    const ears = [-1, 1].map(s => { const a = K.grp(head, s * .14, .25, -.05); blob(a, m, .08, .36, .06, 0, .32, 0); blob(a, K.flat(0xffc2d8), .045, .26, .03, 0, .32, .04); return a; });
+    const e = eyes(head, .08, .15, 0, .06, .26); for (const s of [-1, 1]) blob(b, m, .13, .1, .24, s * .24, .1, .3);
+    K.shade(g, true, false); return { g, b, ears, e };
+  };
+  const bunnies = [0xffffff, 0xe8cfa8, 0xcfd3e6].map((c, k) => Object.assign(bunny(c), { ph: k * TAU / 3 }));
+  const tw = []; for (let i = 0; i < 70; i++) { const a = R() * TAU, d = R() * 30; tw.push(Math.cos(a) * d, 1 + R() * 14, Math.sin(a) * d - 4); }
+  const twinkles = K.points(scene, tw, .5, 0xfff6c8, { fog: false });
+  const v1 = new T.Vector3();
+  const gallop = (u, p, air) => {
+    u.b.position.y = 2.05 + .22 * Math.abs(Math.sin(p)) + (air || 0); u.b.rotation.x = .09 * Math.sin(p * 2 + 1);
+    u.legs.forEach((l, i) => { l.rotation.x = .8 * Math.sin(p * 2 + (i > 1 ? Math.PI : 0) + (i % 2 ? .7 : 0)); });
+    u.tail.forEach((j, k) => { j.rotation.x = -.2 + .12 * Math.sin(p * 2 - k * .8); j.rotation.y = .12 * Math.sin(p - k * .7); });
+    u.neck.rotation.x = .55 + .08 * Math.sin(p * 2); u.head.rotation.x = -.15 + .06 * Math.sin(p * 2 + 2);
+  };
+  return {
+    scene, cam, fov: 50,
+    step(t) {
+      herd.forEach((u, k) => {
+        const a = K.ring(u.g, t, 8, .42, u.ph, 0); gallop(u, t * 4.2 + k * 1.3); K.blink(u.e, t, k * .3);
+        trail[k].forEach((s, n) => { const q = a - .22 - n * .13; s.position.set(Math.cos(q) * 8, 1 + .5 * Math.sin(t * 9 + n * 2 + k), Math.sin(q) * 8); s.material.opacity = (.75 - n * .14) * (.6 + .4 * Math.sin(t * 13 + n * 3 + k)); });
+      });
+      K.ring(pega.g, t, 12, -.3, 2, 11 + 1.5 * Math.sin(t * .6)); gallop(pega, t * 2.2); pega.g.rotation.z = .25;
+      const fl = Math.sin(t * 5); pega.wings.forEach(q => { q.w.rotation.z = q.s * (.35 + .65 * fl); }); K.blink(pega.e, t, .8);
+      bunnies.forEach((b, k) => { const hop = Math.abs(Math.sin(t * 4.4 + k * 1.1)); K.ring(b.g, t, 2.5, -.5, b.ph, hop * .55); b.b.rotation.x = -.25 * Math.cos(t * 4.4 + k * 1.1); b.ears.forEach((e, i) => { e.rotation.x = -.5 * hop; e.rotation.z = (i ? -1 : 1) * .15; }); K.blink(b.e, t, k * .4); });
+      puffs.forEach(p => { p.g.position.x = -110 + (p.x0 + t * p.v) % 220; });
+      twinkles.material.opacity = .5 + .4 * Math.sin(t * 3);
+      cam.position.set(8 * Math.sin(t * .1), 6 + .5 * Math.sin(t * .2), 23); cam.lookAt(v1.set(0, 5.9, 0));
+      sky.position.copy(cam.position);
+    },
+  };
+});
+
+/* 🐞 Bug Garden: down in the grass with ladybirds, bumblebees, a caterpillar, butterflies and a snail */
+def3D('garden3d', (T, K) => {
+  const R = K.rng(97), scene = new T.Scene(), cam = new T.PerspectiveCamera(50, 1, .5, 950), TAU = Math.PI * 2, { S, blob, block, spike, pole, eyes } = K.parts();
+  const sky = K.sky(scene, [[0, '#4fb0ff'], [.42, '#bfe9ff'], [.5, '#f4ffd8'], [.52, '#a8dc7a'], [1, '#6fbf4a']]);
+  scene.fog = new T.Fog(0xdcf7c8, 36, 130);
+  scene.add(new T.HemisphereLight(0xffffff, 0x6fae4a, .74)); K.sun(scene, 0xfff6d8, .46, 10, 26, 12, 22);
+  const hf = (x, z) => { const d = Math.hypot(x, z); return d < 17 ? 0 : Math.pow(d - 17, 1.1) * .07 * (1 + .5 * Math.sin(x * .2) * Math.cos(z * .17)); };
+  K.land(scene, 240, 60, hf, K.flat(0x63b846));
+  /* flowers as tall as trees */
+  const stemM = K.flat(0x3f9a45), leafM = K.flat(0x4fbf55), flowers = [];
+  const flower = (x, z, h, kind, c1, c2) => {
+    const g = K.grp(scene, x, hf(x, z), z), js = K.chain(g, 4, 0, h / 4, 0, p => pole(p, stemM, .32, h / 4 + .2, 0, h / 8, 0));
+    for (const [k, s] of [[1, 1], [2, -1]]) { const lf = blob(js[k], leafM, 1.7, .1, .7, s * 1.5, .6, 0); lf.rotation.z = s * .35; }
+    const head = K.grp(js[3], 0, h / 4, 0); head.rotation.x = 1.05; head.rotation.z = (x > 0 ? 1 : -1) * .15;
+    const pm = K.flat(c1, { shininess: 20 }), n = kind === 2 ? 6 : 10;
+    for (let k = 0; k < n; k++) { const lf = K.grp(head); lf.rotation.y = k * TAU / n; const pt = blob(lf, pm, kind === 2 ? 1 : 1.6, .16, kind === 2 ? .9 : .6, kind === 2 ? .9 : 1.75, kind === 2 ? .7 : .05, 0); pt.rotation.z = kind === 2 ? 1.1 : .12; }
+    blob(head, K.flat(c2, { shininess: 10 }), 1, .5, 1, 0, .15, 0);
+    let e = null; if (kind === 1) { e = eyes(head, .2, .36, 0, .62, .25); e.forEach(o => { o.rotation.x = -Math.PI / 2; }); blob(head, K.ink, .3, .05, .09, 0, .62, -.3); }
+    K.shade(g, true, false); flowers.push({ js, ph: R() * TAU, e });
+  };
+  [[-13, -8, 11, 0, 0xff7ac6, 0xffd23f], [13.5, -9, 12, 1, 0xffd23f, 0x8a5a2a], [-19, 2, 9, 0, 0xffffff, 0xffd23f], [19, 3, 9.5, 2, 0xff4d6d, 0xffd23f], [0, -17, 13, 0, 0xb47bff, 0xfff0a8], [-8, -19, 10, 2, 0xff9f1c, 0xffd23f], [9, -20, 10.5, 0, 0xffffff, 0xffb020], [-26, -13, 13, 1, 0xffd23f, 0x8a5a2a], [26, -15, 12, 0, 0xff7ac6, 0xffffff]].forEach(q => flower(q[0], q[1], q[2], q[3], q[4], q[5]));
+  const blades = new T.InstancedMesh(K.cone(1, 1, 4), K.soft(0xffffff), 170), M = new T.Matrix4(), Q = new T.Quaternion(), E = new T.Euler(), V = new T.Vector3(), SC = new T.Vector3(), C = new T.Color();
+  for (let i = 0; i < 170; i++) {
+    let x, z, d; do { const a = R() * TAU; d = 6.6 + R() * 40; x = Math.cos(a) * d; z = Math.sin(a) * d; } while (Math.abs(d - 10) < 1.7 || Math.abs(d - 13.5) < 1.4 || (z > 6 && Math.abs(x) < 7));
+    const hgt = 2 + R() * 4.5; M.compose(V.set(x, hf(x, z) + hgt / 2 - .1, z), Q.setFromEuler(E.set((R() - .5) * .35, R() * TAU, (R() - .5) * .35)), SC.set(.24, hgt, .12)); blades.setMatrixAt(i, M); blades.setColorAt(i, C.setHex([0x4fb84a, 0x3fa545, 0x6fd05a][i % 3]));
+  }
+  scene.add(blades);
+  const capM = K.flat(0xff4d4d, { shininess: 40 }), creamM = K.flat(0xfff3d6);
+  [[-5.6, -5.1, 1], [5.9, -4.8, .8], [-17, .5, 1.3], [15, 6.5, 1.1]].forEach(q => { const g = K.grp(scene, q[0], 0, q[1]); g.scale.setScalar(q[2]); pole(g, creamM, .5, 1.8, 0, .9, 0); K.add(g, new T.SphereGeometry(1.6, 14, 8, 0, TAU, 0, Math.PI / 2), capM, 0, 1.6, 0).scale.set(1, .75, 1); for (let k = 0; k < 7; k++) { const a = k * 2.4, b = .35 + (k % 3) * .32; blob(g, creamM, .22, .1, .22, Math.sin(b) * Math.cos(a) * 1.5, 1.6 + Math.cos(b) * 1.15, Math.sin(b) * Math.sin(a) * 1.5); } K.shade(g, true, false); });
+  /* ladybirds */
+  const LK = K.flat(0x1b1b3a, { shininess: 60 });
+  const lady = (s, col) => {
+    const g = K.grp(scene), b = K.grp(g), m = K.flat(col, { shininess: 90 }); b.scale.setScalar(s);
+    K.add(b, new T.SphereGeometry(1, 16, 8, 0, TAU, 0, Math.PI / 2), m, 0, .35, 0).scale.set(1.05, .88, 1.25); blob(b, LK, .035, .9, 1.27, 0, .35, 0); blob(b, LK, .95, .2, 1.15, 0, .32, 0);
+    for (const [x, y, z] of [[.5, 1, .35], [.68, .78, -.45], [.3, 1.14, -.2]]) for (const sd of [-1, 1]) blob(b, LK, .19, .08, .19, sd * x, y, z).lookAt(0, .35, 0);
+    blob(b, LK, .55, .48, .45, 0, .58, 1.2); const e = eyes(b, .2, .27, 0, .72, 1.5); for (const sd of [-1, 1]) { pole(b, LK, .03, .5, sd * .2, 1.2, 1.4).rotation.z = -sd * .4; blob(b, LK, .07, .07, .07, sd * .3, 1.44, 1.4); }
+    const legs = []; for (let k = 0; k < 6; k++) { const sd = k < 3 ? -1 : 1, l = K.grp(b, sd * .85, .35, .6 - (k % 3) * .6); pole(l, LK, .06, .7, sd * .3, -.1, 0).rotation.z = sd * 1; legs.push(l); }
+    K.shade(g, true, false); return { g, b, legs, e };
+  };
+  const ladies = [Object.assign(lady(1.15, 0xff3b3b), { ph: 0 }), Object.assign(lady(.8, 0xff9a2a), { ph: Math.PI })];
+  /* bumblebees */
+  const beeMap = K.tex(8, 64, (c, w, h) => { ['#2a2238', '#ffd23f', '#2a2238', '#ffd23f', '#2a2238', '#ffd23f'].forEach((col, k) => { c.fillStyle = col; c.fillRect(0, k * h / 6, w, h / 6 + 1); }); });
+  const glass = new T.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: .6, shininess: 100, side: T.DoubleSide });
+  const bee = () => {
+    const g = K.grp(scene), b = K.grp(g), body = K.add(b, S, K.soft(0xffffff, { map: beeMap })); body.rotation.x = Math.PI / 2; body.scale.set(.62, .92, .58);
+    blob(b, LK, .44, .42, .4, 0, .06, .95); const e = eyes(b, .17, .2, 0, .16, 1.2); blob(b, K.lit(0xff8fb0), .1, .04, .04, 0, -.08, 1.34);
+    spike(b, LK, .1, .32, 0, 0, -1.02).rotation.x = -Math.PI / 2; for (const sd of [-1, 1]) { pole(b, LK, .025, .4, sd * .15, .52, 1.05).rotation.z = -sd * .35; blob(b, LK, .06, .06, .06, sd * .22, .72, 1.05); }
+    const wings = [-1, 1].map(sd => { const w = K.grp(b, sd * .2, .5, 0); blob(w, glass, .72, .04, .4, sd * .65, 0, -.1); return w; });
+    b.scale.setScalar(1.25); return { g, b, wings, e };
+  };
+  const bees = [0, 1, 2].map(k => Object.assign(bee(), { A: 11 + k * 2, B: 5 + k, w: .34 + k * .07, ph: k * 2.2 }));
+  /* the caterpillar, one hump at a time */
+  const CG = K.flat(0x7dd957, { shininess: 30 }), CG2 = K.flat(0x4fbf4a, { shininess: 30 }), cat = [];
+  for (let k = 0; k < 9; k++) { const g = K.grp(scene); blob(g, k % 2 ? CG : CG2, k ? .6 : .72, k ? .6 : .72, k ? .55 : .7, 0, 0, 0); if (k) { blob(g, K.flat(0xffd23f), .14, .14, .14, 0, .52, 0); for (const sd of [-1, 1]) pole(g, LK, .05, .4, sd * .3, -.55, 0); } cat.push(g); }
+  const catEyes = eyes(cat[0], .2, .28, 0, .22, .58); blob(cat[0], K.lit(0x2a7a3a), .2, .05, .06, 0, -.15, .7); for (const sd of [-1, 1]) { pole(cat[0], CG2, .03, .5, sd * .22, .85, .1).rotation.z = -sd * .3; blob(cat[0], K.lit(0xff7ac6), .09, .09, .09, sd * .3, 1.1, .1); }
+  cat.forEach(g => K.shade(g, true, false));
+  /* butterflies */
+  const bsh = new T.Shape(); bsh.moveTo(0, 0); bsh.bezierCurveTo(.4, 1.6, 2.2, 1.9, 2, .5); bsh.bezierCurveTo(2.2, -.2, 1.3, -1.5, .5, -1.1); bsh.bezierCurveTo(.2, -.9, .1, -.4, 0, 0);
+  const bgeo = new T.ShapeGeometry(bsh, 8); bgeo.rotateX(-Math.PI / 2);
+  const flies = [[0xff9f1c, -9, -2], [0x5fa8ff, 9, -4], [0xff7ac6, 0, -9]].map((q, k) => {
+    const g = K.grp(scene), b = K.grp(g); blob(b, LK, .12, .12, .6, 0, 0, 0); blob(b, LK, .16, .16, .16, 0, .03, .62);
+    const m = K.lit(q[0], { side: T.DoubleSide });
+    const wings = [-1, 1].map(sd => { const w = K.grp(b, sd * .08, 0, 0), o = new T.Mesh(bgeo, m); o.scale.set(sd * .85, 1, .85); w.add(o); blob(w, K.lit(0xffffff), .2, .02, .2, sd * 1.1, .03, -.3); return { w, sd }; });
+    return { g, b, wings, cx: q[1], cz: q[2], ph: k * 2.6 };
+  });
+  /* the snail is in no hurry at all */
+  const SB = K.flat(0xffe6b8, { shininess: 60 }), SH = K.flat(0xc77a3a, { shininess: 50 }), snail = K.grp(scene);
+  blob(snail, SB, .5, .4, 1.8, 0, .4, 0); const sHead = K.grp(snail, 0, .85, 1.5); blob(sHead, SB, .45, .5, .5, 0, 0, 0); blob(sHead, K.lit(0xc7603a), .16, .04, .05, 0, -.12, .46);
+  const stalks = [-1, 1].map(sd => { const a = K.grp(sHead, sd * .2, .35, .1); pole(a, SB, .05, .7, 0, .35, 0); const o = blob(a, K.white, .16, .16, .16, 0, .78, 0); blob(o, K.ink, .5, .5, .4, 0, 0, .72); return a; });
+  blob(snail, SH, 1.1, 1.1, .78, 0, 1.4, -.25).rotation.y = Math.PI / 2; for (const sd of [-1, 1]) { K.add(snail, new T.TorusGeometry(.62, .12, 6, 16), K.flat(0xffd9a0), sd * .8, 1.4, -.25).rotation.y = Math.PI / 2; K.add(snail, new T.TorusGeometry(.26, .1, 6, 12), K.flat(0xffd9a0), sd * .84, 1.4, -.25).rotation.y = Math.PI / 2; }
+  K.shade(snail, true, false);
+  const fz = []; for (let i = 0; i < 46; i++) fz.push(-26 + R() * 52, R() * 20, -24 + R() * 34);
+  const fluff = K.points(scene, fz.slice(), .5, 0xffffff, { opacity: .8, blending: T.NormalBlending }), fzV = fz.map(() => .3 + R() * .5);
+  const v1 = new T.Vector3(), v2 = new T.Vector3();
+  const beeAt = (q, t, v) => v.set(q.A * Math.cos(q.w * t + q.ph), 7 + 2.2 * Math.sin(1.7 * q.w * t + q.ph), q.B * Math.sin(q.w * t + q.ph) - 3);
+  const flyAt = (q, t, v) => v.set(q.cx + 3.4 * Math.sin(t * .7 + q.ph), 5.5 + 1.6 * Math.sin(t * 1.1 + q.ph) + .35 * Math.sin(t * 8 + q.ph), q.cz + 3 * Math.cos(t * .5 + q.ph));
+  return {
+    scene, cam, fov: 50,
+    step(t) {
+      ladies.forEach((l, k) => { K.ring(l.g, t, 4.9, .3, l.ph, 0); l.b.rotation.z = .04 * Math.sin(t * 9 + k); l.legs.forEach((q, i) => { q.rotation.x = .45 * Math.sin(t * 11 + i * 2.1 + k); }); K.blink(l.e, t, k * .4); });
+      bees.forEach((q, k) => { beeAt(q, t, q.g.position); q.g.lookAt(beeAt(q, t + .08, v1)); q.b.rotation.z = .2 * Math.sin(t * 3 + k); const f = Math.sin(t * 38 + k * 2); q.wings.forEach((w, i) => { w.rotation.z = (i ? 1 : -1) * (.35 + .55 * f); }); K.blink(q.e, t, k * .3); });
+      const ca = t * .07 + 1.9;
+      cat.forEach((g, k) => { const a = ca - k * .095; g.position.set(Math.cos(a) * 10, .62 + .45 * Math.max(0, Math.sin(t * 3.4 - k * .9)), Math.sin(a) * 10); g.rotation.y = Math.atan2(-Math.sin(a), Math.cos(a)); });
+      cat[0].rotation.y += .25 * Math.sin(t * 1.4); K.blink(catEyes, t, .15);
+      flies.forEach((q, k) => { flyAt(q, t, q.g.position); q.g.lookAt(flyAt(q, t + .1, v1)); const f = Math.abs(Math.sin(t * 8 + k * 1.7)); q.wings.forEach(w => { w.w.rotation.z = w.sd * (.15 + 1.05 * f); }); });
+      K.ring(snail, t, 13.5, .012, 2.42, 0); sHead.rotation.x = -.15 + .1 * Math.sin(t * .9); stalks.forEach((a, i) => { a.rotation.z = (i ? -1 : 1) * (.25 + .15 * Math.sin(t * 1.3 + i)); a.rotation.x = .15 * Math.sin(t * 1.1 + i * 2); });
+      flowers.forEach(f => { f.js.forEach((j, n) => { j.rotation.z = .035 * Math.sin(t * .9 + f.ph + n * .5); j.rotation.x = .02 * Math.sin(t * .7 + f.ph); }); if (f.e) K.blink(f.e, t, f.ph); });
+      const fp = fluff.geometry.attributes.position; for (let i = 0; i < fzV.length / 3; i++) { fp.setY(i, (fz[i * 3 + 1] + t * fzV[i * 3]) % 20); fp.setX(i, fz[i * 3] + 1.2 * Math.sin(t * .4 + i)); } fp.needsUpdate = true;
+      cam.position.set(6 * Math.sin(t * .1), 4.8 + .4 * Math.sin(t * .2), 22); cam.lookAt(v2.set(0, 5.3, 0));
+      sky.position.copy(cam.position);
+    },
+  };
+});
+
 /* A 3D scene joins the others like any scene: it copies in the frame three.js drew. Until three.js is here, and
    where it cannot come (no internet, no WebGL), the scene paints a flat poster of itself instead. */
 const scene3D = (id, name, emoji, at, poster) => defScene({ id, name, emoji, three: true, at,
@@ -5224,6 +5863,45 @@ scene3D('dragon3d', 'Dragon Sky 3D', '🐉', 3, (c, w, h, t, u) => {
   vfill(c, w, h, [[0, '#231a63'], [.4, '#e0688f'], [.62, '#ffb36b'], [.8, '#ffe6a3'], [1, '#ffd9c0']]);
   glow(c, w * .4, h * .62, u * .5, '255, 240, 180', .9);
   for (const [x, y, s] of [[.2, .8, .5], [.6, .86, .6], [.9, .78, .45]]) put(c, CLOUD('dusk'), s * u, loopX(x, u * .01, t, w, s * u), y * h);
+});
+scene3D('dino3d', 'Dino Valley 3D', '🦖', 3, (c, w, h, t, u) => {
+  vfill(c, w, h, [[0, '#2aa6c9'], [.45, '#8fdcc8'], [.62, '#ffe9b0'], [.64, '#7fc75a'], [1, '#5fae4a']]);
+  c.fillStyle = '#7a5a4a'; c.beginPath(); c.moveTo(w * .08, h * .64); c.lineTo(w * .3, h * .2); c.lineTo(w * .52, h * .64); c.fill();
+  c.fillStyle = '#ff7a1a'; c.beginPath(); c.moveTo(w * .262, h * .275); c.lineTo(w * .3, h * .2); c.lineTo(w * .338, h * .275); c.fill();
+  glow(c, w * .3, h * .2, u * .22, '255, 154, 61', .5 + .2 * Math.sin(t * 3));
+});
+scene3D('reef3d', 'Coral Reef 3D', '🐠', 9, (c, w, h, t, u) => {
+  vfill(c, w, h, [[0, '#7fe0f0'], [.3, '#2fb4dc'], [.8, '#0c5f9e'], [.82, '#dcc98c'], [1, '#c9b578']]);
+  c.fillStyle = 'rgba(255, 255, 255, .6)'; c.beginPath();
+  for (const s of POSTER_STARS) blob(c, s[0] * w + Math.sin(t + s[3]) * u * .01, loopY(s[1], -u * (.03 + s[2] * 3), t, h * .8, 4), s[2] * u * .9);
+  c.fill();
+});
+scene3D('snow3d', 'Penguin Party 3D', '🐧', 9, (c, w, h, t, u) => {
+  vfill(c, w, h, [[0, '#06112e'], [.4, '#10306a'], [.62, '#2f6f9a'], [.64, '#e9f2fb'], [1, '#ffffff']]);
+  glow(c, w * .5, h * .3, u * .6, '90, 255, 170', .25);
+  c.fillStyle = 'rgba(255, 255, 255, .9)'; c.beginPath();
+  for (const s of POSTER_STARS) blob(c, s[0] * w + Math.sin(t + s[3]) * u * .02, loopY(s[1], u * (.05 + s[2] * 4), t, h, 4), s[2] * u * .6);
+  c.fill();
+});
+scene3D('moon3d', 'Moon Pals 3D', '👨‍🚀', 9, (c, w, h, t, u) => {
+  vfill(c, w, h, [[0, '#00000a'], [.6, '#0b0b26'], [.64, '#b4b8c6'], [1, '#9a9eae']]);
+  for (const s of POSTER_STARS) twinkle(c, s[0] * w, s[1] * h * .6, s[2] * u, '#fff', .35 + .65 * (.5 + .5 * Math.sin(t * 2 + s[3])));
+  glow(c, w * .3, h * .26, u * .22, '111, 180, 255', .5); c.fillStyle = '#2f7fe0'; c.beginPath(); c.arc(w * .3, h * .26, u * .09, 0, TAU); c.fill();
+  c.fillStyle = '#4fd07a'; c.beginPath(); c.ellipse(w * .3 - u * .02, h * .26, u * .04, u * .025, .5, 0, TAU); c.fill();
+});
+scene3D('unicorn3d', 'Unicorn Land 3D', '🦄', 3, (c, w, h, t, u) => {
+  vfill(c, w, h, [[0, '#6fb0ff'], [.35, '#c4b6ff'], [.58, '#ffd1ec'], [.64, '#fff3d0'], [.66, '#92dc98'], [1, '#7fcf88']]);
+  ['#ff4d6d', '#ff9f1c', '#ffd60a', '#4cd964', '#3cb4ff', '#b45cff'].forEach((col, k) => { c.strokeStyle = col; c.lineWidth = u * .028; c.beginPath(); c.arc(w / 2, h * .66, u * (.52 - k * .028), Math.PI, TAU); c.stroke(); });
+  for (const [x, s] of [[.14, .34], [.86, .34]]) put(c, CLOUD('pink'), s * u, x * w, h * .64 + Math.sin(t * .8 + x * 9) * u * .006);
+});
+scene3D('garden3d', 'Bug Garden 3D', '🐞', 3, (c, w, h, t, u) => {
+  vfill(c, w, h, [[0, '#4fb0ff'], [.5, '#bfe9ff'], [.62, '#f4ffd8'], [.64, '#63b846'], [1, '#4f9a3a']]);
+  [[.18, '#ff7ac6'], [.42, '#ffffff'], [.66, '#ffd23f'], [.86, '#b47bff']].forEach(([x, col], k) => {
+    const fx = x * w + Math.sin(t * .9 + k) * u * .012, fy = h * (.34 + (k % 2) * .08), r = u * .07;
+    c.strokeStyle = '#3f9a45'; c.lineWidth = u * .016; c.beginPath(); c.moveTo(x * w, h * .7); c.lineTo(fx, fy); c.stroke();
+    c.fillStyle = col; c.beginPath(); for (let j = 0; j < 8; j++) blob(c, fx + Math.cos(j * TAU / 8) * r, fy + Math.sin(j * TAU / 8) * r, r * .5); c.fill();
+    c.fillStyle = '#ffb020'; c.beginPath(); c.arc(fx, fy, r * .55, 0, TAU); c.fill();
+  });
 });
 
 /* the "Mix" scene in a saved picture: the stage's own CSS gradient and dots, drawn by hand */
@@ -6222,6 +6900,7 @@ function setScene(id, quiet) {
   if (!quiet) { sceneTouched = true; save('fw.scene', state.scene); }
   focusPhotos(); markScene(); refreshScene();
   if (SCENES[state.scene] && SCENES[state.scene].three) want3D(!quiet);
+  for (const id in G3.worlds) if (id !== state.scene) drop3D(id); /* only the world on stage is kept */
 }
 /* three.js is fetched only when a 3D scene is wanted: one is picked, one was left on last time, or the Scenes tab
    is opened and their tiles are about to be seen. Then the tiles are painted again with the real thing. */
@@ -6229,7 +6908,7 @@ function paint3DTiles() {
   let k = 0;
   scenesEl.querySelectorAll('.tile.scene').forEach((b) => {
     const S = SCENES[b.dataset.scene], cv = b.querySelector('.scv'); if (!S || !S.three || !cv) return;
-    setTimeout(() => { const c = cv.getContext('2d'); c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, 78, 56); drawScene(c, S.id, 78, 56, S.at || 2.5); }, 350 * k++); /* one world at a time, so the tab stays quick */
+    setTimeout(() => { const c = cv.getContext('2d'); c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, 78, 56); drawScene(c, S.id, 78, 56, S.at || 2.5); if (S.id !== state.scene) drop3D(S.id); }, 350 * k++); /* one world at a time, so the tab stays quick */
   });
 }
 function want3D(say) {
@@ -6785,7 +7464,7 @@ window.FW = {
   setTab(name) { setTab(name); },
   setScene(id) { setScene(id); },
   scenes: SCENE_ORDER.slice(),
-  three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv },
+  three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv, worlds: () => Object.keys(G3.worlds), memory: () => (G3.r ? Object.assign({}, G3.r.info.memory) : null) },
   fullscreen: { enter: () => enterFs(), exit: () => exitFs(), state: () => ({ on: fs.on, api: fs.api, idle: root.classList.contains('fs-idle'), field: !root.classList.contains('fs-nofield') }) },
   __drawScene: (c, id, w, h, t) => drawScene(c, id, w, h, t),
   photos: {

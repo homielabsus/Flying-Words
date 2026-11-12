@@ -4,7 +4,7 @@ A one-file website for kids. Type anything — a word, your name, `🦖🦖🦖`
 
 ## Open it
 
-Double-click `index.html`. That's it — no install, no build step, no server needed. It also works offline (the optional Fredoka web font is only fetched when the page is served from a website). Only the five 3D scenes need the internet (the browser usually keeps what it fetched, so after the first time they tend to work offline too).
+Double-click `index.html`. That's it — no install, no build step, no server needed. It also works offline (the optional Fredoka web font is only fetched when the page is served from a website). Only the 3D scenes need the internet (the browser usually keeps what it fetched, so after the first time they tend to work offline too).
 
 Works on phones, tablets and desktops. Tap a letter to make it hop; double-tap the stage to replay the last trick; tap 🎲 (or the yellow sticker) for a surprise. On a phone, **GO!** tucks the keyboard away so the show gets the whole screen; tap the word box to type again.
 
@@ -23,7 +23,7 @@ Works on phones, tablets and desktops. Tap a letter to make it hop; double-tap t
 - **The toy box** has tabs. On a phone it sits under the word box as a row of big tiles you can swipe (two rows on a tablet held upright); on a wide screen it is a side panel of grids.
   - 🎨 **Styles** — every style draws "Wow" in itself, so you can see it before you pick it. Tap one and your word wears it straight away; tap it again to replay the word. 🎲 **Mix** goes back to a new style every time.
   - 🎬 **Moves** — each tile's emoji acts out its move when you point at it. Tap one to see your word do it. 🎲 **Mix** goes back to a new move every time.
-  - 🏞️ **Scenes** — a world behind your word: Sunny Sky, Outer Space, Under the Sea, Rainbow, Sunset, Snow Day, Flower Garden, Dino Land, Candyland, Party Time, Magic Castle, Pirate Cove, Safari, Spooky Night, Movie Night and Choo-Choo Train, plus five 3D scenes (see below). Each one moves smoothly, at 60 frames a second, and stays until you pick another. Everything in them is drawn by the page itself, not with emoji, so a scene looks the same on every phone, tablet and computer: a smiling sun with a hot-air balloon and birds; a planet, a UFO and a rocket; clownfish, a jellyfish and a crab among coral; hearts floating past the rainbow; palm trees and a sailboat at sunset; a snowman, a penguin and a cabin in the snow; tulips, daisies, a sunflower, butterflies and a bee; dinosaurs, a pterodactyl and a volcano; lollipops, cupcakes and candy canes; balloons, bunting and presents; a fairy flying round a pink castle under a sleepy moon; a pirate ship, a parrot, a shark's fin and a treasure chest; an elephant, a giraffe, a lion and a monkey swinging on a vine; friendly ghosts, bats, pumpkins and a black cat by a haunted house; a happy tub of popcorn and a clapperboard between red curtains and searchlights; a steam train with a teddy on board, puffing past a windmill. 🎲 **Mix** goes back to the colour-changing stage. **📷 Camera** and **🖼️ Add Photo** put *you* behind your word (see below).
+  - 🏞️ **Scenes** — a world behind your word: Sunny Sky, Outer Space, Under the Sea, Rainbow, Sunset, Snow Day, Flower Garden, Dino Land, Candyland, Party Time, Magic Castle, Pirate Cove, Safari, Spooky Night, Movie Night and Choo-Choo Train, plus eleven 3D scenes (see below). Each one moves smoothly, at 60 frames a second, and stays until you pick another. Everything in them is drawn by the page itself, not with emoji, so a scene looks the same on every phone, tablet and computer: a smiling sun with a hot-air balloon and birds; a planet, a UFO and a rocket; clownfish, a jellyfish and a crab among coral; hearts floating past the rainbow; palm trees and a sailboat at sunset; a snowman, a penguin and a cabin in the snow; tulips, daisies, a sunflower, butterflies and a bee; dinosaurs, a pterodactyl and a volcano; lollipops, cupcakes and candy canes; balloons, bunting and presents; a fairy flying round a pink castle under a sleepy moon; a pirate ship, a parrot, a shark's fin and a treasure chest; an elephant, a giraffe, a lion and a monkey swinging on a vine; friendly ghosts, bats, pumpkins and a black cat by a haunted house; a happy tub of popcorn and a clapperboard between red curtains and searchlights; a steam train with a teddy on board, puffing past a windmill. 🎲 **Mix** goes back to the colour-changing stage. **📷 Camera** and **🖼️ Add Photo** put *you* behind your word (see below).
   - 😀 **Emoji** — tap to add emoji to your word (handy on computers with no emoji keyboard), plus ⌫ to delete one and 🧹 to clear.
   - 🎛️ **Show** — Auto Play, Shuffle, the ⏱ timer, 🔊 Sound and 🐢 Calm. On a wide screen these are always in view at the bottom of the panel instead.
 
@@ -49,15 +49,21 @@ The Mix stage colours change on every press, now from 14 colour pairs (strawberr
 
 ## 🧊 3D scenes
 
-Five scenes are little films in real 3D, with a moving camera. Their tiles carry a **3D** badge:
+Eleven scenes are little films in real 3D, with a moving camera and characters that walk, swim, fly and blink. Their tiles carry a **3D** badge:
 
 - 🚀 **Space Ride 3D** flies through the stars past planets, with a rocket and a flying saucer for company.
 - 🌆 **Neon Sunset 3D** is a night drive down a glowing road towards a huge striped sun.
 - 🧱 **Block World 3D** circles an island made of cubes, where a pig, a cow, sheep and chickens hop about.
 - 🤖 **Robot Disco 3D** has three robots dancing on a floor of lights under a glitter ball.
 - 🐉 **Dragon Sky 3D** follows a friendly dragon round a castle on a floating island, above the clouds at sunset.
+- 🦖 **Dino Valley 3D** has a T-rex on patrol (he roars now and then), a long-neck eating leaves, a triceratops, a pterodactyl overhead, a baby peeping out of its egg, and a smoking volcano.
+- 🐠 **Coral Reef 3D** is under the sea: a school of clownfish, blue tangs, a puffer fish, a turtle, a waving octopus, jellyfish, a crab, a whale going by, and a yellow submarine.
+- 🐧 **Penguin Party 3D** has penguins skating on a frozen pond and one sliding down the hill on his tummy, a polar bear waving, a seal bouncing a ball, a snowman and the northern lights.
+- 👨‍🚀 **Moon Pals 3D** has an astronaut bounding about in low gravity, little green aliens popping out of a crater, one in a flying saucer, a rover with eyes, and the Earth in the sky.
+- 🦄 **Unicorn Land 3D** has three unicorns galloping round a meadow under a rainbow, a winged one flying over, and hopping bunnies.
+- 🐞 **Bug Garden 3D** is down in the grass among flowers as tall as trees: ladybirds, bumblebees, a caterpillar, butterflies and a snail in no hurry.
 
-They are drawn with [three.js](https://threejs.org) (release 128), which the page fetches from the cdnjs network the first time the Scenes tab is opened or a 3D scene is used. Until it arrives, and on a device with no internet or no 3D graphics, each of these scenes shows a flat poster of itself instead and everything else works as before. **📸 Keep it** saves a 3D scene in pictures, GIFs and videos like any other.
+They are drawn with [three.js](https://threejs.org) (release 128), which the page fetches from the cdnjs network the first time the Scenes tab is opened or a 3D scene is used. Until it arrives, and on a device with no internet or no 3D graphics, each of these scenes shows a flat poster of itself instead and everything else works as before. Only the 3D scene on the stage is kept in memory, so a phone is not asked to hold them all. **📸 Keep it** saves a 3D scene in pictures, GIFs and videos like any other.
 
 ## 📷 Your own photo as the scene
 
