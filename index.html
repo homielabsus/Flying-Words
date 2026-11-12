@@ -880,6 +880,11 @@ html.fs.fs-nofield #f { opacity: 0; pointer-events: none; }
 }
 .booth-b[aria-pressed="true"] { background: var(--sun); box-shadow: 0 1px 0 var(--ink); transform: translateY(2px); }
 .booth-b:active { transform: translateY(3px); box-shadow: none; }
+/* "Just me" is fetching its scissors */
+.booth-b.busy { border-style: dashed; animation: boothBusy 700ms ease-in-out infinite alternate; }
+@keyframes boothBusy { to { background: var(--sun); } }
+html.calm .booth-b.busy { animation: none; }
+@media (prefers-reduced-motion: reduce) { .booth-b.busy { animation: none; } }
 .booth-b:focus-visible { outline: 4px solid #fff; outline-offset: 2px; }
 #stage.cam #toast { bottom: 144px; }
 html.short #boothBar { bottom: 64px; gap: 6px; }
@@ -6546,7 +6551,7 @@ const KEEP = (() => {
     c.setTransform(k, 0, 0, k, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; if (CTX_FILTER) c.filter = 'none';
     c.shadowColor = 'transparent'; c.shadowBlur = 0;
     drawScene(c, R.scene, R.W, R.H, t / 1000, R.palette, R.dark);
-    if (R.cut) coverDraw(c, R.cut, R.W, R.H); /* the kid from the photo booth stands in the scene */
+    if (R.cut) { c.save(); coverDraw(c, R.cut, R.W, R.H); c.restore(); } /* the kid from the photo booth stands in the scene */
     const LT = R.targets.get(R.line), box = R.lay.box;
     const LM = about(box.cx, box.cy, toM(valueAt(LT, 'transform', t))), lineO = valueAt(LT, 'opacity', t), lineF = valueAt(LT, 'filter', t), clip = valueAt(LT, 'clipPath', t);
     const lineHue = fval(lineF, 'hue-rotate', [0])[0], lineBlur = fval(lineF, 'blur', [0])[0], glow = fval(lineF, 'drop-shadow', null);
@@ -7215,12 +7220,12 @@ function renderPhotoTiles() {
   let at = addTile;
   photos.forEach((p, k) => {
     const wrap = document.createElement('div'); wrap.className = 'tile-wrap';
-    const b = mkTile('scene photo' + (p.cut ? ' cutout' : ''), (p.cut ? 'Me, cut out: tap to stand in the scene, tap again to leave ' : 'My photo ') + (k + 1)); if (p.cut) b.dataset.cut = p.id; else b.dataset.scene = p.id;
+    const b = mkTile('scene photo' + (p.cut ? ' cutout' : ''), p.cut ? 'Me, cut out ' + (k + 1) + ': tap to step into the scene or out of it' : 'My photo ' + (k + 1)); if (p.cut) b.dataset.cut = p.id; else b.dataset.scene = p.id;
     const sw = document.createElement('span'); sw.className = 'sw';
     const cv = document.createElement('canvas'); cv.className = 'scv'; cv.width = 156; cv.height = 112; cv.setAttribute('aria-hidden', 'true');
     coverDraw(cv.getContext('2d'), p.small, 156, 112); sw.append(cv);
     const del = document.createElement('button'); del.type = 'button'; del.className = 'tile-del'; del.dataset.del = p.id;
-    del.setAttribute('aria-label', 'Remove my photo ' + (k + 1)); del.title = 'Remove this photo'; del.textContent = '✕';
+    del.setAttribute('aria-label', (p.cut ? 'Remove my cut-out ' : 'Remove my photo ') + (k + 1)); del.title = p.cut ? 'Remove this cut-out' : 'Remove this photo'; del.textContent = '✕';
     b.append(sw, tileName(p.cut ? 'Just Me' : 'My Photo')); wrap.append(b, del);
     at.after(wrap); at = wrap;
   });
@@ -7233,7 +7238,7 @@ function addPhoto(cv) {
   const t = Date.now() * 1000 + photoN % 1000; /* the order photos were taken, even within one millisecond */
   const id = 'photo-' + Date.now().toString(36) + '-' + (photoN++), rec = { id, cv, blob: null, small: photoCanvas(cv, cv.width, cv.height, false, PHOTO_SMALL) };
   registerPhoto(rec); photos.unshift(rec);
-  while (photos.length > PHOTO_KEEP) forgetPhoto(photos[photos.length - 1].id);
+  trimPhotos();
   renderPhotoTiles(); setScene(id);
   rec.saved = toJPEG(cv).then(async (blob) => {
     rec.blob = blob; /* without one the photo just keeps its canvas */
@@ -7274,7 +7279,7 @@ async function restorePhotos() {
   }
   for (const r of recs.slice(PHOTO_KEEP)) photoDB.del(r.id).catch(() => {});
   photos.sort((a, b) => (recs.findIndex((r) => r.id === a.id) - recs.findIndex((r) => r.id === b.id))); /* one snapped meanwhile stays first */
-  while (photos.length > PHOTO_KEEP) forgetPhoto(photos[photos.length - 1].id);
+  trimPhotos();
   renderPhotoTiles();
   const want = load('fw.scene', 'mix');
   if (!sceneTouched && SCENES[want] && state.scene !== want) setScene(want, true);
@@ -7308,8 +7313,9 @@ const cam = { on: false, stream: null, devices: [], deviceId: '', mirror: true, 
    "Just me" finds the person in the picture, and "Green screen" takes away a cloth of one colour behind them.
    Either way the kid is seen standing in the scene, live, and Snap! saves that cut-out. A cut-out is not a
    scene: it stands in front of whichever scene is picked, behind the word, until it is switched off. ---------- */
-const meCv = $('#me'), meCx = meCv.getContext('2d'), boothBar = $('#boothBar'), boothPick = $('#boothPick');
+const meCv = $('#me'), meCx = meCv.getContext('2d'), boothBar = $('#boothBar'), boothPick = $('#boothPick'), boothMe = boothBar.querySelector('[data-mode="me"]');
 const cx2 = (cv) => cv.getContext('2d', { willReadFrequently: true });
+const tell = (text, ms) => { toast(text, ms); announceEl.textContent = text; }; /* said out loud too: these are things a kid has to know */
 let cutTouched = false;
 function cutRec(id) { const want = id === undefined ? state.cut : id; return (want && photos.find((p) => p.cut && p.id === want)) || null; }
 /* the layer between the scene and the word: the live cut-out while the booth is on, else the saved one */
@@ -7317,7 +7323,8 @@ function drawCut() {
   const w = stage.clientWidth, h = stage.clientHeight, live = cam.booth && cam.cutOK, rec = cam.on ? null : cutRec();
   const img = live ? (cam.mode === 'green' ? cam.keyCv : cam.cutCv) : rec && (rec.cv || rec.small);
   stage.classList.toggle('has-me', !!img);
-  if (!img || !w || !h) return;
+  if (!img) { if (meCv.width > 1) meCv.width = meCv.height = 1; return; } /* nothing of the last picture is left lying about */
+  if (!w || !h) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(w * dpr), H = Math.round(h * dpr);
   if (meCv.width !== W || meCv.height !== H) { meCv.width = W; meCv.height = H; }
   meCx.setTransform(dpr, 0, 0, dpr, 0, 0); meCx.clearRect(0, 0, w, h);
@@ -7325,16 +7332,23 @@ function drawCut() {
   coverDraw(meCx, img, w, h);
 }
 function setCut(id, quiet) {
-  state.cut = cutRec(id) ? id : '';
+  state.cut = id && cutRec(id) ? id : '';
   if (!quiet) { cutTouched = true; save('fw.cut', state.cut); }
   focusPhotos(); markScene(); drawCut();
+}
+/* six places for photos and cut-outs together: the oldest goes first, but never the newest, nor one that is on the stage */
+function trimPhotos() {
+  while (photos.length > PHOTO_KEEP) {
+    let i = photos.length - 1; while (i > 0 && (photos[i].id === state.scene || photos[i].id === state.cut)) i--;
+    if (i <= 0) break;
+    forgetPhoto(photos[i].id);
+  }
 }
 const toCutBlob = (cv) => new Promise((res) => { try { cv.toBlob(res, 'image/webp', .92); } catch (e) { res(null); } }); /* a browser that can not write WebP writes a PNG */
 function addCut(cv) {
   const t = Date.now() * 1000 + photoN % 1000;
   const id = 'cut-' + Date.now().toString(36) + '-' + (photoN++), rec = { id, cut: true, cv, blob: null, small: photoCanvas(cv, cv.width, cv.height, false, PHOTO_SMALL) };
-  photos.unshift(rec);
-  while (photos.length > PHOTO_KEEP) forgetPhoto(photos[photos.length - 1].id);
+  photos.unshift(rec); trimPhotos();
   renderPhotoTiles(); setCut(id);
   rec.saved = toCutBlob(cv).then(async (blob) => {
     rec.blob = blob; if (blob && state.cut !== id) rec.cv = null;
@@ -7343,10 +7357,20 @@ function addCut(cv) {
   return id;
 }
 
-/* --- finding the person: MediaPipe's selfie segmentation, fetched the first time "Just me" is used --- */
+/* --- finding the person: MediaPipe's selfie segmentation, fetched when "Just me" is switched on. Every file of it
+   is checked against the hash written here before it is used: the first one by the browser, the others by fetch,
+   which then hands them over as blobs. A file that does not match is not run, and "Just me" says it can not start. --- */
 const SEG = {
   src: 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/',
-  sri: 'sha384-J/3LshwuX+2viPOY3En4QiZvdvlffDhZYH5MsMuLGdwcoGcYSA7EV1jXFsys0gIb',
+  sri: {
+    'selfie_segmentation.js': 'sha384-J/3LshwuX+2viPOY3En4QiZvdvlffDhZYH5MsMuLGdwcoGcYSA7EV1jXFsys0gIb',
+    'selfie_segmentation_solution_simd_wasm_bin.js': 'sha384-xIX6ryHo3rUlj65NPL4chQmGdxre0lhQgbLxuiFPLdIWo8fTRQJlj7GIGXti54Q3',
+    'selfie_segmentation_solution_simd_wasm_bin.wasm': 'sha384-cceBeRPjr7qYiOjqqsQ0LszvtPcMLLd5WK+KrqJIC/7/e3AMb9+ISw0AU1sFGnVP',
+    'selfie_segmentation_solution_wasm_bin.js': 'sha384-vCokyqNes9sZdEbsmv1tuNsUsrbLFZCLWgRAq6NKTNVPBpHAj0HbKFdc1cT5NcSW',
+    'selfie_segmentation_solution_wasm_bin.wasm': 'sha384-Zu5Kh7e3gHmKeo1qktdo1iyMS67Iqigue89LNW8HhId7xW5YHH6LgmYGxny4XbFh',
+    'selfie_segmentation.binarypb': 'sha384-BFwb8DuJ1f176o9tEFTyIB3+QHSLjQxG9oYt+S04EhwMNV9yGzZl0tG5yS2j68oh',
+    'selfie_segmentation.tflite': 'sha384-QTt0Xx5FhJzqvOea2yx22m7Nq2MHX93UxKcXyItRs/bt5wR4Te/c3KWLlo2IkvJr'
+  },
   state: 'idle', wait: null, ss: null, target: null, chain: Promise.resolve(),
 };
 const inTime = (p, ms) => new Promise((res, rej) => { const slow = setTimeout(() => rej(new Error('slow')), ms); p.then((v) => { clearTimeout(slow); res(v); }, (e) => { clearTimeout(slow); rej(e); }); });
@@ -7361,44 +7385,60 @@ function segResult(r) {
   for (let i = 3; i < d.length; i += 4) { const a = d[i]; d[i] = a <= 76 ? 0 : a >= 180 ? 255 : (a - 76) * 2.452; }
   c.putImageData(im, 0, 0);
 }
+function segScript() {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script'), f = 'selfie_segmentation.js';
+    s.src = SEG.src + f; s.integrity = SEG.sri[f]; s.crossOrigin = 'anonymous'; s.referrerPolicy = 'no-referrer';
+    s.onload = () => (window.SelfieSegmentation ? res() : rej(new Error('empty'))); s.onerror = () => { s.remove(); rej(new Error('offline')); };
+    document.head.appendChild(s);
+  });
+}
+/* `box` holds what has to be cleared away again; `box.dead` says nobody is waiting any more */
+async function segBoot(box) {
+  if (!window.SelfieSegmentation) await segScript();
+  /* the same question MediaPipe asks to pick its fast or its plain build, so the right one is fetched */
+  let simd = true;
+  try { await WebAssembly.instantiate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 4, 1, 96, 0, 0, 3, 2, 1, 0, 10, 9, 1, 7, 0, 65, 0, 253, 15, 26, 11])); } catch (e) { simd = false; }
+  const bin = 'selfie_segmentation_solution_' + (simd ? 'simd_' : '') + 'wasm_bin', TYPE = { js: 'text/javascript', wasm: 'application/wasm' };
+  await Promise.all([bin + '.js', bin + '.wasm', 'selfie_segmentation.binarypb', 'selfie_segmentation.tflite'].map(async (f) => {
+    const r = await fetch(SEG.src + f, { integrity: SEG.sri[f], mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+    if (!r.ok) throw new Error('missing');
+    const blob = new Blob([await r.arrayBuffer()], { type: TYPE[f.split('.').pop()] || 'application/octet-stream' });
+    if (!box.dead) box.urls[f] = URL.createObjectURL(blob);
+  }));
+  if (box.dead) throw new Error('late');
+  const ss = box.ss = new window.SelfieSegmentation({ locateFile: (f) => box.urls[f] || 'about:blank#' + f }); /* nothing unchecked is fetched */
+  ss.setOptions({ modelSelection: 0 }); ss.onResults(segResult);
+  await ss.initialize();
+  const try1 = document.createElement('canvas'); try1.width = try1.height = 64; cx2(try1).fillRect(0, 0, 64, 64);
+  await ss.send({ image: try1 }); /* the first picture is the slow one: it is done here, not in the kid's face */
+  if (box.dead) { try { ss.close(); } catch (e) { /* ignore */ } throw new Error('late'); }
+  return ss;
+}
 function loadSeg() {
   if (SEG.wait) return SEG.wait;
   SEG.state = 'loading';
-  return (SEG.wait = new Promise((done) => {
-    const fail = () => { SEG.state = 'failed'; SEG.ss = null; done(false); };
-    const boot = async () => {
-      let ss = null;
-      try {
-        ss = new window.SelfieSegmentation({ locateFile: (f) => SEG.src + f });
-        ss.setOptions({ modelSelection: 0 });
-        ss.onResults(segResult);
-        await inTime(ss.initialize(), 45000);
-        const try1 = document.createElement('canvas'); try1.width = try1.height = 64; cx2(try1).fillRect(0, 0, 64, 64);
-        await inTime(ss.send({ image: try1 }), 45000); /* the first picture is the slow one: it is done here, not in the kid's face */
-        SEG.ss = ss; SEG.state = 'ready'; done(true);
-      } catch (e) { try { if (ss) ss.close(); } catch (e2) { /* ignore */ } fail(); }
-    };
-    if (window.SelfieSegmentation) { boot(); return; }
-    const s = document.createElement('script');
-    s.src = SEG.src + 'selfie_segmentation.js'; s.integrity = SEG.sri; s.crossOrigin = 'anonymous'; s.referrerPolicy = 'no-referrer';
-    const slow = setTimeout(() => { s.onload = s.onerror = null; s.remove(); fail(); }, 30000);
-    s.onload = () => { clearTimeout(slow); if (window.SelfieSegmentation) boot(); else fail(); };
-    s.onerror = () => { clearTimeout(slow); s.remove(); fail(); };
-    document.head.appendChild(s);
-  }));
+  const box = { urls: {}, ss: null, dead: false }, tidy = () => { for (const f in box.urls) URL.revokeObjectURL(box.urls[f]); box.urls = {}; };
+  return (SEG.wait = inTime(segBoot(box), 60000).then((ss) => { tidy(); SEG.ss = ss; SEG.chain = Promise.resolve(); SEG.state = 'ready'; return true; },
+    () => { box.dead = true; tidy(); try { if (box.ss) box.ss.close(); } catch (e) { /* ignore */ } SEG.ss = null; SEG.state = 'failed'; return false; }));
 }
+/* a person finder that stopped answering is thrown away; the next "Just me" builds a new one */
+function dropSeg() { try { if (SEG.ss) SEG.ss.close(); } catch (e) { /* ignore */ } SEG.ss = null; SEG.target = null; SEG.state = 'failed'; }
 /* one picture at a time goes through; `out` gets the person and nothing else */
 function segRun(src, out) {
   const job = SEG.chain.then(() => { SEG.target = out; return inTime(SEG.ss.send({ image: src }), 8000); })
     .then(() => { if (SEG.target === out) SEG.target = null; return out; }, (e) => { if (SEG.target === out) SEG.target = null; throw e; });
-  SEG.chain = job.catch(() => {});
+  SEG.chain = job.then(() => {}, () => {});
   return job;
 }
 
 /* --- the green screen: nothing to fetch, and it keeps everything that is not the cloth, toys and hats included --- */
+/* `ok`: a colour a cloth can be keyed on, clearly green or clearly blue. Walls, wood and skin are not: keying on
+   those would take the kid's face away. */
 function keyOf(r, g, b) {
-  const cb = -.168736 * r - .331264 * g + .5 * b, cr = .5 * r - .418688 * g - .081312 * b;
-  return { r, g, b, cb, cr, mag: Math.hypot(cb, cr), y: .299 * r + .587 * g + .114 * b, ch: g >= r && g >= b ? 1 : b >= r ? 2 : 0 };
+  const cb = -.168736 * r - .331264 * g + .5 * b, cr = .5 * r - .418688 * g - .081312 * b, mag = Math.hypot(cb, cr), y = .299 * r + .587 * g + .114 * b;
+  const ch = g >= r && g >= b ? 1 : b >= r ? 2 : 0;
+  return { r, g, b, cb, cr, mag, y, ch, ok: ch > 0 && (ch === 1 ? g : b) > r * 1.2 && mag >= 14 && mag >= y * .28 };
 }
 /* the cloth's colour is read from the top corners of the picture, where nobody's head is */
 function sampleKey(d, w, h) {
@@ -7407,8 +7447,8 @@ function sampleKey(d, w, h) {
     for (let y = 0; y < bh; y++) for (let x = x0; x < x0 + bw; x++) { const i = (y * w + x) * 4; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
     return keyOf(r / n, g / n, b / n);
   };
-  const a = box(0), b = box(w - bw), k = a.mag >= b.mag ? a : b;
-  return k.mag >= 26 ? k : Object.assign(keyOf(40, 175, 80), { weak: true }); /* no coloured cloth in sight: expect a green one */
+  const a = box(0), b = box(w - bw), k = a.ok && b.ok ? (a.mag >= b.mag ? a : b) : a.ok ? a : b.ok ? b : null;
+  return k || Object.assign(keyOf(40, 175, 80), { weak: true }); /* no cloth up there: a green one is looked for anyway, but no photo is taken */
 }
 /* Each pixel is asked how far its colour leans the cloth's way, whatever its brightness, so the cloth's own shadows
    and folds go too. Pixels on the edge fade out, and the cloth's tint is taken off whatever it shone on. */
@@ -7432,7 +7472,7 @@ function greenCut(src, out, live) {
   const im = c.getImageData(0, 0, w, h), now = performance.now();
   if (!cam.key || (live && (cam.key.weak || now < cam.keyUntil) && now - cam.keyAt > 400)) {
     cam.key = sampleKey(im.data, w, h); cam.keyAt = now;
-    if (live && cam.key.weak && !cam.warned && now > cam.keyUntil) { cam.warned = true; toast('🟩 Hang a green or blue cloth behind you', 3600); }
+    if (live && cam.key.weak && !cam.warned && now > cam.keyUntil) { cam.warned = true; tell('🟩 Hang a green or blue cloth behind you', 3600); }
   }
   chromaKey(im.data, cam.key); c.putImageData(im, 0, 0);
 }
@@ -7442,12 +7482,18 @@ function markBooth() {
   for (const b of boothBar.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === cam.mode));
   boothPick.hidden = cam.mode !== 'green';
 }
+function boothBusy(on) { boothMe.classList.toggle('busy', on); if (on) boothMe.setAttribute('aria-busy', 'true'); else boothMe.removeAttribute('aria-busy'); }
 function boothOn(on) {
-  cam.booth = !!(on && cam.on && cam.stream); cam.cutOK = false; cam.fails = 0;
+  cam.booth = !!(on && cam.on && cam.stream); cam.cutOK = false; cam.goodAt = performance.now();
   cam.key = null; cam.warned = false; cam.keyAt = 0; cam.keyUntil = performance.now() + 2000;
   stage.classList.toggle('booth', cam.booth);
   refreshScene(); drawCut();
   if (cam.booth) boothLoop();
+}
+/* the camera is closing: nothing of the booth stays, not even the last picture it worked on */
+function boothOff() {
+  cam.booth = false; cam.cutOK = false; cam.snapping = false; stage.classList.remove('booth'); boothBar.hidden = true;
+  for (const k of ['cutCv', 'keyCv']) if (cam[k]) cam[k].width = cam[k].height = 1;
 }
 async function setBooth(mode, quiet) {
   if (['all', 'me', 'green'].indexOf(mode) < 0) mode = 'all';
@@ -7457,10 +7503,11 @@ async function setBooth(mode, quiet) {
   const seq = cam.seq;
   if (mode === 'me' && SEG.state !== 'ready') {
     if (SEG.state === 'failed') { SEG.wait = null; SEG.state = 'idle'; } /* worth another try */
-    boothOn(false); camSnap.disabled = true; toast('✂️ Getting the scissors… one moment', 5000);
+    boothOn(false); camSnap.disabled = true; boothBusy(true); tell('✂️ Getting the scissors… one moment', 5000);
     const ok = await loadSeg();
+    boothBusy(SEG.state === 'loading');
     if (seq !== cam.seq || cam.mode !== 'me') return; /* the camera or the kid has moved on */
-    if (!ok) { cam.mode = 'all'; markBooth(); camSnap.disabled = cam.counting; toast('✂️ No scissors: they come over the internet. Try the green screen!', 4600); return; }
+    if (!ok) { cam.mode = 'all'; markBooth(); camSnap.disabled = cam.counting; tell('✂️ No scissors: they come over the internet. Try the green screen!', 4600); return; }
   }
   camSnap.disabled = cam.counting;
   boothOn(mode !== 'all');
@@ -7476,16 +7523,16 @@ function boothLoop() {
     const vw = camVid.videoWidth, vh = camVid.videoHeight, now = camVid.currentTime;
     if (vw && vh && camVid.readyState >= 2 && now !== seen && !cam.snapping && !document.hidden) {
       seen = now;
-      const green = cam.mode === 'green', s = Math.min(1, (green ? 640 : 960) / Math.max(vw, vh)), w = Math.max(2, Math.round(vw * s)), h = Math.max(2, Math.round(vh * s));
+      const seq = cam.seq, green = cam.mode === 'green', s = Math.min(1, (green ? 640 : 960) / Math.max(vw, vh)), w = Math.max(2, Math.round(vw * s)), h = Math.max(2, Math.round(vh * s));
       const cv = green ? (cam.keyCv || (cam.keyCv = document.createElement('canvas'))) : (cam.cutCv || (cam.cutCv = document.createElement('canvas')));
       if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
       try {
         if (green) greenCut(camVid, cv, true); else await segRun(camVid, cv);
-        cam.fails = 0;
-        if (cam.booth && !cam.snapping && (cam.mode === 'green') === green) { cam.cutOK = true; drawCut(); }
+        cam.goodAt = performance.now();
+        if (cam.booth && seq === cam.seq && !cam.snapping && (cam.mode === 'green') === green) { cam.cutOK = true; drawCut(); }
       } catch (e) {
-        /* one picture lost is nothing; a long run of them means the cutting has broken */
-        if (cam.booth && ++cam.fails > 40) { toast('✂️ The scissors got stuck. Here is the whole picture', 4200); setBooth('all', true); }
+        /* one picture lost is nothing; six seconds without any means the cutting has broken */
+        if (cam.booth && seq === cam.seq && !green && performance.now() - cam.goodAt > 6000) { dropSeg(); tell('✂️ The scissors got stuck. Here is the whole picture', 4200); setBooth('all', true); }
       }
     }
     if (cam.booth) requestAnimationFrame(tick); else cam.looping = false;
@@ -7507,12 +7554,14 @@ async function boothSnap(full, seq) {
   try { cut = await cutOut(full); } catch (e) { /* told below */ }
   cam.snapping = false;
   if (seq !== cam.seq) return false;
-  const why = !cut ? '✂️ That did not work. Try again!' : cut.cover < .004 ? (green ? '🟩 I only see the cloth. Step in!' : '✂️ I can not see you. Step in!')
-    : green && cut.cover > .985 ? '🟩 I can not find the cloth. Tap 🎯 with the cloth in the corners' : '';
-  if (why) { cam.counting = false; camSnap.disabled = false; toast(why, 3600); return false; }
+  const why = !cut ? '✂️ That did not work. Try again!'
+    : green && ((cam.key && cam.key.weak) || cut.cover > .985) ? '🟩 I can not find the cloth. It has to fill the top corners. Then tap 🎯'
+      : cut.cover < .004 ? (green ? '🟩 I only see the cloth. Step in!' : '✂️ I can not see you. Step in!') : '';
+  if (why) { cam.counting = false; camSnap.disabled = false; tell(why, 3800); return false; }
   return cut;
 }
 boothBar.addEventListener('click', (e) => {
+  if (cam.counting) return; /* 3, 2, 1 is running: the photo will be the kind that was asked for */
   const b = e.target.closest('[data-mode]');
   if (b) { setBooth(b.dataset.mode); sound.pop(); return; }
   if (e.target.closest('#boothPick')) { cam.key = null; cam.warned = false; cam.keyUntil = 0; toast('🎯 Matched the cloth again', 2000); sound.pop(); }
@@ -7541,7 +7590,7 @@ async function startCamera(deviceId, byKeys) {
   if (!camOK()) { noCamera('none', byKeys); return false; }
   if (camBlocked()) { noCamera('NotAllowedError', byKeys); return false; }
   cam.on = true; markCam(); hideHint();
-  stage.classList.add('cam'); camBar.hidden = false; boothBar.hidden = false; cam.booth = false; cam.cutOK = false; stage.classList.remove('booth'); drawCut(); camSnap.disabled = true; camFlip.hidden = cam.devices.length < 2;
+  stage.classList.add('cam'); camBar.hidden = false; boothBar.hidden = false; cam.booth = false; cam.cutOK = false; stage.classList.remove('booth'); drawCut(); cam.counting = false; camCount.textContent = ''; camCount.classList.remove('go'); /* a countdown the old camera was in is over */ camSnap.disabled = true; camFlip.hidden = cam.devices.length < 2;
   refreshScene();
   if (byKeys) { try { camOff.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   stopStream();
@@ -7573,7 +7622,7 @@ function stopCamera() {
   const had = cam.on || cam.stream; cam.seq++; cam.on = false; cam.counting = false;
   stopStream(); try { camVid.pause(); } catch (e) { /* ignore */ } camVid.srcObject = null;
   const focusIn = camBar.contains(document.activeElement) || boothBar.contains(document.activeElement);
-  stage.classList.remove('cam', 'mirror', 'booth'); camBar.hidden = true; boothBar.hidden = true; cam.booth = false; cam.cutOK = false; cam.snapping = false; camCount.textContent = ''; camCount.classList.remove('go');
+  stage.classList.remove('cam', 'mirror'); camBar.hidden = true; boothOff(); camCount.textContent = ''; camCount.classList.remove('go');
   markCam();
   if (had) refreshScene();
   drawCut();
