@@ -4,7 +4,7 @@ A one-file website for kids. Type anything — a word, your name, `🦖🦖🦖`
 
 ## Open it
 
-Double-click `index.html`. That's it — no install, no build step, no server needed. It also works offline (the optional Fredoka web font is only fetched when the page is served from a website).
+Double-click `index.html`. That's it — no install, no build step, no server needed. It also works offline (the optional Fredoka web font is only fetched when the page is served from a website). Only the five 3D scenes need the internet, the first time they are used.
 
 Works on phones, tablets and desktops. Tap a letter to make it hop; double-tap the stage to replay the last trick; tap 🎲 (or the yellow sticker) for a surprise. On a phone, **GO!** tucks the keyboard away so the show gets the whole screen; tap the word box to type again.
 
@@ -23,28 +23,41 @@ Works on phones, tablets and desktops. Tap a letter to make it hop; double-tap t
 - **The toy box** has tabs. On a phone it sits under the word box as a row of big tiles you can swipe (two rows on a tablet held upright); on a wide screen it is a side panel of grids.
   - 🎨 **Styles** — every style draws "Wow" in itself, so you can see it before you pick it. Tap one and your word wears it straight away; tap it again to replay the word. 🎲 **Mix** goes back to a new style every time.
   - 🎬 **Moves** — each tile's emoji acts out its move when you point at it. Tap one to see your word do it. 🎲 **Mix** goes back to a new move every time.
-  - 🏞️ **Scenes** — a world behind your word: Sunny Sky, Outer Space, Under the Sea, Rainbow, Sunset, Snow Day, Flower Garden, Dino Land, Candyland, Party Time and Magic Castle. Each one moves smoothly, at 60 frames a second, and stays until you pick another. Everything in them is drawn by the page itself, not with emoji, so a scene looks the same on every phone, tablet and computer: a smiling sun with a hot-air balloon and birds; a planet, a UFO and a rocket; clownfish, a jellyfish and a crab among coral; hearts floating past the rainbow; palm trees and a sailboat at sunset; a snowman, a penguin and a cabin in the snow; tulips, daisies, a sunflower, butterflies and a bee; dinosaurs, a pterodactyl and a volcano; lollipops, cupcakes and candy canes; balloons, bunting and presents; a fairy flying round a pink castle under a sleepy moon. 🎲 **Mix** goes back to the colour-changing stage. **📷 Camera** and **🖼️ Add Photo** put *you* behind your word (see below).
+  - 🏞️ **Scenes** — a world behind your word: Sunny Sky, Outer Space, Under the Sea, Rainbow, Sunset, Snow Day, Flower Garden, Dino Land, Candyland, Party Time, Magic Castle, Pirate Cove, Safari, Spooky Night, Movie Night and Choo-Choo Train, plus five 3D scenes (see below). Each one moves smoothly, at 60 frames a second, and stays until you pick another. Everything in them is drawn by the page itself, not with emoji, so a scene looks the same on every phone, tablet and computer: a smiling sun with a hot-air balloon and birds; a planet, a UFO and a rocket; clownfish, a jellyfish and a crab among coral; hearts floating past the rainbow; palm trees and a sailboat at sunset; a snowman, a penguin and a cabin in the snow; tulips, daisies, a sunflower, butterflies and a bee; dinosaurs, a pterodactyl and a volcano; lollipops, cupcakes and candy canes; balloons, bunting and presents; a fairy flying round a pink castle under a sleepy moon; a pirate ship, a parrot, a shark's fin and a treasure chest; an elephant, a giraffe, a lion and a monkey swinging on a vine; friendly ghosts, bats, pumpkins and a black cat by a haunted house; a happy tub of popcorn and a clapperboard between red curtains and searchlights; a steam train with a teddy on board, puffing past a windmill. 🎲 **Mix** goes back to the colour-changing stage. **📷 Camera** and **🖼️ Add Photo** put *you* behind your word (see below).
   - 😀 **Emoji** — tap to add emoji to your word (handy on computers with no emoji keyboard), plus ⌫ to delete one and 🧹 to clear.
   - 🎛️ **Show** — Auto Play, Shuffle, the ⏱ timer, 🔊 Sound and 🐢 Calm. On a wide screen these are always in view at the bottom of the panel instead.
 
 Every strip and grid slides: drag it with a finger or the mouse, or roll the wheel over it. A faded edge means there is more that way.
 
-## The game: find all 50 tricks
+## The game: find all 70 tricks
 
-Every style and every move you make happen counts once toward the ⭐ counter (18 styles + 32 moves = 50). Only your own finds count: the welcome "Hello!" and the Auto Play show don't. Tiles you haven't found yet wear a pink **NEW** sticker, the tabs show how many are left, and a new find gets a **NEW** tag on the yellow sticker. Stuck? Tap the ⭐ counter and it points at a tile you still need. Find all 50 and the counter turns into a 🏆. Your finds are remembered on this device.
+Every style and every move you make happen counts once toward the ⭐ counter (26 styles + 44 moves = 70). Only your own finds count: the welcome "Hello!" and the Auto Play show don't. Tiles you haven't found yet wear a pink **NEW** sticker, the tabs show how many are left, and a new find gets a **NEW** tag on the yellow sticker. Stuck? Tap the ⭐ counter and it points at a tile you still need. Find all 70 and the counter turns into a 🏆. Your finds are remembered on this device.
 
 ## Styles (WordArt)
 
-🌈 Rainbow · 🍬 Candy · 🧱 Chunky 3D · 🫧 Bubble Gum · ✏️ Outline · 🌃 Neon Sign · 🪙 Chrome · 🌉 Rainbow Arch · 〰️ Wavy · 🦄 Unicorn · 🍭 Lollipop · ✨ Glitter · 🔥 Fire · 🧊 Ice · 🌌 Galaxy · 💥 Comic POW · 🎈 Balloons · 🍩 Sprinkles
+🌈 Rainbow · 🍬 Candy · 🧱 Chunky 3D · 🫧 Bubble Gum · ✏️ Outline · 🌃 Neon Sign · 🪙 Chrome · 🌉 Rainbow Arch · 〰️ Wavy · 🦄 Unicorn · 🍭 Lollipop · ✨ Glitter · 🔥 Fire · 🧊 Ice · 🌌 Galaxy · 💥 Comic POW · 🎈 Balloons · 🍩 Sprinkles · 🐯 Tiger · 🍉 Watermelon · 🫠 Slime · 🌋 Lava · 💎 Diamond · 🍫 Chocolate · 🦕 Dino Scales · 🎬 Blockbuster
 
 The Mix stage colours change on every press, now from 14 colour pairs (strawberry lemonade, mermaid, cotton candy, ocean mint, grape soda and lemon-lime among them).
 
 ## Moves (PowerPoint motions)
 
-- **Entrances:** 🚀 Fly In · 🏀 Boing Bounce · 🔍 Big Zoom · 🌀 Spinny · 🪄 Magic Wipe · 🎈 Balloon Float · 🌱 Grow & Turn · 🪧 Swivel · ⌨️ Type-Type · 🌧️ Letter Rain · 🦘 Kangaroo Hop · 🌪️ Tornado · 🐍 Snake · 🧲 Magnet · 🪀 Yo-Yo · 🏎️ Race Car · 🎇 Fireworks
-- **Emphasis:** 💓 Heartbeat · 🎢 Teeter · 🌊 The Wave · 🪩 Disco Colors · 🎡 Cartwheel · 🐘 Big & Tiny · 🍮 Jelly Wiggle · 🫨 Shake · 🕺 Dance Party · 👻 Peekaboo · 🤸 Backflip
+- **Entrances:** 🚀 Fly In · 🏀 Boing Bounce · 🔍 Big Zoom · 🌀 Spinny · 🪄 Magic Wipe · 🎈 Balloon Float · 🌱 Grow & Turn · 🪧 Swivel · ⌨️ Type-Type · 🌧️ Letter Rain · 🦘 Kangaroo Hop · 🌪️ Tornado · 🐍 Snake · 🧲 Magnet · 🪀 Yo-Yo · 🏎️ Race Car · 🎇 Fireworks · 🪂 Parachute · ☄️ Shooting Stars · 👣 Stomp
+- **Emphasis:** 💓 Heartbeat · 🎢 Teeter · 🌊 The Wave · 🪩 Disco Colors · 🎡 Cartwheel · 🐘 Big & Tiny · 🍮 Jelly Wiggle · 🫨 Shake · 🕺 Dance Party · 👻 Peekaboo · 🤸 Backflip · 📺 Glitch · 🎠 Carousel · 🀄 Dominoes
 - **Exit and return:** 🧨 Blast Off · 💥 Shatter · 🍂 Fall Apart
+- **At the movies:** 🎬 Movie Title (out of focus, then sharp, with a glint of light) · 🛸 Space Crawl (the word rises from the bottom of the screen, lying back) · 🕶️ Slow-Mo (it rushes in, hangs in the air, then snaps into place) · 🦸 Hero Landing · 🎭 Curtain Up · 🎰 Jackpot
 - **Everything at once:** 🎆 Party! It also turns up by itself on runs 10, 25 and 50, and for words like `party`, `🎉`, `🥳`, `🎂`, unless you have pinned a move. A tile you picked always wins.
+
+## 🧊 3D scenes
+
+Five scenes are little films in real 3D, with a moving camera. Their tiles carry a **3D** badge:
+
+- 🚀 **Space Ride 3D** flies through the stars past planets, with a rocket and a flying saucer for company.
+- 🌆 **Neon Sunset 3D** is a night drive down a glowing road towards a huge striped sun.
+- 🧱 **Block World 3D** circles an island made of cubes, where a pig, a cow, sheep and chickens hop about.
+- 🤖 **Robot Disco 3D** has three robots dancing on a floor of lights under a glitter ball.
+- 🐉 **Dragon Sky 3D** follows a friendly dragon round a castle on a floating island, above the clouds at sunset.
+
+They are drawn with [three.js](https://threejs.org) (release 128), which the page fetches from the cdnjs network the first time the Scenes tab is opened or a 3D scene is used. Until it arrives, and on a device with no internet or no 3D graphics, each of these scenes shows a flat poster of itself instead and everything else works as before. **📸 Keep it** saves a 3D scene in pictures, GIFs and videos like any other.
 
 ## 📷 Your own photo as the scene
 
