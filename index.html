@@ -5262,7 +5262,7 @@ def3D('dino3d', (T, K) => {
   K.shade(rex, true, false);
   /* the long-neck, who never stops eating */
   const P1 = K.flat(0x7a8cf0, { shininess: 18 }), P2 = K.flat(0x5a6ad8, { shininess: 18 }), pale = K.flat(0xdfe6ff);
-  const bro = K.grp(scene, -13.5, 0, -10.5); bro.rotation.y = 1.35;
+  const bro = K.grp(scene, -15.5, 0, -11.5); bro.rotation.y = 1.35;
   blob(bro, P1, 2.1, 1.9, 3.2, 0, 3.6, 0); blob(bro, pale, 1.8, 1.4, 2.8, 0, 3.1, .1);
   for (const [x, z] of [[-1.25, 1.7], [1.25, 1.7], [-1.25, -1.7], [1.25, -1.7]]) { pole(bro, P2, .56, 2.6, x, 1.3, z); pole(bro, pale, .6, .3, x, .15, z); }
   const bNeck = K.chain(K.grp(bro, 0, 4.4, 2.6), 8, 0, .98, .42, (p, k) => blob(p, k % 2 ? P1 : P2, .82 - k * .05, .7, .82 - k * .05, 0, 0, 0));
@@ -5288,13 +5288,14 @@ def3D('dino3d', (T, K) => {
   const Q1 = K.flat(0xd9534f), Q2 = new T.MeshPhongMaterial({ color: 0xffb36b, flatShading: true, side: T.DoubleSide, shininess: 8 });
   const pt = K.grp(scene), pb = K.grp(pt); blob(pb, Q1, .5, .45, 1.5, 0, 0, 0);
   const pHead = K.grp(pb, 0, .25, 1.5); blob(pHead, Q1, .42, .4, .55, 0, 0, 0); spike(pHead, horn, .18, 1.5, 0, -.05, 1.05).rotation.x = Math.PI / 2; spike(pHead, Q1, .16, 1.2, 0, .3, -.7).rotation.x = -Math.PI / 2 + .3; eyes(pHead, .13, .34, 0, .12, .28);
-  const wshape = new T.Shape(); wshape.moveTo(0, .7); wshape.lineTo(5.2, 1.4); wshape.lineTo(4.2, .2); wshape.lineTo(3, -.1); wshape.lineTo(2.4, -.9); wshape.lineTo(1.2, -.6); wshape.lineTo(0, -1.1);
-  const wgeo = new T.ShapeGeometry(wshape); wgeo.rotateX(-Math.PI / 2);
+  /* the arm of the wing is its front edge; the points trail behind */
+  const wshape = new T.Shape(); wshape.moveTo(0, 1.1); wshape.lineTo(5.2, .4); wshape.lineTo(4.2, -.4); wshape.lineTo(3, -.5); wshape.lineTo(2.4, -1.3); wshape.lineTo(1.2, -1); wshape.lineTo(0, -1.5);
+  const wgeo = new T.ShapeGeometry(wshape); wgeo.rotateX(Math.PI / 2);
   const pWings = [-1, 1].map(s => { const w = K.grp(pb, s * .35, .1, 0), m = new T.Mesh(wgeo, Q2); m.scale.set(s, 1, 1); w.add(m); return { w, s }; });
   /* and somebody is hatching */
   const egg = K.grp(scene, 10.5, 0, 8), shellM = K.flat(0xfff3d6), spot = K.flat(0x9fd0ff);
   K.add(egg, new T.SphereGeometry(1.1, 14, 8, 0, TAU, Math.PI * .45, Math.PI * .55), shellM, 0, 1.2, 0).scale.set(1, 1.2, 1);
-  for (let k = 0; k < 5; k++) blob(egg, spot, .2, .2, .08, Math.cos(k * 1.3) * .95, .55 + (k % 2) * .25, Math.sin(k * 1.3) * .95).lookAt(egg.position.x, .9, egg.position.z);
+  for (let k = 0; k < 5; k++) { const sy = .7 + (k % 2) * .25; blob(egg, spot, .2, .2, .08, Math.cos(k * 1.3) * 1.07, sy, Math.sin(k * 1.3) * 1.07).lookAt(egg.position.x, sy, egg.position.z); }
   const baby = K.grp(egg, 0, .9, 0); blob(baby, K.flat(0x9be86a), .62, .6, .66, 0, 0, 0); blob(baby, K.flat(0x9be86a), .4, .3, .4, 0, -.12, .45);
   const babyEyes = eyes(baby, .2, .3, 0, .18, .42);
   const cap = K.add(baby, new T.SphereGeometry(.7, 12, 6, 0, TAU, 0, Math.PI * .38), shellM, 0, .25, -.05); cap.rotation.x = -.35;
@@ -5304,7 +5305,7 @@ def3D('dino3d', (T, K) => {
     scene, cam, fov: 50,
     step(t) {
       /* T-rex: stomp round the clearing, tail swinging, and now and then a roar */
-      K.ring(rex, t, 9, .17, .4, 0);
+      K.ring(rex, t, 7.6, .2, .4, 0);
       const st = t * 3.3; rb.position.y = 3.15 + .14 * Math.abs(Math.sin(st)); rb.rotation.z = .04 * Math.sin(st);
       rLegs.forEach((l, i) => { l.rotation.x = .6 * Math.sin(st + i * Math.PI); });
       rTail.forEach((j, k) => { j.rotation.y = .16 * Math.sin(st - k * .7); });
@@ -5317,12 +5318,12 @@ def3D('dino3d', (T, K) => {
       bHead.rotation.x = -.9 - dip * .1 + .08 * Math.sin(t * 7); bLeaf.rotation.z = .3 * Math.sin(t * 7);
       bTail.forEach((j, k) => { j.rotation.y = .12 * Math.sin(t * 1.4 - k * .6); }); K.blink(bEyes, t, .4);
       /* triceratops: a slow walk the other way */
-      K.ring(tri, t, 4.2, -.2, 2, 0);
+      K.ring(tri, t, 3.6, -.22, 2, 0);
       const tt = t * 3.6; tb.position.y = 1.75 + .06 * Math.abs(Math.sin(tt)); tHead.rotation.y = .2 * Math.sin(t * .9); tHead.rotation.x = .08 * Math.sin(tt);
       tLegs.forEach((l, i) => { l.rotation.x = .45 * Math.sin(tt + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI : 0)); });
       tTail.forEach((j, k) => { j.rotation.y = .2 * Math.sin(tt * .5 - k * .8); }); K.blink(tEyes, t, .7);
       /* pterodactyl */
-      K.ring(pt, t, 17, .34, 3, 15 + 1.6 * Math.sin(t * .5)); pb.rotation.z = -.3;
+      K.ring(pt, t, 17, .34, 3, 17 + 1.6 * Math.sin(t * .5)); pb.rotation.z = .3;
       const fl = Math.sin(t * 4.4); pWings.forEach(q => { q.w.rotation.z = q.s * (.25 + .6 * fl); });
       /* the egg wobbles, and the baby pops up for a look */
       const up = K.ease(Math.max(0, Math.min(1, Math.sin(t * 1.1) * 1.6 + .5)));
@@ -5337,7 +5338,7 @@ def3D('dino3d', (T, K) => {
 
 /* 🐠 Coral Reef: clownfish in a school, a turtle, a whale, an octopus, jellyfish, a crab and a little submarine */
 def3D('reef3d', (T, K) => {
-  const R = K.rng(83), scene = new T.Scene(), cam = new T.PerspectiveCamera(52, 1, .5, 950), TAU = Math.PI * 2, { blob, block, spike, pole, eyes } = K.parts();
+  const R = K.rng(83), scene = new T.Scene(), cam = new T.PerspectiveCamera(52, 1, .5, 950), TAU = Math.PI * 2, { blob, block, spike, pole, eyes } = K.parts(), UP = new T.Vector3(0, 1, 0);
   const sky = K.sky(scene, [[0, '#7fe0f0'], [.2, '#2fb4dc'], [.5, '#1487c4'], [.75, '#0c5f9e'], [1, '#083b6e']]);
   scene.fog = new T.Fog(0x1487c4, 16, 95);
   scene.add(new T.HemisphereLight(0xcff6ff, 0x1a5f8a, .82)); K.sun(scene, 0xe6fbff, .4, 5, 30, 8);
@@ -5360,7 +5361,7 @@ def3D('reef3d', (T, K) => {
     else { const js = K.chain(g, 4, .25, 1.05, 0, (p, k) => pole(p, cols[4], .3 - k * .05, 1.2, 0, .5, 0)); js.forEach((j, k) => { j.rotation.z = k ? .35 * (k % 2 ? 1 : -1) : 0; if (k) { const b = K.grp(j, 0, .5, 0); b.rotation.z = (k % 2 ? -1 : 1) * 1; pole(b, cols[4], .16, .9, 0, .45, 0); } }); }
     K.add(g, K.ball(1.2, 0), rock, .9, .1, -.8).scale.set(1.2, .6, 1);
   };
-  [[-13, -3, 0, 1.2], [-17, -10, 1, 1.5], [-8, -9, 2, 1.3], [12, -4, 3, 1.3], [16, -9, 0, 1.4], [8, -11, 1, 1.2], [19, 2, 2, 1.2], [-20, 3, 3, 1.4], [0, -15, 0, 1.5], [-26, -14, 2, 1.8], [26, -15, 1, 1.9], [-11, 7, 1, .8], [11, 8, 3, .8]].forEach(q => coral(q[0], q[1], q[2], q[3]));
+  [[-13, -3, 0, 1.2], [-17, -10, 1, 1.5], [-8, -9, 2, 1.3], [22, -6, 3, 1.3], [16, -9, 0, 1.4], [8, -11, 1, 1.2], [19, 2, 2, 1.2], [-20, 3, 3, 1.4], [0, -15, 0, 1.5], [-26, -14, 2, 1.8], [26, -15, 1, 1.9], [-15, 8.5, 1, .8], [11, 8, 3, .8]].forEach(q => coral(q[0], q[1], q[2], q[3]));
   for (let i = 0; i < 12; i++) {
     const x = -24 + R() * 48, z = -16 + R() * 20, n = 5 + (R() * 3 | 0);
     weeds.push({ js: K.chain(K.grp(scene, x, hf(x, z), z), n, 0, 1.15, 0, p => blob(p, weedM, .3, .75, .1, 0, .6, 0)), ph: R() * TAU });
@@ -5380,11 +5381,11 @@ def3D('reef3d', (T, K) => {
     return { g, tail, fins, e };
   };
   const clownM = K.flat(0xff7a2a, { shininess: 30 }), clownT = K.flat(0xff9a4a), tangM = K.flat(0x2f6bff, { shininess: 30 }), tangT = K.flat(0xffd23f);
-  const school = []; for (let i = 0; i < 7; i++) school.push(Object.assign(fish(clownM, clownT, true, .75 + R() * .35), { du: i * .13 + R() * .05, dy: R() * 2.4 - 1.2, dz: R() * 2.6 - 1.3 }));
-  const tangs = []; for (let i = 0; i < 4; i++) tangs.push(Object.assign(fish(tangM, tangT, false, .9 + R() * .3), { du: i * .16, dy: R() * 2 - 1, dz: R() * 2 - 1 }));
+  const school = []; for (let i = 0; i < 7; i++) school.push(Object.assign(fish(clownM, clownT, true, .75 + R() * .3), { du: i * .3, dy: i % 2 ? .35 : -.35, dz: i % 3 ? .3 : -.3 })); /* nose to tail, a fish length apart */
+  const tangs = []; for (let i = 0; i < 4; i++) tangs.push(Object.assign(fish(tangM, tangT, false, .9 + R() * .25), { du: i * .32, dy: i % 2 ? .3 : -.3, dz: i % 2 ? -.3 : .3 }));
   /* the puffer keeps puffing up */
-  const puff = K.grp(scene, 14, 6, 2), puffB = K.grp(puff); blob(puffB, K.flat(0xffe14d, { shininess: 30 }), 1, 1, 1, 0, 0, 0); blob(puffB, K.white, .8, .7, .8, 0, -.28, .1);
-  for (let k = 0; k < 22; k++) { const a = R() * TAU, b = Math.acos(R() * 1.6 - .8); const sp = spike(puffB, K.flat(0xff9a2a), .1, .4, Math.sin(b) * Math.cos(a), Math.cos(b), Math.sin(b) * Math.sin(a)); sp.lookAt(0, 0, 0); sp.rotateX(-Math.PI / 2); }
+  const puff = K.grp(scene, 14, 6, 2), puffB = K.grp(puff), puffS = K.flat(0xff9a2a); blob(puffB, K.flat(0xffe14d, { shininess: 30 }), 1, 1, 1, 0, 0, 0); blob(puffB, K.white, .8, .7, .8, 0, -.28, .1);
+  for (let k = 0; k < 22; k++) { const a = R() * TAU, b = Math.acos(R() * 1.6 - .8); const sp = spike(puffB, puffS, .1, .4, Math.sin(b) * Math.cos(a), Math.cos(b), Math.sin(b) * Math.sin(a)); sp.quaternion.setFromUnitVectors(UP, sp.position.clone().normalize()); }
   const puffEyes = eyes(puffB, .24, .42, 0, .3, .82); blob(puffB, K.lit(0xff5f7a), .16, .1, .1, 0, -.12, .98);
   const puffTail = spike(puffB, K.flat(0xff9a2a), .4, .6, 0, 0, -1.15); puffTail.rotation.x = Math.PI / 2; puffTail.scale.x = .15;
   /* the turtle */
@@ -5407,8 +5408,8 @@ def3D('reef3d', (T, K) => {
   for (const s of [-1, 1]) blob(oHead, OC2, .2, .13, .08, s * .85, -.05, .92);
   const arms = []; for (let k = 0; k < 8; k++) { const base = K.grp(octo, 0, .55, 0); base.rotation.y = k * TAU / 8 + .2; arms.push(K.chain(K.grp(base, .85, 0, 0), 6, .62, -.1, 0, (p, j) => blob(p, j % 2 ? OC2 : OC, .42 - j * .05, .36 - j * .045, .36 - j * .045, 0, 0, 0))); }
   /* jellyfish */
-  const jellies = [[5, 12, -6, 0xff9ad8], [-3, 15, -12, 0x9ad8ff], [18, 14, -10, 0xd8b4ff]].map((q, i) => {
-    const g = K.grp(scene, q[0], q[1], q[2]), m = new T.MeshPhongMaterial({ color: q[3], transparent: true, opacity: .72, shininess: 60, side: T.DoubleSide });
+  const jellies = [[-9, 13, -15, 0xff9ad8], [7, 15, -18, 0x9ad8ff], [20, 14, -14, 0xd8b4ff]].map((q, i) => { /* behind everybody's path */
+    const g = K.grp(scene, q[0], q[1], q[2]); g.scale.setScalar(1.35); const m = new T.MeshPhongMaterial({ color: q[3], transparent: true, opacity: .72, shininess: 60, side: T.DoubleSide });
     const dome = K.add(g, new T.SphereGeometry(1.3, 14, 8, 0, TAU, 0, Math.PI * .55), m); blob(g, K.lit(0xffffff, { transparent: true, opacity: .5 }), .6, .5, .6, 0, .3, 0);
     const legs = []; for (let k = 0; k < 6; k++) { const a = k * TAU / 6; legs.push(K.chain(K.grp(g, Math.cos(a) * .7, -.2, Math.sin(a) * .7), 4, 0, -.85, 0, p => pole(p, m, .08, .85, 0, -.42, 0))); }
     eyes(g, .16, .32, 0, .45, 1.02); return { g, dome, legs, y: q[1], ph: i * 2.1 };
@@ -5422,16 +5423,16 @@ def3D('reef3d', (T, K) => {
   const sub = K.grp(scene), SY = K.flat(0xffd23f, { shininess: 50 }); blob(sub, SY, 1.5, 1.4, 3.4, 0, 0, 0); block(sub, SY, 1.3, 1.1, 1.5, 0, 1.5, .2); pole(sub, K.flat(0x8f96a8), .12, 1.3, 0, 2.6, .4); block(sub, K.flat(0x8f96a8), .2, .2, .5, 0, 3.2, .6);
   for (const z of [1.6, .2, -1.2]) for (const s of [-1, 1]) { blob(sub, K.flat(0x8f96a8), .12, .5, .5, s * 1.36, .15, z); blob(sub, K.lit(0x9fe9ff), .1, .38, .38, s * 1.42, .15, z); }
   const prop = K.grp(sub, 0, 0, -3.5); block(prop, K.flat(0xff5f6d), 1.9, .28, .1, 0, 0, 0); block(prop, K.flat(0xff5f6d), .28, 1.9, .1, 0, 0, 0);
-  const pathA = (u, v) => v.set(Math.cos(u) * 12, 6.5 + 2.2 * Math.sin(2 * u), Math.sin(u) * 6.5 - 2), pathB = (u, v) => v.set(Math.cos(u) * 15, 11 + 1.5 * Math.sin(3 * u), Math.sin(u) * 5 - 6);
+  const pathA = (u, v) => v.set(Math.cos(u) * 12, 5.6 + 2 * Math.sin(2 * u), Math.sin(u) * 6.5 - 2), pathB = (u, v) => v.set(Math.cos(u) * 15, 14.4 + Math.sin(3 * u), Math.sin(u) * 5 - 6);
   const v1 = new T.Vector3(), v2 = new T.Vector3();
-  const swim = (f, path, u, t, k) => { path(u, f.g.position); f.g.position.y += f.dy + .15 * Math.sin(t * 2 + k); f.g.position.z += f.dz; path(u + .06, v1); v1.y += f.dy; v1.z += f.dz; f.g.lookAt(v1); f.tail.rotation.y = .5 * Math.sin(t * 9 + k * 1.7); f.fins.forEach((q, i) => { q.rotation.z = (i ? 1 : -1) * (.3 + .3 * Math.sin(t * 6 + k)); }); K.blink(f.e, t, k * .17); };
+  const swim = (f, path, u, t, k, dir) => { path(u, f.g.position); f.g.position.y += f.dy + .15 * Math.sin(t * 2 + k); f.g.position.z += f.dz; path(u + .06 * dir, v1); v1.y += f.dy; v1.z += f.dz; f.g.lookAt(v1); f.tail.rotation.y = .5 * Math.sin(t * 9 + k * 1.7); f.fins.forEach((q, i) => { q.rotation.z = (i ? 1 : -1) * (.3 + .3 * Math.sin(t * 6 + k)); }); K.blink(f.e, t, k * .17); };
   return {
     scene, cam, fov: 52,
     step(t) {
-      school.forEach((f, k) => swim(f, pathA, t * .33 - f.du, t, k));
-      tangs.forEach((f, k) => swim(f, pathB, -t * .26 - f.du - 2, t, k + 9));
+      school.forEach((f, k) => swim(f, pathA, t * .33 - f.du, t, k, 1));
+      tangs.forEach((f, k) => swim(f, pathB, -t * .26 + f.du - 2, t, k + 9, -1));
       const pf = .5 + .5 * Math.sin(t * .9); puffB.scale.setScalar(.8 + .5 * K.ease(pf)); puff.position.y = 6 + .5 * Math.sin(t * .7); puff.rotation.y = -.6 + .4 * Math.sin(t * .4); puffTail.rotation.y = .5 * Math.sin(t * 8); K.blink(puffEyes, t, .5);
-      const tu = t * .13 + 1; turtle.position.set(Math.cos(tu) * 17, 9 + 1.5 * Math.sin(t * .4), Math.sin(tu) * 5.5 - 3); turtle.lookAt(v1.set(Math.cos(tu + .05) * 17, 9 + 1.5 * Math.sin(t * .4 + .1), Math.sin(tu + .05) * 5.5 - 3));
+      const tu = t * .13 + 1; turtle.position.set(Math.cos(tu) * 17, 10.6 + Math.sin(t * .4), Math.sin(tu) * 5.5 - 3); turtle.lookAt(v1.set(Math.cos(tu + .05) * 17, 10.6 + Math.sin(t * .4 + .1), Math.sin(tu + .05) * 5.5 - 3));
       flip.forEach(q => { q.f.rotation.z = q.s * (q.back ? .2 : .45) * Math.sin(t * 2.2 + (q.back ? 1.5 : 0)); }); tuHead.rotation.x = .12 * Math.sin(t * 1.1); K.blink(tuEyes, t, .3);
       whale.position.set(-75 + (t * 2.2 + 40) % 150, 13 + 1.5 * Math.sin(t * .3), -40); whale.rotation.y = Math.PI / 2; wb.rotation.x = .06 * Math.sin(t * .8);
       wTail.forEach((j, k) => { j.rotation.x = .22 * Math.sin(t * 1.6 - k * .7); }); K.blink(wEyes, t, .8);
@@ -5505,8 +5506,9 @@ def3D('snow3d', (T, K) => {
     K.shade(g, true, false); return { g, b, head, flips, e };
   };
   const skaters = [2, 3, 4, 0].map((x, k) => Object.assign(penguin(x), { ph: k * TAU / 4 })), star = penguin(1), slider = penguin(0);
-  const A = new T.Vector3(17.5, 6.4, -5), B = new T.Vector3(9.5, .35, 5.5), C = new T.Vector3(6.6, .35, 9.2), ramp = block(scene, snowM, 3, 1, A.distanceTo(B) + 1.5, (A.x + B.x) / 2, (A.y + B.y) / 2 - .75, (A.z + B.z) / 2);
-  ramp.lookAt(B.x, B.y - .75, B.z); ramp.receiveShadow = true;
+  const A = new T.Vector3(17.5, 6.4, -5), B = new T.Vector3(9.5, 0, 5.5), C = new T.Vector3(6.6, 0, 9.2), ramp = block(scene, snowM, 3, 1, A.distanceTo(B) + 1.5, (A.x + B.x) / 2, (A.y + B.y) / 2 - .58, (A.z + B.z) / 2);
+  ramp.lookAt(B.x, B.y - .58, B.z); ramp.receiveShadow = true;
+  const dSlope = B.clone().sub(A).normalize(), dFlat = C.clone().sub(B).normalize();
   /* the polar bear waves from her seat */
   const BW = K.flat(0xfafcff, { shininess: 10 }), BS = K.flat(0xdde8f4), bear = K.grp(scene, -12.5, 0, 6.5); bear.rotation.y = 1.15;
   blob(bear, BW, 1.7, 1.75, 1.6, 0, 1.65, 0); blob(bear, BS, 1.2, 1.2, .9, 0, 1.45, .85);
@@ -5518,9 +5520,9 @@ def3D('snow3d', (T, K) => {
   const bearArms = [-1, 1].map(s => { const a = K.grp(bear, s * 1.5, 2.65, .35); blob(a, BW, .42, .95, .45, 0, -.75, 0); blob(a, BS, .3, .2, .3, 0, -1.6, .1); return a; });
   K.shade(bear, true, false);
   /* the seal keeps a ball in the air */
-  const SG = K.flat(0x8f9bb4, { shininess: 50 }), seal = K.grp(scene, 8.5, 0, 9.5); seal.rotation.y = -1.75;
+  const SG = K.flat(0x8f9bb4, { shininess: 50 }), seal = K.grp(scene, -3.5, 0, 12.5); seal.rotation.y = 1.45;
   pole(seal, K.flat(0xbfe6f7, { shininess: 60 }), 2.6, .3, 0, .1, .2);
-  const sb = K.grp(seal, 0, .9, 0); sb.rotation.x = -.5; blob(sb, SG, .8, .72, 1.9, 0, 0, 0); blob(sb, K.flat(0xc9d2e2), .6, .5, 1.5, 0, -.2, .3);
+  const sb = K.grp(seal, 0, 1.3, 0); sb.rotation.x = -.5; blob(sb, SG, .8, .72, 1.9, 0, 0, 0); blob(sb, K.flat(0xc9d2e2), .6, .5, 1.5, 0, -.2, .3);
   const sh = K.grp(sb, 0, .35, 1.75); sh.rotation.x = -.6; blob(sh, SG, .62, .58, .64, 0, 0, 0); blob(sh, K.flat(0xc9d2e2), .34, .26, .3, 0, -.12, .46); blob(sh, K.ink, .1, .08, .08, 0, 0, .74); const sealEyes = eyes(sh, .12, .28, 0, .2, .46);
   const sealFlips = [-1, 1].map(s => { const f = K.grp(sb, s * .75, -.3, .7); blob(f, SG, .5, .1, .3, s * .4, 0, 0); return f; });
   for (const s of [-1, 1]) blob(sb, SG, .36, .08, .5, s * .3, .1, -2.05).rotation.y = s * .5;
@@ -5539,11 +5541,12 @@ def3D('snow3d', (T, K) => {
       /* down the slope on his tummy, a glide across the flat, then back to the top */
       const q = K.fr(t * .2), down = Math.min(1, q / .7), go = down * down, on = Math.max(0, (q - .7) / .3), glide = 1 - (1 - on) * (1 - on);
       if (q < .7) slider.g.position.lerpVectors(A, B, go); else slider.g.position.lerpVectors(B, C, glide);
-      slider.g.position.y += .55; slider.g.lookAt(q < .7 ? v1.copy(B).setY(B.y + .55) : v1.copy(C).setY(C.y + .55)); slider.b.rotation.x = Math.PI / 2;
+      slider.g.position.y += .55; /* he levels out before the bottom, so his beak stays out of the snow */
+      slider.g.lookAt(v1.copy(dSlope).lerp(dFlat, q < .7 ? K.ease(Math.max(0, (go - .6) / .4)) : 1).add(slider.g.position)); slider.b.rotation.x = Math.PI / 2;
       slider.flips.forEach((f, i) => { f.rotation.z = (i ? 1 : -1) * (1.5 + .3 * Math.sin(t * 9)); }); K.blink(slider.e, t, .8);
       smArms[1].rotation.z = .5 + .35 * Math.sin(t * 4); smHead.rotation.z = .06 * Math.sin(t * 1.3);
       bh.rotation.z = .1 * Math.sin(t * 1.1); bh.rotation.y = .25 * Math.sin(t * .6); bearArms[0].rotation.z = -.25; bearArms[1].rotation.z = 2.3 + .45 * Math.sin(t * 4.5); K.blink(bearEyes, t, .35);
-      const bn = Math.abs(Math.sin(t * 2.6)); ball.position.set(0, 3.2 + bn * 1.3, 1.75); ball.rotation.set(t * 3, t * 2, 0);
+      const bn = Math.abs(Math.sin(t * 2.6)); ball.position.set(0, 3.6 + bn * 1.3, 1.75); ball.rotation.set(t * 3, t * 2, 0);
       sh.rotation.x = -.6 - .12 * (1 - bn); sealFlips.forEach((f, i) => { f.rotation.z = (i ? 1 : -1) * (.3 + .5 * (1 - bn)); }); K.blink(sealEyes, t, .65);
       hearth.material.opacity = .55 + .2 * Math.sin(t * 6) * Math.sin(t * 2.3);
       const fp = flakes.geometry.attributes.position; for (let i = 0; i < flV.length / 3; i++) { fp.setY(i, 28 - (fl[i * 3 + 1] + t * flV[i * 3]) % 28); fp.setX(i, fl[i * 3] + .6 * Math.sin(t * .9 + i)); } fp.needsUpdate = true;
@@ -5565,8 +5568,8 @@ def3D('moon3d', (T, K) => {
   K.land(scene, 300, 70, hf, K.flat(0xb4b8c6));
   const dust = K.flat(0xcfd3df), dark = K.lit(0x7c8094), stone = K.flat(0x9a9eae);
   const crater = (x, z, r) => { const y = hf(x, z), ring = K.add(scene, new T.TorusGeometry(r, r * .17, 6, 20), dust, x, y + .04, z); ring.rotation.x = Math.PI / 2; ring.scale.z = .5; K.add(scene, new T.CircleGeometry(r * .93, 20), dark, x, y + .03, z).rotation.x = -Math.PI / 2; };
-  [[0, 0, 2.7], [-10, -11, 2.1], [11, -13, 2.6], [-15.5, 3, 1.5], [14.5, 7, 1.3], [-26, -22, 4], [28, -30, 5], [3, -22, 1.8]].forEach(q => crater(q[0], q[1], q[2]));
-  for (let i = 0; i < 22; i++) { const a = R() * TAU, d = 13 + R() * 26, x = Math.cos(a) * d, z = Math.sin(a) * d, s = .3 + R() * .9; K.add(scene, K.ball(s, 0), stone, x, hf(x, z) + s * .3, z).scale.set(1, .7, 1.2); }
+  [[0, 0, 2.7], [-12.5, -13.5, 2.1], [4, -19, 2.4], [-17, 3, 1.5], [16.5, 7.5, 1.3], [-26, -22, 4], [28, -30, 5], [3, -22, 1.8]].forEach(q => crater(q[0], q[1], q[2]));
+  for (let i = 0; i < 22; i++) { const a = R() * TAU, d = 15.6 + R() * 26, x = Math.cos(a) * d, z = Math.sin(a) * d, s = .3 + R() * .9; K.add(scene, K.ball(s, 0), stone, x, hf(x, z) + s * .3, z).scale.set(1, .7, 1.2); }
   /* home, up in the sky */
   const earth = K.add(scene, K.orb(15, 30), K.soft(0xffffff, { fog: false, map: K.tex(256, 128, (c, w, h) => {
     c.fillStyle = '#2f7fe0'; c.fillRect(0, 0, w, h); c.fillStyle = '#4fd07a';
@@ -5578,13 +5581,13 @@ def3D('moon3d', (T, K) => {
   /* the lander and its flag */
   const goldM = K.flat(0xe8b84a, { shininess: 60 }), grey = K.flat(0xc9d2e6, { shininess: 40 }), steel = K.flat(0x7f879c, { shininess: 40 });
   const strut = (p, m, r, a, b) => { const d = b.clone().sub(a), o = pole(p, m, r, d.length(), (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); o.quaternion.setFromUnitVectors(UP, d.normalize()); return o; };
-  const lander = K.grp(scene, 12.5, 0, -10.5); lander.rotation.y = .5;
+  const lander = K.grp(scene, 15.5, hf(15.5, -13), -13); lander.rotation.y = .5;
   pole(lander, goldM, 1.75, 1.5, 0, 2.7, 0); block(lander, grey, 1.7, 1.3, 1.7, 0, 4.05, 0); spike(lander, steel, .9, 1.1, 0, 1.5, 0); blob(lander, K.lit(0x7fe9ff), .5, .5, .1, 0, 4.1, .86);
   for (const [x, z] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { strut(lander, steel, .09, new T.Vector3(x * 1.3, 2.5, z * 1.3), new T.Vector3(x * 2.7, .15, z * 2.7)); strut(lander, steel, .06, new T.Vector3(x * 1.3, 3.2, z * 1.3), new T.Vector3(x * 2.2, 1, z * 2.2)); pole(lander, goldM, .5, .12, x * 2.7, .08, z * 2.7); }
   const dish = K.grp(lander, .9, 4.9, 0); pole(dish, steel, .05, .6, 0, 0, 0); K.add(dish, new T.SphereGeometry(.7, 12, 6, 0, TAU, 0, Math.PI * .4), new T.MeshPhongMaterial({ color: 0xc9d2e6, side: T.DoubleSide, flatShading: true }), 0, 1, 0).rotation.x = Math.PI;
   K.shade(lander, true, false);
-  const flagP = K.grp(scene, 6.5, 0, -12.5); pole(flagP, steel, .06, 4, 0, 2, 0);
-  const flag = K.add(flagP, new T.PlaneGeometry(2, 1.2, 8, 1), new T.MeshBasicMaterial({ side: T.DoubleSide, map: K.tex(8, 48, (c, w, h) => { ['#ff4d6d', '#ff9f1c', '#ffd60a', '#4cd964', '#3cb4ff', '#b45cff'].forEach((col, k) => { c.fillStyle = col; c.fillRect(0, k * h / 6, w, h / 6 + 1); }); }) }), 1.05, 3.35, 0);
+  const flagP = K.grp(scene, 9, 0, -15); pole(flagP, steel, .06, 4, 0, 2, 0);
+  const flag = K.add(flagP, new T.PlaneGeometry(2, 1.2, 8, 1), new T.MeshBasicMaterial({ side: T.DoubleSide, map: K.tex(8, 64, (c, w, h) => { ['#ff4d6d', '#ff9f1c', '#ffd60a', '#4cd964', '#3cb4ff', '#b45cff'].forEach((col, k) => { c.fillStyle = col; c.fillRect(0, k * h / 6, w, h / 6 + 1); }); }) }), 1.05, 3.35, 0);
   /* the rover has a face, and a lot of wheels */
   const rover = K.grp(scene), rv = K.grp(rover, 0, 0, 0), tyre = K.flat(0x3b4058), hub = K.lit(0xffd23f);
   block(rv, grey, 2.3, .55, 3.4, 0, 1.2, 0); block(rv, goldM, 1.6, .5, 1.4, 0, 1.75, -.6);
@@ -5629,7 +5632,7 @@ def3D('moon3d', (T, K) => {
       helm.rotation.y = .3 * Math.sin(t * .9);
       aliens.forEach((a, k) => {
         const up = K.ease(Math.max(0, Math.min(1, Math.sin(t * .9 + a.ph) * 1.4 + .55)));
-        a.g.position.y = -1.7 + up * 1.9; a.b.rotation.y = .6 * Math.sin(t * 1.3 + k * 2); a.b.rotation.z = .1 * Math.sin(t * 3 + k);
+        a.g.position.y = -1.9 + up * 1.9; a.b.rotation.y = .6 * Math.sin(t * 1.3 + k * 2); a.b.rotation.z = .1 * Math.sin(t * 3 + k);
         a.arms.forEach((q, i) => { q.rotation.z = (i ? -1 : 1) * (.4 + .9 * up + .4 * Math.sin(t * 7 + k)); }); K.blink(a.e, t, k * .31);
       });
       const ra = K.ring(rover, t, 12.6, .09, 4, 0); wheels.forEach(w => { w.rotation.x = ra * 12.6 / .6; }); rv.position.y = .04 * Math.sin(t * 9); rv.rotation.z = .015 * Math.sin(t * 7);
@@ -5658,7 +5661,7 @@ def3D('unicorn3d', (T, K) => {
   const puffM = K.soft(0xffffff), puffs = [];
   const puff = (x, y, z, s) => { const g = K.grp(scene, x, y, z); for (let j = 0; j < 5; j++) { const q = .9 + R() * .9; blob(g, puffM, q * 1.2, q * .8, q, (j - 2) * 1.25 + R() * .5, R() * .5, R() * 1.2 - .6); } g.scale.setScalar(s); return g; };
   puff(-32, 3, -37, 3.2); puff(32, 3, -37, 3.2);
-  for (let i = 0; i < 9; i++) puffs.push({ g: puff(0, 16 + R() * 16, -70 + R() * 50, 2 + R() * 2.4), x0: R() * 220, v: 1 + R() * 1.4 });
+  for (let i = 0; i < 9; i++) puffs.push({ g: puff(0, 21 + R() * 14, -70 + R() * 50, 2 + R() * 2.4), x0: R() * 220, v: 1 + R() * 1.4 });
   /* lollipop trees, flowers and a little castle on the hill */
   const swirl = cols => K.tex(8, 64, (c, w, h) => { for (let k = 0; k < 8; k++) { c.fillStyle = cols[k % cols.length]; c.fillRect(0, k * h / 8, w, h / 8 + 1); } });
   const lolly = (x, z, s, cols) => { const g = K.grp(scene, x, hf(x, z), z); g.scale.setScalar(s); pole(g, K.flat(0xffffff), .18, 3.4, 0, 1.7, 0); const b = K.add(g, K.orb(1.35, 18), K.soft(0xffffff, { map: swirl(cols) }), 0, 4.2, 0); b.rotation.set(.5, 0, .6); K.shade(g, true, false); };
@@ -5668,13 +5671,13 @@ def3D('unicorn3d', (T, K) => {
     let x, z, d; do { const a = R() * TAU; d = 1 + R() * 34; x = Math.cos(a) * d; z = Math.sin(a) * d; } while (Math.abs(d - 8) < 1.9 || (d < 3.6 && d > 1.4));
     M.makeScale(.24, .2, .24).setPosition(x, hf(x, z) + .16, z); dots.setMatrixAt(i, M); dots.setColorAt(i, C.setHex([0xff7ac6, 0xffd23f, 0xffffff, 0xb47bff, 0xff9f6b][i % 5]));
   }
-  scene.add(dots);
+  dots.frustumCulled = false; scene.add(dots);
   const cx = 26, cz = -32, cy = hf(cx, cz), wall = K.flat(0xfff0f7), roofs = [0xff7ac6, 0xb47bff, 0x8fd3ff];
   block(scene, wall, 7, 3.4, 4, cx, cy + 1.7, cz); [[-3.6, 0, 1.3, 6], [3.6, 0, 1.3, 6], [0, -1, 1.6, 9]].forEach((q, k) => { pole(scene, wall, q[2], q[3], cx + q[0], cy + q[3] / 2, cz + q[1]); spike(scene, K.flat(roofs[k]), q[2] * 1.3, q[2] * 2.3, cx + q[0], cy + q[3] + q[2] * 1.15, cz + q[1]); });
   /* a unicorn, nose along +Z */
   const WHt = K.flat(0xffffff, { shininess: 30 }), hornM = new T.MeshPhongMaterial({ color: 0xffd23f, shininess: 110 }), hoofM = K.flat(0xffb3d9), noseM = K.flat(0xffd9ec);
-  const wsh = new T.Shape(); wsh.moveTo(0, .5); wsh.lineTo(1.4, 1.5); wsh.lineTo(3.6, 1.7); wsh.lineTo(3, .9); wsh.lineTo(2.9, .1); wsh.lineTo(2.1, -.2); wsh.lineTo(1.9, -.9); wsh.lineTo(1, -.8); wsh.lineTo(0, -1);
-  const wgeo = new T.ShapeGeometry(wsh); wgeo.rotateX(-Math.PI / 2);
+  const wsh = new T.Shape(); wsh.moveTo(0, .6); wsh.lineTo(1.6, 1.1); wsh.lineTo(3.8, .5); wsh.lineTo(3.1, 0); wsh.lineTo(3, -.7); wsh.lineTo(2.2, -.9); wsh.lineTo(2, -1.5); wsh.lineTo(1, -1.3); wsh.lineTo(0, -1.3);
+  const wgeo = new T.ShapeGeometry(wsh); wgeo.rotateX(Math.PI / 2); /* smooth edge in front, feathers behind */
   const unicorn = (c1, c2, winged) => {
     const g = K.grp(scene), b = K.grp(g, 0, 2.05, 0), m1 = K.flat(c1, { shininess: 30 }), m2 = K.flat(c2, { shininess: 30 });
     blob(b, WHt, .78, .82, 1.45, 0, 0, 0); blob(b, m1, .16, .16, .05, .72, .15, -.5); blob(b, m1, .16, .16, .05, -.72, .15, -.5);
@@ -5717,7 +5720,7 @@ def3D('unicorn3d', (T, K) => {
         const a = K.ring(u.g, t, 8, .42, u.ph, 0); gallop(u, t * 4.2 + k * 1.3); K.blink(u.e, t, k * .3);
         trail[k].forEach((s, n) => { const q = a - .22 - n * .13; s.position.set(Math.cos(q) * 8, 1 + .5 * Math.sin(t * 9 + n * 2 + k), Math.sin(q) * 8); s.material.opacity = (.75 - n * .14) * (.6 + .4 * Math.sin(t * 13 + n * 3 + k)); });
       });
-      K.ring(pega.g, t, 12, -.3, 2, 11 + 1.5 * Math.sin(t * .6)); gallop(pega, t * 2.2); pega.g.rotation.z = .25;
+      K.ring(pega.g, t, 12, -.3, 2, 11 + 1.5 * Math.sin(t * .6)); gallop(pega, t * 2.2); pega.g.rotation.z = -.25;
       const fl = Math.sin(t * 5); pega.wings.forEach(q => { q.w.rotation.z = q.s * (.35 + .65 * fl); }); K.blink(pega.e, t, .8);
       bunnies.forEach((b, k) => { const hop = Math.abs(Math.sin(t * 4.4 + k * 1.1)); K.ring(b.g, t, 2.5, -.5, b.ph, hop * .55); b.b.rotation.x = -.25 * Math.cos(t * 4.4 + k * 1.1); b.ears.forEach((e, i) => { e.rotation.x = -.5 * hop; e.rotation.z = (i ? -1 : 1) * .15; }); K.blink(b.e, t, k * .4); });
       puffs.forEach(p => { p.g.position.x = -110 + (p.x0 + t * p.v) % 220; });
@@ -5754,15 +5757,15 @@ def3D('garden3d', (T, K) => {
     let x, z, d; do { const a = R() * TAU; d = 6.6 + R() * 40; x = Math.cos(a) * d; z = Math.sin(a) * d; } while (Math.abs(d - 10) < 1.7 || Math.abs(d - 13.5) < 1.4 || (z > 6 && Math.abs(x) < 7));
     const hgt = 2 + R() * 4.5; M.compose(V.set(x, hf(x, z) + hgt / 2 - .1, z), Q.setFromEuler(E.set((R() - .5) * .35, R() * TAU, (R() - .5) * .35)), SC.set(.24, hgt, .12)); blades.setMatrixAt(i, M); blades.setColorAt(i, C.setHex([0x4fb84a, 0x3fa545, 0x6fd05a][i % 3]));
   }
-  scene.add(blades);
+  blades.frustumCulled = false; scene.add(blades);
   const capM = K.flat(0xff4d4d, { shininess: 40 }), creamM = K.flat(0xfff3d6);
-  [[-5.6, -5.1, 1], [5.9, -4.8, .8], [-17, .5, 1.3], [15, 6.5, 1.1]].forEach(q => { const g = K.grp(scene, q[0], 0, q[1]); g.scale.setScalar(q[2]); pole(g, creamM, .5, 1.8, 0, .9, 0); K.add(g, new T.SphereGeometry(1.6, 14, 8, 0, TAU, 0, Math.PI / 2), capM, 0, 1.6, 0).scale.set(1, .75, 1); for (let k = 0; k < 7; k++) { const a = k * 2.4, b = .35 + (k % 3) * .32; blob(g, creamM, .22, .1, .22, Math.sin(b) * Math.cos(a) * 1.5, 1.6 + Math.cos(b) * 1.15, Math.sin(b) * Math.sin(a) * 1.5); } K.shade(g, true, false); });
+  [[-5.6, -5.1, 1], [5.9, -4.8, .8], [-16.5, 6.5, 1.2], [15, 6.5, 1.1]].forEach(q => { const g = K.grp(scene, q[0], 0, q[1]); g.scale.setScalar(q[2]); pole(g, creamM, .5, 1.8, 0, .9, 0); K.add(g, new T.SphereGeometry(1.6, 14, 8, 0, TAU, 0, Math.PI / 2), capM, 0, 1.6, 0).scale.set(1, .75, 1); for (let k = 0; k < 7; k++) { const a = k * 2.4, b = .35 + (k % 3) * .32; blob(g, creamM, .22, .1, .22, Math.sin(b) * Math.cos(a) * 1.5, 1.6 + Math.cos(b) * 1.15, Math.sin(b) * Math.sin(a) * 1.5); } K.shade(g, true, false); });
   /* ladybirds */
   const LK = K.flat(0x1b1b3a, { shininess: 60 });
   const lady = (s, col) => {
     const g = K.grp(scene), b = K.grp(g), m = K.flat(col, { shininess: 90 }); b.scale.setScalar(s);
     K.add(b, new T.SphereGeometry(1, 16, 8, 0, TAU, 0, Math.PI / 2), m, 0, .35, 0).scale.set(1.05, .88, 1.25); blob(b, LK, .035, .9, 1.27, 0, .35, 0); blob(b, LK, .95, .2, 1.15, 0, .32, 0);
-    for (const [x, y, z] of [[.5, 1, .35], [.68, .78, -.45], [.3, 1.14, -.2]]) for (const sd of [-1, 1]) blob(b, LK, .19, .08, .19, sd * x, y, z).lookAt(0, .35, 0);
+    for (const [x, y, z] of [[.5, 1, .35], [.68, .78, -.45], [.3, 1.14, -.2]]) for (const sd of [-1, 1]) blob(b, LK, .19, .19, .07, sd * x, y, z).lookAt(0, .35 * s, 0);
     blob(b, LK, .55, .48, .45, 0, .58, 1.2); const e = eyes(b, .2, .27, 0, .72, 1.5); for (const sd of [-1, 1]) { pole(b, LK, .03, .5, sd * .2, 1.2, 1.4).rotation.z = -sd * .4; blob(b, LK, .07, .07, .07, sd * .3, 1.44, 1.4); }
     const legs = []; for (let k = 0; k < 6; k++) { const sd = k < 3 ? -1 : 1, l = K.grp(b, sd * .85, .35, .6 - (k % 3) * .6); pole(l, LK, .06, .7, sd * .3, -.1, 0).rotation.z = sd * 1; legs.push(l); }
     K.shade(g, true, false); return { g, b, legs, e };
@@ -5786,11 +5789,11 @@ def3D('garden3d', (T, K) => {
   cat.forEach(g => K.shade(g, true, false));
   /* butterflies */
   const bsh = new T.Shape(); bsh.moveTo(0, 0); bsh.bezierCurveTo(.4, 1.6, 2.2, 1.9, 2, .5); bsh.bezierCurveTo(2.2, -.2, 1.3, -1.5, .5, -1.1); bsh.bezierCurveTo(.2, -.9, .1, -.4, 0, 0);
-  const bgeo = new T.ShapeGeometry(bsh, 8); bgeo.rotateX(-Math.PI / 2);
+  const bgeo = new T.ShapeGeometry(bsh, 8); bgeo.rotateX(Math.PI / 2); /* the big wing in front */
   const flies = [[0xff9f1c, -9, -2], [0x5fa8ff, 9, -4], [0xff7ac6, 0, -9]].map((q, k) => {
     const g = K.grp(scene), b = K.grp(g); blob(b, LK, .12, .12, .6, 0, 0, 0); blob(b, LK, .16, .16, .16, 0, .03, .62);
     const m = K.lit(q[0], { side: T.DoubleSide });
-    const wings = [-1, 1].map(sd => { const w = K.grp(b, sd * .08, 0, 0), o = new T.Mesh(bgeo, m); o.scale.set(sd * .85, 1, .85); w.add(o); blob(w, K.lit(0xffffff), .2, .02, .2, sd * 1.1, .03, -.3); return { w, sd }; });
+    const wings = [-1, 1].map(sd => { const w = K.grp(b, sd * .08, 0, 0), o = new T.Mesh(bgeo, m); o.scale.set(sd * .85, 1, .85); w.add(o); blob(w, K.lit(0xffffff), .2, .02, .2, sd * 1.1, .03, .3); return { w, sd }; });
     return { g, b, wings, cx: q[1], cz: q[2], ph: k * 2.6 };
   });
   /* the snail is in no hurry at all */
@@ -5803,7 +5806,7 @@ def3D('garden3d', (T, K) => {
   const fluff = K.points(scene, fz.slice(), .5, 0xffffff, { opacity: .8, blending: T.NormalBlending }), fzV = fz.map(() => .3 + R() * .5);
   const v1 = new T.Vector3(), v2 = new T.Vector3();
   const beeAt = (q, t, v) => v.set(q.A * Math.cos(q.w * t + q.ph), 7 + 2.2 * Math.sin(1.7 * q.w * t + q.ph), q.B * Math.sin(q.w * t + q.ph) - 3);
-  const flyAt = (q, t, v) => v.set(q.cx + 3.4 * Math.sin(t * .7 + q.ph), 5.5 + 1.6 * Math.sin(t * 1.1 + q.ph) + .35 * Math.sin(t * 8 + q.ph), q.cz + 3 * Math.cos(t * .5 + q.ph));
+  const flyAt = (q, t, v, bob) => v.set(q.cx + 3.4 * Math.sin(t * .7 + q.ph), 5.5 + 1.6 * Math.sin(t * 1.1 + q.ph) + bob * Math.sin(t * 8 + q.ph), q.cz + 3 * Math.cos(t * .5 + q.ph));
   return {
     scene, cam, fov: 50,
     step(t) {
@@ -5812,7 +5815,7 @@ def3D('garden3d', (T, K) => {
       const ca = t * .07 + 1.9;
       cat.forEach((g, k) => { const a = ca - k * .095; g.position.set(Math.cos(a) * 10, .62 + .45 * Math.max(0, Math.sin(t * 3.4 - k * .9)), Math.sin(a) * 10); g.rotation.y = Math.atan2(-Math.sin(a), Math.cos(a)); });
       cat[0].rotation.y += .25 * Math.sin(t * 1.4); K.blink(catEyes, t, .15);
-      flies.forEach((q, k) => { flyAt(q, t, q.g.position); q.g.lookAt(flyAt(q, t + .1, v1)); const f = Math.abs(Math.sin(t * 8 + k * 1.7)); q.wings.forEach(w => { w.w.rotation.z = w.sd * (.15 + 1.05 * f); }); });
+      flies.forEach((q, k) => { flyAt(q, t, q.g.position, 0); q.g.lookAt(flyAt(q, t + .1, v1, 0)); q.g.position.y += .35 * Math.sin(t * 8 + q.ph); /* the flutter moves it, but does not turn it */ const f = Math.abs(Math.sin(t * 8 + k * 1.7)); q.wings.forEach(w => { w.w.rotation.z = w.sd * (.15 + 1.05 * f); }); });
       K.ring(snail, t, 13.5, .012, 2.42, 0); sHead.rotation.x = -.15 + .1 * Math.sin(t * .9); stalks.forEach((a, i) => { a.rotation.z = (i ? -1 : 1) * (.25 + .15 * Math.sin(t * 1.3 + i)); a.rotation.x = .15 * Math.sin(t * 1.1 + i * 2); });
       flowers.forEach(f => { f.js.forEach((j, n) => { j.rotation.z = .035 * Math.sin(t * .9 + f.ph + n * .5); j.rotation.x = .02 * Math.sin(t * .7 + f.ph); }); if (f.e) K.blink(f.e, t, f.ph); });
       const fp = fluff.geometry.attributes.position; for (let i = 0; i < fzV.length / 3; i++) { fp.setY(i, (fz[i * 3 + 1] + t * fzV[i * 3]) % 20); fp.setX(i, fz[i * 3] + 1.2 * Math.sin(t * .4 + i)); } fp.needsUpdate = true;
@@ -5891,7 +5894,7 @@ scene3D('moon3d', 'Moon Pals 3D', '👨‍🚀', 9, (c, w, h, t, u) => {
 });
 scene3D('unicorn3d', 'Unicorn Land 3D', '🦄', 3, (c, w, h, t, u) => {
   vfill(c, w, h, [[0, '#6fb0ff'], [.35, '#c4b6ff'], [.58, '#ffd1ec'], [.64, '#fff3d0'], [.66, '#92dc98'], [1, '#7fcf88']]);
-  ['#ff4d6d', '#ff9f1c', '#ffd60a', '#4cd964', '#3cb4ff', '#b45cff'].forEach((col, k) => { c.strokeStyle = col; c.lineWidth = u * .028; c.beginPath(); c.arc(w / 2, h * .66, u * (.52 - k * .028), Math.PI, TAU); c.stroke(); });
+  ['#ff4d6d', '#ff9f1c', '#ffd60a', '#4cd964', '#3cb4ff', '#b45cff'].forEach((col, k) => { c.strokeStyle = col; c.lineWidth = u * .028; c.beginPath(); c.arc(w / 2, h * .66, Math.min(u * .52, w * .42) - k * u * .028, Math.PI, TAU); c.stroke(); });
   for (const [x, s] of [[.14, .34], [.86, .34]]) put(c, CLOUD('pink'), s * u, x * w, h * .64 + Math.sin(t * .8 + x * 9) * u * .006);
 });
 scene3D('garden3d', 'Bug Garden 3D', '🐞', 3, (c, w, h, t, u) => {
@@ -6886,6 +6889,8 @@ function sceneTick(now) {
 function refreshScene() {
   if (sceneRaf) { cancelAnimationFrame(sceneRaf); sceneRaf = 0; }
   scenePrev = 0; sceneSkip = 0;
+  /* only the 3D world on stage is kept (the Keep-it dialog holds on to the one it is showing) */
+  if (!K.open) for (const id in G3.worlds) if (id !== state.scene) drop3D(id);
   stage.classList.toggle('scened', state.scene !== 'mix');
   if (state.scene === 'mix') return;
   drawStageScene();
@@ -6900,7 +6905,6 @@ function setScene(id, quiet) {
   if (!quiet) { sceneTouched = true; save('fw.scene', state.scene); }
   focusPhotos(); markScene(); refreshScene();
   if (SCENES[state.scene] && SCENES[state.scene].three) want3D(!quiet);
-  for (const id in G3.worlds) if (id !== state.scene) drop3D(id); /* only the world on stage is kept */
 }
 /* three.js is fetched only when a 3D scene is wanted: one is picked, one was left on last time, or the Scenes tab
    is opened and their tiles are about to be seen. Then the tiles are painted again with the real thing. */
@@ -6908,7 +6912,7 @@ function paint3DTiles() {
   let k = 0;
   scenesEl.querySelectorAll('.tile.scene').forEach((b) => {
     const S = SCENES[b.dataset.scene], cv = b.querySelector('.scv'); if (!S || !S.three || !cv) return;
-    setTimeout(() => { const c = cv.getContext('2d'); c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, 78, 56); drawScene(c, S.id, 78, 56, S.at || 2.5); if (S.id !== state.scene) drop3D(S.id); }, 350 * k++); /* one world at a time, so the tab stays quick */
+    setTimeout(() => { const c = cv.getContext('2d'); c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, 78, 56); drawScene(c, S.id, 78, 56, S.at || 2.5); if (S.id !== state.scene && !(K.open && K.R && K.R.scene === S.id)) drop3D(S.id); }, 350 * k++); /* one world at a time, so the tab stays quick */
   });
 }
 function want3D(say) {
