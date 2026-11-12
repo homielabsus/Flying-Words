@@ -864,6 +864,32 @@ html.fs.fs-idle #fsBtn, html.fs.fs-idle #fsPlay, html.fs.fs-idle #keepBtn, html.
 html.fs.fs-idle #stage { cursor: none; }
 /* the word box keeps its own time: away as full screen starts, back for a tap or a key, and it waits 30 seconds after typing */
 html.fs.fs-nofield #f { opacity: 0; pointer-events: none; }
+/* ---------- ✂️ the photo booth: the kid cut out of the camera picture, standing in the scene ---------- */
+#me { position: absolute; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; }
+#stage.has-me #me { display: block; }
+#stage.cam:not(.booth) #me { display: none; }
+/* in the booth the scene plays on behind the kid; the camera picture itself is only where the kid is cut from */
+#stage.cam.booth #camVid { opacity: 0; }
+#stage.cam.booth.scened #scene { display: block; }
+#stage.cam.booth:not(.scened)::before { display: block; }
+#boothBar { position: absolute; left: 50%; bottom: 88px; translate: -50% 0; z-index: 6; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 12px); }
+.booth-b {
+  flex: none; min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 999px; background: #fff; color: var(--ink); border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink); font: 800 15px/1 var(--font); white-space: nowrap; cursor: pointer; touch-action: manipulation;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.booth-b[aria-pressed="true"] { background: var(--sun); box-shadow: 0 1px 0 var(--ink); transform: translateY(2px); }
+.booth-b:active { transform: translateY(3px); box-shadow: none; }
+.booth-b:focus-visible { outline: 4px solid #fff; outline-offset: 2px; }
+#stage.cam #toast { bottom: 144px; }
+html.short #boothBar { bottom: 64px; gap: 6px; }
+html.short .booth-b { min-height: 38px; min-width: 38px; padding: 0 10px; font-size: 13px; }
+html.short #stage.cam #toast { bottom: auto; top: 6px; } /* a short stage has no room left below: the note goes on top */
+@media (max-width: 480px) { #boothBar { gap: 6px; } .booth-b { padding: 0 9px; font-size: 13.5px; gap: 4px; } .booth-b .long { display: none; } }
+@media (max-width: 380px) { #boothBar { gap: 4px; } .booth-b, html.short .booth-b { padding: 0 6px; font-size: 12.5px; gap: 3px; min-width: 38px; } }
+/* a cut-out says so on its tile, and lies on a checked cloth so the see-through part shows */
+.tile.cutout .sw { position: relative; background: repeating-conic-gradient(#dfe4f2 0 25%, #fff 0 50%) 0 0 / 14px 14px; }
+.tile.cutout .sw::after { content: '✂️'; position: absolute; right: 2px; bottom: 1px; font-size: 14px; line-height: 1; }
 </style>
 </head>
 <body>
@@ -872,6 +898,7 @@ html.fs.fs-nofield #f { opacity: 0; pointer-events: none; }
     <div id="stage">
       <canvas id="scene" aria-hidden="true"></canvas>
       <video id="camVid" muted playsinline aria-hidden="true"></video>
+      <canvas id="me" aria-hidden="true"></canvas>
       <div id="host" aria-hidden="true"></div>
       <canvas id="confetti" aria-hidden="true"></canvas>
       <div id="ring" aria-hidden="true"></div>
@@ -880,6 +907,12 @@ html.fs.fs-nofield #f { opacity: 0; pointer-events: none; }
       <button id="stars" type="button" aria-label="Tricks found"><span class="st" aria-hidden="true">⭐</span><span class="num" aria-hidden="true">0/70</span><span class="bar" aria-hidden="true"><i></i></span></button>
       <div id="toast" aria-hidden="true"></div>
       <button id="keepBtn" type="button" aria-label="Keep it! Save a picture or a video" title="Keep it!"><span aria-hidden="true">📸</span></button>
+      <div id="boothBar" role="group" aria-label="What the camera keeps" hidden>
+        <button type="button" class="booth-b" data-mode="all" aria-pressed="true" aria-label="The whole picture" title="Keep the whole picture"><span aria-hidden="true">🖼️</span><span aria-hidden="true">All</span></button>
+        <button type="button" class="booth-b" data-mode="me" aria-pressed="false" aria-label="Just me: cut me out and stand me in the scene" title="Just me: cut me out and stand me in the scene"><span aria-hidden="true">✂️</span><span aria-hidden="true">Just me</span></button>
+        <button type="button" class="booth-b" data-mode="green" aria-pressed="false" aria-label="Green screen: stand in front of a green or blue cloth" title="Green screen: stand in front of a green or blue cloth"><span aria-hidden="true">🟩</span><span aria-hidden="true">Green<span class="long"> screen</span></span></button>
+        <button type="button" class="booth-b" id="boothPick" aria-label="Match the cloth's colour again" title="Match the cloth's colour again" hidden><span aria-hidden="true">🎯</span></button>
+      </div>
       <div id="camBar" role="group" aria-label="Camera" hidden>
         <button id="camOff" class="cam-b" type="button" aria-label="Close the camera" title="Close the camera"><span aria-hidden="true">✕</span></button>
         <button id="camSnap" type="button" aria-label="Snap a photo: 3, 2, 1!"><span aria-hidden="true">📸</span><span aria-hidden="true">Snap!</span></button>
@@ -1077,7 +1110,7 @@ function split(text) {
 
 /* ---------- state, bags, rng, palettes ---------- */
 const state = { seq: 0, lastText: '', lastCombo: null, pinnedMove: null, pinnedLook: null, runCount: 0, calm: false, sound: false, ctx: null, breathe: null, paletteIdx: -1,
-  autoplay: false, autoShuffle: true, autoEvery: 2000, scene: 'mix' };
+  autoplay: false, autoShuffle: true, autoEvery: 2000, scene: 'mix', cut: '' };
 const isReduced = () => !!(mq.matches || state.calm);
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 function makeBag(ids) {
@@ -2985,7 +3018,7 @@ function setVH() {
   if (h) root.style.setProperty('--vh', (h / 100) + 'px');
   root.classList.toggle('short', !!h && h < 600 && window.innerWidth < 900); /* see html.short in the CSS */
 }
-function onViewport() { if (vhRaf) return; vhRaf = requestAnimationFrame(() => { vhRaf = 0; setVH(); confetti.resize(); sizeBadge(); stackBadge(); refit(); drawStageScene(); stripEdges.forEach((f) => f()); }); }
+function onViewport() { if (vhRaf) return; vhRaf = requestAnimationFrame(() => { vhRaf = 0; setVH(); confetti.resize(); sizeBadge(); stackBadge(); refit(); drawStageScene(); drawCut(); stripEdges.forEach((f) => f()); }); }
 setVH();
 window.addEventListener('resize', onViewport);
 if (FEAT.vv) { visualViewport.addEventListener('resize', onViewport); visualViewport.addEventListener('scroll', setVH); }
@@ -6302,7 +6335,7 @@ const KEEP = (() => {
       const scene = SCENES[spec.scene] && SCENES[spec.scene].draw ? spec.scene : 'mix';
       const dark = lay.look === 'neon' && scene === 'mix';
       return {
-        W, H, spec, lay, U: lay.U, fs: lay.fs, h, n, lookId: lay.look, look, move, reduced, palette: spec.palette, scene, dark,
+        W, H, spec, lay, U: lay.U, fs: lay.fs, h, n, lookId: lay.look, look, move, reduced, palette: spec.palette, scene, dark, cut: ((me) => (me ? me.cv || me.small : null))(cutRec(spec.cut || '')),
         targets, line, ring, flash, sweeps, classes, fx, runEnd, tEnd, tStill: runEnd + 900, font: fontOf(lay.fs),
         glow: 'hsl(' + h + ' 100% 60%)', Wl: lay.box.w, sprites: new Map(),
         pad: Math.ceil(lay.fs * .45 + 16) + (lay.look === 'neon' ? 96 : 0)
@@ -6513,6 +6546,7 @@ const KEEP = (() => {
     c.setTransform(k, 0, 0, k, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; if (CTX_FILTER) c.filter = 'none';
     c.shadowColor = 'transparent'; c.shadowBlur = 0;
     drawScene(c, R.scene, R.W, R.H, t / 1000, R.palette, R.dark);
+    if (R.cut) coverDraw(c, R.cut, R.W, R.H); /* the kid from the photo booth stands in the scene */
     const LT = R.targets.get(R.line), box = R.lay.box;
     const LM = about(box.cx, box.cy, toM(valueAt(LT, 'transform', t))), lineO = valueAt(LT, 'opacity', t), lineF = valueAt(LT, 'filter', t), clip = valueAt(LT, 'clipPath', t);
     const lineHue = fval(lineF, 'hue-rotate', [0])[0], lineBlur = fval(lineF, 'blur', [0])[0], glow = fval(lineF, 'drop-shadow', null);
@@ -6821,6 +6855,7 @@ const KEEP = (() => {
     const [W, H] = SHAPES[shape] || SHAPES.square;
     if (document.fonts && document.fonts.load && /^https?:$/.test(location.protocol)) { try { await document.fonts.load('700 40px Fredoka'); } catch (e) { /* the fallback font is fine */ } }
     const S = SCENES[spec.scene]; if (S && S.ready) { try { await S.ready(); } catch (e) { /* the small picture will do */ } } /* a photo wakes at full size */
+    const me = cutRec(spec.cut || ''); if (me) { try { await wakePhoto(me); } catch (e) { /* the small picture will do */ } }
     return record(spec, W, H);
   }
   async function make(R, fmt, shape, onProgress, abort) {
@@ -6865,7 +6900,7 @@ const sceneCv = $('#scene'), sceneCx = sceneCv.getContext('2d'), scenesEl = $('#
 let sceneRaf = 0, scenePrev = 0, sceneGap = 1000 / 60, sceneSkip = 0;
 const sceneT0 = performance.now();
 function drawStageScene() {
-  const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h || state.scene === 'mix' || cam.on) return;
+  const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h || state.scene === 'mix' || (cam.on && !cam.booth)) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(w * dpr), H = Math.round(h * dpr);
   if (sceneCv.width !== W || sceneCv.height !== H) { sceneCv.width = W; sceneCv.height = H; }
   sceneCx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -6875,7 +6910,7 @@ function drawStageScene() {
 }
 /* a photo stands still (one drawing is enough); nothing is drawn under a live camera; and the stage rests while
    the Keep-it dialog covers it, so the dialog's preview and the file being made get the computer to themselves */
-const sceneMoving = () => { const S = SCENES[state.scene]; return !!S && state.scene !== 'mix' && !S.still && !cam.on && !K.open && !isReduced() && !document.hidden; };
+const sceneMoving = () => { const S = SCENES[state.scene]; return !!S && state.scene !== 'mix' && !S.still && !(cam.on && !cam.booth) && !K.open && !isReduced() && !document.hidden; };
 /* Every display frame on a 60–90 Hz screen. A faster screen (120 Hz and up) draws every 2nd frame (or 3rd …),
    which keeps the pace even at about 60 a second and spares the battery. sceneGap learns the screen's frame time. */
 function sceneTick(now) {
@@ -6898,7 +6933,8 @@ function refreshScene() {
 }
 function markScene() {
   for (const t of scenesEl.querySelectorAll('.tile[data-scene]')) { const on = t.dataset.scene === state.scene; t.classList.toggle('on', on); t.setAttribute('aria-pressed', String(on)); }
-  for (const d of scenesEl.querySelectorAll('.tile-del')) d.hidden = d.dataset.del !== state.scene; /* ✕ only on the photo in use */
+  for (const t of scenesEl.querySelectorAll('.tile[data-cut]')) { const on = t.dataset.cut === state.cut; t.classList.toggle('on', on); t.setAttribute('aria-pressed', String(on)); }
+  for (const d of scenesEl.querySelectorAll('.tile-del')) d.hidden = d.dataset.del !== state.scene && d.dataset.del !== state.cut; /* ✕ only on the photos in use */
 }
 function setScene(id, quiet) {
   state.scene = SCENES[id] ? id : 'mix';
@@ -6944,7 +6980,8 @@ scenesEl.addEventListener('click', (e) => {
   hideHint();
   if (b.dataset.act === 'camera') { if (cam.on) stopCamera(); else startCamera('', e.detail === 0); sound.pop(); return; }
   if (b.dataset.act === 'photo') { if (cam.on) stopCamera(); pickPhoto(); return; }
-  if (cam.on) stopCamera();
+  if (b.dataset.cut) { if (cam.on) stopCamera(); setCut(state.cut === b.dataset.cut ? '' : b.dataset.cut); bump(b, 'demo'); sound.pop(); if (e.detail > 0) refocus(); return; }
+  if (cam.on && !cam.booth) stopCamera(); /* in the booth the camera stays on: the kid is picking where to stand */
   setScene(b.dataset.scene); bump(b, 'demo'); sound.pop();
   if (e.detail > 0) refocus();
 });
@@ -6961,9 +6998,9 @@ const K = { open: false, spec: null, R: null, raf: 0, t0: 0, sim: null, job: nul
 /* what is on stage right now, down to the dice rolls, so the file is the very trick the kid saw */
 function stageSpec(text) {
   const ctx = state.ctx;
-  if (!ctx) return { text: text || currentText(), look: 'rainbow', move: 'bounce', seed: 1, palette: PALETTES[0], reduced: isReduced(), scene: state.scene, milestone: false, lookFromRng: false };
+  if (!ctx) return { text: text || currentText(), look: 'rainbow', move: 'bounce', seed: 1, palette: PALETTES[0], reduced: isReduced(), scene: state.scene, cut: state.cut || '', milestone: false, lookFromRng: false };
   return { text: text || ctx.text || state.lastText || 'Hello!', look: ctx.look.id, move: ctx.move.id, seed: ctx.combo.seed >>> 0, palette: ctx.palette, reduced: ctx.reduced,
-    scene: state.scene, milestone: !!ctx.combo.milestone, lookFromRng: !!ctx.lookFromRng };
+    scene: state.scene, cut: state.cut || '', milestone: !!ctx.combo.milestone, lookFromRng: !!ctx.lookFromRng };
 }
 const radios = (name) => Array.prototype.slice.call(keepDlg.querySelectorAll('input[name="' + name + '"]'));
 function markRadios() {
@@ -7148,19 +7185,20 @@ const photoDB = (() => {
 })();
 /* a photo scene draws its full-size picture, or the small one for the moment it takes to wake */
 function registerPhoto(rec) {
+  if (rec.cut) return; /* a cut-out is not a scene: it stands in front of one */
   SCENES[rec.id] = { id: rec.id, name: 'My Photo', emoji: '🖼️', still: true, photo: true,
     draw: (c, w, h) => { const img = rec.cv || rec.small; if (img) coverDraw(c, img, w, h); }, ready: () => wakePhoto(rec) };
 }
 function wakePhoto(rec) {
   if (rec.cv) return Promise.resolve(rec.cv);
   if (!rec.waking) {
-    rec.waking = decodePhoto(rec.blob, PHOTO_SIDE).then((cv) => { rec.waking = null; rec.cv = cv; if (state.scene === rec.id) refreshScene(); return cv; },
+    rec.waking = decodePhoto(rec.blob, PHOTO_SIDE).then((cv) => { rec.waking = null; rec.cv = cv; if (state.scene === rec.id) refreshScene(); if (state.cut === rec.id) drawCut(); return cv; },
       (e) => { rec.waking = null; throw e; });
   }
   return rec.waking;
 }
 /* the photo on stage gets its full size; the rest let theirs go (each can wake again from its JPEG) */
-function focusPhotos() { for (const p of photos) { if (p.id === state.scene) wakePhoto(p).catch(() => {}); else if (p.blob) p.cv = null; } }
+function focusPhotos() { for (const p of photos) { if (p.id === state.scene || p.id === state.cut) wakePhoto(p).catch(() => {}); else if (p.blob) p.cv = null; } }
 
 /* the tiles: 📷 Camera and 🖼️ Add Photo after Mix, then one tile per photo, newest first */
 const camTile = mkTile('scene act cam', 'Camera: take a photo of you');
@@ -7177,13 +7215,13 @@ function renderPhotoTiles() {
   let at = addTile;
   photos.forEach((p, k) => {
     const wrap = document.createElement('div'); wrap.className = 'tile-wrap';
-    const b = mkTile('scene photo', 'My photo ' + (k + 1)); b.dataset.scene = p.id;
+    const b = mkTile('scene photo' + (p.cut ? ' cutout' : ''), (p.cut ? 'Me, cut out: tap to stand in the scene, tap again to leave ' : 'My photo ') + (k + 1)); if (p.cut) b.dataset.cut = p.id; else b.dataset.scene = p.id;
     const sw = document.createElement('span'); sw.className = 'sw';
     const cv = document.createElement('canvas'); cv.className = 'scv'; cv.width = 156; cv.height = 112; cv.setAttribute('aria-hidden', 'true');
     coverDraw(cv.getContext('2d'), p.small, 156, 112); sw.append(cv);
     const del = document.createElement('button'); del.type = 'button'; del.className = 'tile-del'; del.dataset.del = p.id;
     del.setAttribute('aria-label', 'Remove my photo ' + (k + 1)); del.title = 'Remove this photo'; del.textContent = '✕';
-    b.append(sw, tileName('My Photo')); wrap.append(b, del);
+    b.append(sw, tileName(p.cut ? 'Just Me' : 'My Photo')); wrap.append(b, del);
     at.after(wrap); at = wrap;
   });
   markScene();
@@ -7209,9 +7247,10 @@ function forgetPhoto(id) {
   photos.splice(i, 1); delete SCENES[id];
   photoDB.del(id).catch(() => {});
   if (state.scene === id) setScene('mix');
+  if (state.cut === id) setCut('');
 }
 function removePhoto(id) {
-  const tiles = Array.prototype.slice.call(scenesEl.querySelectorAll('.tile.photo')), at = tiles.findIndex((t) => t.dataset.scene === id);
+  const tiles = Array.prototype.slice.call(scenesEl.querySelectorAll('.tile.photo')), at = tiles.findIndex((t) => (t.dataset.scene || t.dataset.cut) === id);
   forgetPhoto(id); renderPhotoTiles(); sound.pop();
   /* keep a keyboard user in the row: on the photo that moved into this place, else on Add Photo */
   const next = scenesEl.querySelectorAll('.tile.photo')[Math.max(0, Math.min(at, photos.length - 1))] || addTile;
@@ -7229,8 +7268,8 @@ async function restorePhotos() {
   try { recs = (await photoDB.all()) || []; } catch (e) { return; }
   recs.sort((a, b) => b.t - a.t);
   for (const r of recs.slice(0, PHOTO_KEEP)) {
-    if (SCENES[r.id] || !r.blob) continue;
-    try { const rec = { id: r.id, blob: r.blob, cv: null, small: await decodePhoto(r.blob, PHOTO_SMALL) }; registerPhoto(rec); photos.push(rec); }
+    if (SCENES[r.id] || photos.some((p) => p.id === r.id) || !r.blob) continue;
+    try { const rec = { id: r.id, blob: r.blob, cv: null, small: await decodePhoto(r.blob, PHOTO_SMALL), cut: !!r.cut }; registerPhoto(rec); photos.push(rec); }
     catch (e) { photoDB.del(r.id).catch(() => {}); }
   }
   for (const r of recs.slice(PHOTO_KEEP)) photoDB.del(r.id).catch(() => {});
@@ -7239,6 +7278,8 @@ async function restorePhotos() {
   renderPhotoTiles();
   const want = load('fw.scene', 'mix');
   if (!sceneTouched && SCENES[want] && state.scene !== want) setScene(want, true);
+  const me = load('fw.cut', '');
+  if (!cutTouched && me && cutRec(me) && state.cut !== me) setCut(me, true);
 }
 
 /* picking a file: a hidden input the Add Photo tile clicks, and the same for a dropped picture */
@@ -7262,6 +7303,223 @@ document.addEventListener('drop', (e) => {
 /* ---------- 📷 the live camera: the kid on stage behind the word, then 3, 2, 1, snap! ---------- */
 const camVid = $('#camVid'), camBar = $('#camBar'), camSnap = $('#camSnap'), camFlip = $('#camFlip'), camOff = $('#camOff'), camCount = $('#camCount');
 const cam = { on: false, stream: null, devices: [], deviceId: '', mirror: true, seq: 0, counting: false };
+
+/* ---------- ✂️ the photo booth. The camera can keep the whole picture (as before), or only the kid:
+   "Just me" finds the person in the picture, and "Green screen" takes away a cloth of one colour behind them.
+   Either way the kid is seen standing in the scene, live, and Snap! saves that cut-out. A cut-out is not a
+   scene: it stands in front of whichever scene is picked, behind the word, until it is switched off. ---------- */
+const meCv = $('#me'), meCx = meCv.getContext('2d'), boothBar = $('#boothBar'), boothPick = $('#boothPick');
+const cx2 = (cv) => cv.getContext('2d', { willReadFrequently: true });
+let cutTouched = false;
+function cutRec(id) { const want = id === undefined ? state.cut : id; return (want && photos.find((p) => p.cut && p.id === want)) || null; }
+/* the layer between the scene and the word: the live cut-out while the booth is on, else the saved one */
+function drawCut() {
+  const w = stage.clientWidth, h = stage.clientHeight, live = cam.booth && cam.cutOK, rec = cam.on ? null : cutRec();
+  const img = live ? (cam.mode === 'green' ? cam.keyCv : cam.cutCv) : rec && (rec.cv || rec.small);
+  stage.classList.toggle('has-me', !!img);
+  if (!img || !w || !h) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(w * dpr), H = Math.round(h * dpr);
+  if (meCv.width !== W || meCv.height !== H) { meCv.width = W; meCv.height = H; }
+  meCx.setTransform(dpr, 0, 0, dpr, 0, 0); meCx.clearRect(0, 0, w, h);
+  if (live && cam.mirror) { meCx.translate(w, 0); meCx.scale(-1, 1); } /* a saved cut-out is already the way it was seen */
+  coverDraw(meCx, img, w, h);
+}
+function setCut(id, quiet) {
+  state.cut = cutRec(id) ? id : '';
+  if (!quiet) { cutTouched = true; save('fw.cut', state.cut); }
+  focusPhotos(); markScene(); drawCut();
+}
+const toCutBlob = (cv) => new Promise((res) => { try { cv.toBlob(res, 'image/webp', .92); } catch (e) { res(null); } }); /* a browser that can not write WebP writes a PNG */
+function addCut(cv) {
+  const t = Date.now() * 1000 + photoN % 1000;
+  const id = 'cut-' + Date.now().toString(36) + '-' + (photoN++), rec = { id, cut: true, cv, blob: null, small: photoCanvas(cv, cv.width, cv.height, false, PHOTO_SMALL) };
+  photos.unshift(rec);
+  while (photos.length > PHOTO_KEEP) forgetPhoto(photos[photos.length - 1].id);
+  renderPhotoTiles(); setCut(id);
+  rec.saved = toCutBlob(cv).then(async (blob) => {
+    rec.blob = blob; if (blob && state.cut !== id) rec.cv = null;
+    if (blob && photos.indexOf(rec) >= 0) { try { await photoDB.put({ id, blob, t, cut: true }); } catch (e) { /* it stays for this visit */ } }
+  });
+  return id;
+}
+
+/* --- finding the person: MediaPipe's selfie segmentation, fetched the first time "Just me" is used --- */
+const SEG = {
+  src: 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/',
+  sri: 'sha384-J/3LshwuX+2viPOY3En4QiZvdvlffDhZYH5MsMuLGdwcoGcYSA7EV1jXFsys0gIb',
+  state: 'idle', wait: null, ss: null, target: null, chain: Promise.resolve(),
+};
+const inTime = (p, ms) => new Promise((res, rej) => { const slow = setTimeout(() => rej(new Error('slow')), ms); p.then((v) => { clearTimeout(slow); res(v); }, (e) => { clearTimeout(slow); rej(e); }); });
+/* the answer is a mask that is solid where the person is: the picture is poured into its shape. The mask's edge
+   is a soft guess, so it is firmed up and no halo of the room comes along. */
+function segResult(r) {
+  const out = SEG.target; if (!out) return;
+  const c = cx2(out), w = out.width, h = out.height;
+  c.save(); c.globalCompositeOperation = 'copy'; c.drawImage(r.segmentationMask, 0, 0, w, h);
+  c.globalCompositeOperation = 'source-in'; c.drawImage(r.image, 0, 0, w, h); c.restore();
+  const im = c.getImageData(0, 0, w, h), d = im.data;
+  for (let i = 3; i < d.length; i += 4) { const a = d[i]; d[i] = a <= 76 ? 0 : a >= 180 ? 255 : (a - 76) * 2.452; }
+  c.putImageData(im, 0, 0);
+}
+function loadSeg() {
+  if (SEG.wait) return SEG.wait;
+  SEG.state = 'loading';
+  return (SEG.wait = new Promise((done) => {
+    const fail = () => { SEG.state = 'failed'; SEG.ss = null; done(false); };
+    const boot = async () => {
+      let ss = null;
+      try {
+        ss = new window.SelfieSegmentation({ locateFile: (f) => SEG.src + f });
+        ss.setOptions({ modelSelection: 0 });
+        ss.onResults(segResult);
+        await inTime(ss.initialize(), 45000);
+        const try1 = document.createElement('canvas'); try1.width = try1.height = 64; cx2(try1).fillRect(0, 0, 64, 64);
+        await inTime(ss.send({ image: try1 }), 45000); /* the first picture is the slow one: it is done here, not in the kid's face */
+        SEG.ss = ss; SEG.state = 'ready'; done(true);
+      } catch (e) { try { if (ss) ss.close(); } catch (e2) { /* ignore */ } fail(); }
+    };
+    if (window.SelfieSegmentation) { boot(); return; }
+    const s = document.createElement('script');
+    s.src = SEG.src + 'selfie_segmentation.js'; s.integrity = SEG.sri; s.crossOrigin = 'anonymous'; s.referrerPolicy = 'no-referrer';
+    const slow = setTimeout(() => { s.onload = s.onerror = null; s.remove(); fail(); }, 30000);
+    s.onload = () => { clearTimeout(slow); if (window.SelfieSegmentation) boot(); else fail(); };
+    s.onerror = () => { clearTimeout(slow); s.remove(); fail(); };
+    document.head.appendChild(s);
+  }));
+}
+/* one picture at a time goes through; `out` gets the person and nothing else */
+function segRun(src, out) {
+  const job = SEG.chain.then(() => { SEG.target = out; return inTime(SEG.ss.send({ image: src }), 8000); })
+    .then(() => { if (SEG.target === out) SEG.target = null; return out; }, (e) => { if (SEG.target === out) SEG.target = null; throw e; });
+  SEG.chain = job.catch(() => {});
+  return job;
+}
+
+/* --- the green screen: nothing to fetch, and it keeps everything that is not the cloth, toys and hats included --- */
+function keyOf(r, g, b) {
+  const cb = -.168736 * r - .331264 * g + .5 * b, cr = .5 * r - .418688 * g - .081312 * b;
+  return { r, g, b, cb, cr, mag: Math.hypot(cb, cr), y: .299 * r + .587 * g + .114 * b, ch: g >= r && g >= b ? 1 : b >= r ? 2 : 0 };
+}
+/* the cloth's colour is read from the top corners of the picture, where nobody's head is */
+function sampleKey(d, w, h) {
+  const bw = Math.max(2, Math.round(w * .12)), bh = Math.max(2, Math.round(h * .12)), box = (x0) => {
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let y = 0; y < bh; y++) for (let x = x0; x < x0 + bw; x++) { const i = (y * w + x) * 4; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+    return keyOf(r / n, g / n, b / n);
+  };
+  const a = box(0), b = box(w - bw), k = a.mag >= b.mag ? a : b;
+  return k.mag >= 26 ? k : Object.assign(keyOf(40, 175, 80), { weak: true }); /* no coloured cloth in sight: expect a green one */
+}
+/* Each pixel is asked how far its colour leans the cloth's way, whatever its brightness, so the cloth's own shadows
+   and folds go too. Pixels on the edge fade out, and the cloth's tint is taken off whatever it shone on. */
+function chromaKey(d, key) {
+  const kx = key.cb / key.mag, ky = key.cr / key.mag, t0 = key.mag * .36, t1 = key.mag * .62, ch = key.ch, o1 = (ch + 1) % 3, o2 = (ch + 2) % 3, yMin = key.y * .35;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    const cb = -.168736 * r - .331264 * g + .5 * b, cr = .5 * r - .418688 * g - .081312 * b;
+    const along = cb * kx + cr * ky; if (along <= 0) continue;
+    const y = .299 * r + .587 * g + .114 * b, lean = (along - Math.abs(cb * ky - cr * kx) * 1.3) * key.y / Math.max(y, yMin);
+    if (lean <= t0 * .5) continue;
+    const cap = Math.max(d[i + o1], d[i + o2]); if (d[i + ch] > cap) d[i + ch] = cap;
+    if (lean > t0) d[i + 3] = lean >= t1 ? 0 : 255 * (1 - (lean - t0) / (t1 - t0));
+  }
+}
+/* `live` pictures may teach the cloth's colour: while none was found yet, and for the camera's first two seconds
+   (it is still settling its brightness), the corners are read again */
+function greenCut(src, out, live) {
+  const w = out.width, h = out.height, c = cx2(out);
+  c.globalCompositeOperation = 'copy'; c.drawImage(src, 0, 0, w, h); c.globalCompositeOperation = 'source-over';
+  const im = c.getImageData(0, 0, w, h), now = performance.now();
+  if (!cam.key || (live && (cam.key.weak || now < cam.keyUntil) && now - cam.keyAt > 400)) {
+    cam.key = sampleKey(im.data, w, h); cam.keyAt = now;
+    if (live && cam.key.weak && !cam.warned && now > cam.keyUntil) { cam.warned = true; toast('🟩 Hang a green or blue cloth behind you', 3600); }
+  }
+  chromaKey(im.data, cam.key); c.putImageData(im, 0, 0);
+}
+
+/* --- the booth itself --- */
+function markBooth() {
+  for (const b of boothBar.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', String(b.dataset.mode === cam.mode));
+  boothPick.hidden = cam.mode !== 'green';
+}
+function boothOn(on) {
+  cam.booth = !!(on && cam.on && cam.stream); cam.cutOK = false; cam.fails = 0;
+  cam.key = null; cam.warned = false; cam.keyAt = 0; cam.keyUntil = performance.now() + 2000;
+  stage.classList.toggle('booth', cam.booth);
+  refreshScene(); drawCut();
+  if (cam.booth) boothLoop();
+}
+async function setBooth(mode, quiet) {
+  if (['all', 'me', 'green'].indexOf(mode) < 0) mode = 'all';
+  cam.mode = mode; if (!quiet) save('fw.booth', mode);
+  markBooth();
+  if (!cam.on || !cam.stream) return;
+  const seq = cam.seq;
+  if (mode === 'me' && SEG.state !== 'ready') {
+    if (SEG.state === 'failed') { SEG.wait = null; SEG.state = 'idle'; } /* worth another try */
+    boothOn(false); camSnap.disabled = true; toast('✂️ Getting the scissors… one moment', 5000);
+    const ok = await loadSeg();
+    if (seq !== cam.seq || cam.mode !== 'me') return; /* the camera or the kid has moved on */
+    if (!ok) { cam.mode = 'all'; markBooth(); camSnap.disabled = cam.counting; toast('✂️ No scissors: they come over the internet. Try the green screen!', 4600); return; }
+  }
+  camSnap.disabled = cam.counting;
+  boothOn(mode !== 'all');
+  if (!quiet) toast(mode === 'me' ? '✂️ Just you! Now pick a scene' : mode === 'green' ? '🟩 Stand in front of a green or blue cloth' : '🖼️ The whole picture', 2800);
+  announceEl.textContent = mode === 'me' ? 'Just you, in the scene.' : mode === 'green' ? 'Green screen on.' : 'The whole camera picture.';
+}
+/* every new camera picture is cut out and shown; a slow device simply shows fewer of them */
+function boothLoop() {
+  if (cam.looping) return; cam.looping = true;
+  let seen = -1;
+  const tick = async () => {
+    if (!cam.booth) { cam.looping = false; return; }
+    const vw = camVid.videoWidth, vh = camVid.videoHeight, now = camVid.currentTime;
+    if (vw && vh && camVid.readyState >= 2 && now !== seen && !cam.snapping && !document.hidden) {
+      seen = now;
+      const green = cam.mode === 'green', s = Math.min(1, (green ? 640 : 960) / Math.max(vw, vh)), w = Math.max(2, Math.round(vw * s)), h = Math.max(2, Math.round(vh * s));
+      const cv = green ? (cam.keyCv || (cam.keyCv = document.createElement('canvas'))) : (cam.cutCv || (cam.cutCv = document.createElement('canvas')));
+      if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+      try {
+        if (green) greenCut(camVid, cv, true); else await segRun(camVid, cv);
+        cam.fails = 0;
+        if (cam.booth && !cam.snapping && (cam.mode === 'green') === green) { cam.cutOK = true; drawCut(); }
+      } catch (e) {
+        /* one picture lost is nothing; a long run of them means the cutting has broken */
+        if (cam.booth && ++cam.fails > 40) { toast('✂️ The scissors got stuck. Here is the whole picture', 4200); setBooth('all', true); }
+      }
+    }
+    if (cam.booth) requestAnimationFrame(tick); else cam.looping = false;
+  };
+  requestAnimationFrame(tick);
+}
+/* the picture Snap! took, cut out at full size */
+async function cutOut(full) {
+  const out = document.createElement('canvas'); out.width = full.width; out.height = full.height;
+  if (cam.mode === 'green') greenCut(full, out, false); else await segRun(full, out);
+  const d = cx2(out).getImageData(0, 0, out.width, out.height).data;
+  let on = 0, n = 0;
+  for (let i = 3; i < d.length; i += 28) { n++; if (d[i] > 127) on++; }
+  return { cv: out, cover: on / n }; /* cover: how much of the picture is left */
+}
+/* false: no photo this time (and it says why) */
+async function boothSnap(full, seq) {
+  let cut = null; const green = cam.mode === 'green'; cam.snapping = true;
+  try { cut = await cutOut(full); } catch (e) { /* told below */ }
+  cam.snapping = false;
+  if (seq !== cam.seq) return false;
+  const why = !cut ? '✂️ That did not work. Try again!' : cut.cover < .004 ? (green ? '🟩 I only see the cloth. Step in!' : '✂️ I can not see you. Step in!')
+    : green && cut.cover > .985 ? '🟩 I can not find the cloth. Tap 🎯 with the cloth in the corners' : '';
+  if (why) { cam.counting = false; camSnap.disabled = false; toast(why, 3600); return false; }
+  return cut;
+}
+boothBar.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-mode]');
+  if (b) { setBooth(b.dataset.mode); sound.pop(); return; }
+  if (e.target.closest('#boothPick')) { cam.key = null; cam.warned = false; cam.keyUntil = 0; toast('🎯 Matched the cloth again', 2000); sound.pop(); }
+});
+boothBar.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); stopCamera(); } });
+cam.mode = ['all', 'me', 'green'].indexOf(load('fw.booth', 'all')) >= 0 ? load('fw.booth', 'all') : 'all';
+markBooth();
 const camOK = () => !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
 /* a frame that may not use the camera (claude.ai's viewer is one) says so up front in Chromium, so a
    phone can open its camera app while the tap still counts as a tap */
@@ -7283,7 +7541,7 @@ async function startCamera(deviceId, byKeys) {
   if (!camOK()) { noCamera('none', byKeys); return false; }
   if (camBlocked()) { noCamera('NotAllowedError', byKeys); return false; }
   cam.on = true; markCam(); hideHint();
-  stage.classList.add('cam'); camBar.hidden = false; camSnap.disabled = true; camFlip.hidden = cam.devices.length < 2;
+  stage.classList.add('cam'); camBar.hidden = false; boothBar.hidden = false; cam.booth = false; cam.cutOK = false; stage.classList.remove('booth'); drawCut(); camSnap.disabled = true; camFlip.hidden = cam.devices.length < 2;
   refreshScene();
   if (byKeys) { try { camOff.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
   stopStream();
@@ -7308,16 +7566,17 @@ async function startCamera(deviceId, byKeys) {
   try { cam.devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput'); } catch (e) { cam.devices = []; }
   if (seq !== cam.seq) return false;
   camFlip.hidden = cam.devices.length < 2; camSnap.disabled = false;
-  announceEl.textContent = 'Camera on. Press Snap for a photo.';
+  setBooth(cam.mode, true); announceEl.textContent = 'Camera on. Press Snap for a photo.';
   return true;
 }
 function stopCamera() {
   const had = cam.on || cam.stream; cam.seq++; cam.on = false; cam.counting = false;
   stopStream(); try { camVid.pause(); } catch (e) { /* ignore */ } camVid.srcObject = null;
-  const focusIn = camBar.contains(document.activeElement);
-  stage.classList.remove('cam', 'mirror'); camBar.hidden = true; camCount.textContent = ''; camCount.classList.remove('go');
+  const focusIn = camBar.contains(document.activeElement) || boothBar.contains(document.activeElement);
+  stage.classList.remove('cam', 'mirror', 'booth'); camBar.hidden = true; boothBar.hidden = true; cam.booth = false; cam.cutOK = false; cam.snapping = false; camCount.textContent = ''; camCount.classList.remove('go');
   markCam();
   if (had) refreshScene();
+  drawCut();
   if (focusIn) { try { camTile.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -7332,12 +7591,13 @@ async function snap(quick) {
   camCount.textContent = ''; camCount.classList.remove('go');
   const w = camVid.videoWidth, h = camVid.videoHeight;
   if (!w || !h) { cam.counting = false; camSnap.disabled = false; toast('No picture yet. Try again!', 2600); return null; }
-  const cv = photoCanvas(camVid, w, h, cam.mirror); /* the photo looks just like what the kid saw */
+  const cv = photoCanvas(camVid, w, h, cam.mirror); const cut = cam.booth ? await boothSnap(cv, seq) : null; if (cut === false) return null; /* the photo looks just like what the kid saw */
   if (!isReduced() && FEAT.animate) { try { flashEl.animate([{ opacity: .95 }, { opacity: 0 }], { duration: 380, easing: 'ease-out' }); } catch (e) { /* ignore */ } }
   sound.pop();
   stopCamera();
-  const id = addPhoto(cv);
-  toast('📸 Snap! You are in the scene!', 3000); announceEl.textContent = 'Photo taken. It is the scene now.';
+  if (!cut && state.cut) setCut(''); /* a whole picture of the kid needs no second kid in front of it */
+  const id = cut ? addCut(cut.cv) : addPhoto(cv);
+  toast('📸 Snap! You are in the scene!', 3000); announceEl.textContent = cut ? 'Photo taken. You are standing in the scene.' : 'Photo taken. It is the scene now.';
   if (!state.autoplay) again();
   return id;
 }
@@ -7468,11 +7728,18 @@ window.FW = {
   setTab(name) { setTab(name); },
   setScene(id) { setScene(id); },
   scenes: SCENE_ORDER.slice(),
+  booth: {
+    mode: () => cam.mode, set: (m) => setBooth(m, true), on: () => !!cam.booth, live: () => !!cam.cutOK, seg: () => SEG.state,
+    key: () => (cam.key ? { rgb: [cam.key.r, cam.key.g, cam.key.b].map(Math.round), weak: !!cam.key.weak } : null),
+    canvas: () => (cam.mode === 'green' ? cam.keyCv : cam.cutCv) || null, layer: () => meCv,
+    cut: () => state.cut || '', setCut: (id) => setCut(id), cuts: () => photos.filter((p) => p.cut).map((p) => p.id),
+    async add(url) { return addCut(await decodePhoto(await (await fetch(url)).blob(), PHOTO_SIDE)); }
+  },
   three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv, worlds: () => Object.keys(G3.worlds), memory: () => (G3.r ? Object.assign({}, G3.r.info.memory) : null) },
   fullscreen: { enter: () => enterFs(), exit: () => exitFs(), state: () => ({ on: fs.on, api: fs.api, idle: root.classList.contains('fs-idle'), field: !root.classList.contains('fs-nofield') }) },
   __drawScene: (c, id, w, h, t) => drawScene(c, id, w, h, t),
   photos: {
-    list: () => photos.map((p) => ({ id: p.id, full: !!p.cv, w: p.cv ? p.cv.width : 0, h: p.cv ? p.cv.height : 0, sw: p.small.width, sh: p.small.height, saved: !!p.blob })),
+    list: () => photos.map((p) => ({ id: p.id, full: !!p.cv, w: p.cv ? p.cv.width : 0, h: p.cv ? p.cv.height : 0, sw: p.small.width, sh: p.small.height, saved: !!p.blob, cut: !!p.cut })),
     async add(url, type) { const b = await (await fetch(url)).blob(); return usePhotoFile(new File([b], 'photo', { type: type || b.type || 'image/png' })); },
     remove: (id) => removePhoto(id), restore: () => restorePhotos()
   },

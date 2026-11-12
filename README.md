@@ -74,6 +74,22 @@ They are drawn with [three.js](https://threejs.org) (release 128), which the pag
 - If the camera is not allowed (inside the claude.ai preview, for example, or if you said no), the page says so: a phone or tablet opens its own camera app instead, and on a computer you can use **🖼️ Add Photo**. The live camera needs the page opened directly (from the file or GitHub Pages) in a browser that can use the camera.
 - **📸 Keep it** saves the photo scene with your word like any other scene.
 
+## ✂️ Photo booth: stand in the scene
+
+With the camera on, three buttons above **📸 Snap!** choose what the camera keeps:
+
+- **🖼️ All** — the whole picture, as described above.
+- **✂️ Just me** — the page finds the person in the picture and takes the room away, so you stand in the scene you picked: under the sea, on the moon, next to the dinosaurs. It is live: the scene keeps playing behind you, the word flies in front of you, and you can tap other scenes to try them on while the camera is on. It works anywhere, with no cloth. It keeps people (and mostly what they hold close); a toy held out at arm's length may be cut away.
+- **🟩 Green screen** — hang a cloth or sheet of one colour behind you (green or blue work best) and everything that is *not* the cloth is kept: you, your hat, your toys, your dog. The page reads the cloth's colour from the top corners of the picture by itself; **🎯** reads it again if the light changes or the cloth moves. Do not wear the cloth's colour, or that part of you goes see-through too. No cloth in sight? It says so and waits.
+
+**📸 Snap!** then saves the cut-out, like an instant photo from a party booth:
+
+- The cut-out gets its own tile, marked ✂️ on a checked background. It is not a scene: it stands *in front of* whichever scene is on (your own photos included) and *behind* the word, so you can change the scene, the style and the move around yourself. Tap its tile to step out of the picture, tap again to step back in; **✕** removes it.
+- **📸 Keep it** puts the scene, you and the word into the picture, GIF or video. In GIFs and videos the scene and the word move and you hold your pose.
+- Cut-outs share the six places with your photos, are saved on the device the same way, and never leave it. The page remembers which button you used last.
+
+How it works: **✂️ Just me** uses Google's [MediaPipe Selfie Segmentation](https://www.npmjs.com/package/@mediapipe/selfie_segmentation) (version 0.1.1675465747), about 6 MB, fetched from the jsDelivr network the first time the button is used and never before. The camera picture is worked on inside the browser; nothing is uploaded. Without internet the button says so and the camera goes back to the whole picture. **🟩 Green screen** is done by the page itself and needs no internet.
+
 ## 📸 Keep it: save a picture, a GIF or a video
 
 Saw one you love? Tap **📸** on the stage. You keep exactly what was playing: the same word, style, move, colours and scene, down to where each letter rained in from.
