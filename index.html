@@ -895,6 +895,10 @@ html.short #stage.cam #toast { bottom: auto; top: 6px; } /* a short stage has no
 /* a cut-out says so on its tile, and lies on a checked cloth so the see-through part shows */
 .tile.cutout .sw { position: relative; background: repeating-conic-gradient(#dfe4f2 0 25%, #fff 0 50%) 0 0 / 14px 14px; }
 .tile.cutout .sw::after { content: '✂️'; position: absolute; right: 2px; bottom: 1px; font-size: 14px; line-height: 1; }
+/* a cut-out that is still being made sharper */
+.tile.cutout.wait .sw::after { content: '✨'; animation: boothBusy 700ms ease-in-out infinite alternate; border-radius: 50%; }
+html.calm .tile.cutout.wait .sw::after { animation: none; }
+@media (prefers-reduced-motion: reduce) { .tile.cutout.wait .sw::after { animation: none; } }
 /* a picked cut-out: a frame, and a grip to pull it bigger or smaller */
 #meBox { position: absolute; z-index: 5; box-sizing: border-box; border: 3px dashed #fff; border-radius: 10px; outline: 2px solid var(--ink); pointer-events: none; }
 #meGrip {
@@ -7229,7 +7233,7 @@ function renderPhotoTiles() {
   let at = addTile;
   photos.forEach((p, k) => {
     const wrap = document.createElement('div'); wrap.className = 'tile-wrap';
-    const b = mkTile('scene photo' + (p.cut ? ' cutout' : ''), p.cut ? 'Me, cut out ' + (k + 1) + ': tap to step into the scene or out of it' : 'My photo ' + (k + 1)); if (p.cut) b.dataset.cut = p.id; else b.dataset.scene = p.id;
+    const b = mkTile('scene photo' + (p.cut ? ' cutout' : '') + (p.sr === 'wait' ? ' wait' : ''), p.cut ? 'Me, cut out ' + (k + 1) + ': tap to step into the scene or out of it' : 'My photo ' + (k + 1)); if (p.cut) b.dataset.cut = p.id; else b.dataset.scene = p.id;
     const sw = document.createElement('span'); sw.className = 'sw';
     const cv = document.createElement('canvas'); cv.className = 'scv'; cv.width = 156; cv.height = 112; cv.setAttribute('aria-hidden', 'true');
     coverDraw(cv.getContext('2d'), p.small, 156, 112); sw.append(cv);
@@ -7398,21 +7402,137 @@ function sharpUp(src) {
 /* `full` is the camera picture with the background gone. It is trimmed to what is left, enlarged and sharpened,
    and put on the stage exactly where the kid was just seen. */
 function addCut(full) {
-  const fw = full.width, fh = full.height, d = cx2(full).getImageData(0, 0, fw, fh).data;
+  const fw = full.width, fh = full.height, im = cx2(full).getImageData(0, 0, fw, fh), d = im.data;
   let x0 = fw, y0 = fh, x1 = 0, y1 = 0;
   for (let y = 0, i = 3; y < fh; y++) for (let x = 0; x < fw; x++, i += 4) if (d[i] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-  const bw = Math.max(1, x1 - x0 + 1), bh = Math.max(1, y1 - y0 + 1), cut = document.createElement('canvas'); cut.width = bw; cut.height = bh; cut.getContext('2d').drawImage(full, -x0, -y0);
+  const bw = Math.max(1, x1 - x0 + 1), bh = Math.max(1, y1 - y0 + 1), cut = document.createElement('canvas'); cut.width = bw; cut.height = bh; cx2(cut).putImageData(im, -x0, -y0); /* the pixels themselves: no tie to the camera picture is kept */
   const cv = sharpUp(cut);
   const W = stage.clientWidth || fw, H = stage.clientHeight || fh, s = Math.max(W / fw, H / fh), ox = (fw - W / s) / 2, oy = (fh - H / s) * .42; /* as coverDraw showed it */
   const t = Date.now() * 1000 + photoN % 1000, id = 'cut-' + Date.now().toString(36) + '-' + (photoN++);
-  const rec = { id, cut: true, cv, blob: null, small: photoCanvas(cv, cv.width, cv.height, false, PHOTO_SMALL), x: within((x0 + bw / 2 - ox) * s / W, 0, 1), y: within((y0 + bh / 2 - oy) * s / H, 0, 1), h: bh * s / H };
+  const rec = { id, t, cut: true, cv, blob: null, small: photoCanvas(cv, cv.width, cv.height, false, PHOTO_SMALL), x: within((x0 + bw / 2 - ox) * s / W, 0, 1), y: within((y0 + bh / 2 - oy) * s / H, 0, 1), h: bh * s / H };
   photos.unshift(rec); trimPhotos();
   renderPhotoTiles(); setCut(id, true);
-  rec.saved = toCutBlob(cv).then(async (blob) => {
-    rec.blob = blob; if (blob && !cutOn(id)) rec.cv = null;
-    if (blob && photos.indexOf(rec) >= 0) { try { await photoDB.put({ id, blob, t, cut: true }); } catch (e) { /* it stays for this visit */ } }
-  });
+  rec.saved = saveCut(rec, cv);
+  sharper(rec, cut);
   return id;
+}
+/* a cut-out's picture goes into the device's store (again, when a sharper one has been made) */
+function saveCut(rec, cv) {
+  return toCutBlob(cv).then(async (blob) => {
+    if (!blob || photos.indexOf(rec) < 0) return;
+    rec.blob = blob; if (!cutOn(rec.id)) rec.cv = null;
+    try { await photoDB.put({ id: rec.id, blob, t: rec.t, cut: true }); } catch (e) { /* it stays for this visit */ }
+  });
+}
+
+/* --- ✨ sharper still. The quick sharpening above is there at once; behind it Real-ESRGAN (its small general model,
+   models/realesr-general-x4v3.onnx, run by ONNX Runtime Web) draws the cut-out again, four times as big and clean,
+   and that picture takes the place of the quick one when it is done. It works in a worker, piece by piece, so the
+   page stays lively; it takes from seconds to a minute. Every file is hash-checked before use, as for "Just me".
+   No internet, or a browser that can not do it: the quick picture simply stays. --- */
+const SR = {
+  lib: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/',
+  /* the model lies beside the page when it is served as a website; from a file, or anywhere else, the same file comes from the repository's copy on jsDelivr */
+  model: (/^https?:$/.test(location.protocol) ? ['models/realesr-general-x4v3.onnx'] : []).concat('https://cdn.jsdelivr.net/gh/homielabsus/Flying-Words@16fdf641bb690626f4e070b6b0e2ea21f540e905/models/realesr-general-x4v3.onnx'),
+  sri: {
+    'ort.wasm.min.js': 'sha384-6hgW9I+eQKl5CrHLstudPd4L3E2eTYHm+qNKvf4pI+RZnfBJILOHAiaalHV+trgG',
+    'ort-wasm-simd-threaded.mjs': 'sha384-SyfqCcawqO3udRV2twBwYuuR4Wh7Nj/yfAxyfN6UltDOh5VTrJH4aT9HfEvthS02',
+    'ort-wasm-simd-threaded.wasm': 'sha384-t24pimTffN4djMKJaYLDupLzilNBHTgwqbjacQNJObCC4RrMH4UjfZgDkwHEU04k',
+    model: 'sha384-fynWnNZB1PjUlaYpM80JmLBwm9DHuhg08A6J7fMDUbtoVca46168enKecK9sGs2J'
+  },
+  files: null, worker: null, queue: Promise.resolve(), waiting: 0,
+};
+/* the worker (ONNX Runtime's own code is put in front of this): it takes a piece of picture (RGBA bytes) and gives
+   back the same piece four times as big. It is handed the files themselves, not addresses: a page opened from a
+   file can not share addresses with its worker. */
+const SR_WORKER = `let sess = null;
+onmessage = async (e) => {
+  const m = e.data;
+  try {
+    if (m.init) {
+      ort.env.wasm.numThreads = 1; ort.env.wasm.wasmPaths = { mjs: URL.createObjectURL(m.init.mjs), wasm: URL.createObjectURL(m.init.wasm) };
+      sess = await ort.InferenceSession.create(new Uint8Array(await m.init.model.arrayBuffer()), { executionProviders: ['wasm'] }); postMessage({ ready: true }); return;
+    }
+    const w = m.w, h = m.h, d = m.rgba, n = w * h, x = new Float32Array(3 * n);
+    for (let i = 0; i < n; i++) { x[i] = d[i * 4] / 255; x[n + i] = d[i * 4 + 1] / 255; x[2 * n + i] = d[i * 4 + 2] / 255; }
+    const y = (await sess.run({ x: new ort.Tensor('float32', x, [1, 3, h, w]) })).y.data, N = n * 16, out = new Uint8ClampedArray(N * 4);
+    for (let i = 0; i < N; i++) { out[i * 4] = y[i] * 255; out[i * 4 + 1] = y[N + i] * 255; out[i * 4 + 2] = y[2 * N + i] * 255; out[i * 4 + 3] = 255; }
+    postMessage({ out: out }, [out.buffer]);
+  } catch (err) { postMessage({ fail: String(err) }); }
+};`;
+/* the four files, fetched once and kept: each from the first place that has it with the right hash */
+function srFiles() {
+  if (SR.files) return SR.files;
+  const TYPE = { js: 'text/javascript', mjs: 'text/javascript', wasm: 'application/wasm' };
+  const get = async (f) => {
+    for (const url of f === 'model' ? SR.model : [SR.lib + f]) {
+      try {
+        const r = await fetch(url, { integrity: SR.sri[f], mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+        if (r.ok) return new Blob([await r.arrayBuffer()], { type: TYPE[f.split('.').pop()] || 'application/octet-stream' });
+      } catch (e) { /* the next place, if there is one */ }
+    }
+    throw new Error('missing');
+  };
+  return (SR.files = Promise.all(Object.keys(SR.sri).map(get)).then((got) => ({ js: got[0], mjs: got[1], wasm: got[2], model: got[3] }), (e) => { SR.files = null; throw e; })); /* another cut-out, another try */
+}
+const srAsk = (worker, msg, ms) => inTime(new Promise((res, rej) => {
+  worker.onmessage = (e) => (e.data.fail ? rej(new Error(e.data.fail)) : res(e.data)); worker.onerror = () => rej(new Error('worker'));
+  worker.postMessage(msg);
+}), ms);
+/* colours are spread a few pixels into the see-through part, so the model sees no black rim around the kid */
+function bleed(d, w, h) {
+  const n = w * h, has = new Uint8Array(n); let r, g, b, k, pass;
+  const take = (j) => { if (has[j] && has[j] < pass) { r += d[j * 4]; g += d[j * 4 + 1]; b += d[j * 4 + 2]; k++; } }; /* only from pixels coloured in an earlier round */
+  for (let i = 0; i < n; i++) has[i] = d[i * 4 + 3] > 24 ? 1 : 0;
+  for (pass = 2; pass < 10; pass++) for (let i = 0; i < n; i++) {
+    if (has[i]) continue;
+    const x = i % w; r = g = b = k = 0;
+    if (x > 0) take(i - 1); if (x < w - 1) take(i + 1); if (i >= w) take(i - w); if (i < n - w) take(i + w);
+    if (k) { d[i * 4] = r / k; d[i * 4 + 1] = g / k; d[i * 4 + 2] = b / k; has[i] = pass; }
+  }
+}
+/* `cut` is the cut-out as the camera gave it; W by H is the size its picture on the stage has */
+async function srRun(rec, cut, W, H) {
+  if (photos.indexOf(rec) < 0) return;
+  if (!SR.worker) {
+    const files = await srFiles(), code = URL.createObjectURL(new Blob([files.js, '\n', SR_WORKER], { type: 'text/javascript' })), worker = new Worker(code);
+    URL.revokeObjectURL(code);
+    try { await srAsk(worker, { init: { mjs: files.mjs, wasm: files.wasm, model: files.model } }, 60000); } catch (e) { worker.terminate(); throw e; }
+    SR.worker = worker;
+  }
+  /* at most 800 pixels go in: four times that is plenty, and the wait stays bearable */
+  const s = Math.min(1, 800 / Math.max(cut.width, cut.height)), w = Math.max(1, Math.round(cut.width * s)), h = Math.max(1, Math.round(cut.height * s));
+  const small = document.createElement('canvas'); small.width = w; small.height = h;
+  const sc = cx2(small); sc.imageSmoothingQuality = 'high'; sc.drawImage(cut, 0, 0, w, h);
+  const d = sc.getImageData(0, 0, w, h).data, solid = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) solid[i] = d[i * 4 + 3] > 24 ? 1 : 0;
+  bleed(d, w, h);
+  const out = document.createElement('canvas'); out.width = W; out.height = H;
+  const oc = cx2(out), piece = document.createElement('canvas'), T = 192, P = 8, fx = W / w, fy = H / h; oc.imageSmoothingQuality = 'high';
+  for (let ty = 0; ty < h; ty += T) for (let tx = 0; tx < w; tx += T) {
+    if (photos.indexOf(rec) < 0) return; /* it was thrown away meanwhile */
+    const tw = Math.min(T, w - tx), th = Math.min(T, h - ty); let any = false;
+    for (let y = ty; y < ty + th && !any; y++) for (let x = tx; x < tx + tw; x++) if (solid[y * w + x]) { any = true; break; }
+    if (!any) continue; /* nothing of the kid in this piece */
+    /* each piece is given a rim of its neighbours, which is cut off again: no seams */
+    const x0 = Math.max(0, tx - P), y0 = Math.max(0, ty - P), pw = Math.min(w, tx + tw + P) - x0, ph = Math.min(h, ty + th + P) - y0, rgba = new Uint8ClampedArray(pw * ph * 4);
+    for (let y = 0; y < ph; y++) rgba.set(d.subarray(((y0 + y) * w + x0) * 4, ((y0 + y) * w + x0 + pw) * 4), y * pw * 4);
+    const got = await srAsk(SR.worker, { w: pw, h: ph, rgba }, 120000);
+    piece.width = pw * 4; piece.height = ph * 4; cx2(piece).putImageData(new ImageData(got.out, pw * 4, ph * 4), 0, 0);
+    const dx = Math.round(tx * fx), dy = Math.round(ty * fy);
+    oc.drawImage(piece, (tx - x0) * 4, (ty - y0) * 4, tw * 4, th * 4, dx, dy, Math.round((tx + tw) * fx) - dx, Math.round((ty + th) * fy) - dy);
+  }
+  if (photos.indexOf(rec) < 0) return;
+  oc.globalCompositeOperation = 'destination-in'; oc.drawImage(cut, 0, 0, W, H); /* the outline is the one that was cut */
+  rec.sr = 'done'; rec.cv = out;
+  rec.saved = (rec.saved || Promise.resolve()).then(() => saveCut(rec, out));
+  if (cutOn(rec.id)) { drawCut(); toast('✨ Sharper!', 1800); }
+}
+/* one cut-out at a time; when none is waiting the worker is let go, and its memory with it */
+function sharper(rec, cut) {
+  const W = rec.cv.width, H = rec.cv.height, mark = () => { const t = scenesEl.querySelector('.tile[data-cut="' + rec.id + '"]'); if (t) t.classList.toggle('wait', rec.sr === 'wait'); };
+  rec.sr = 'wait'; mark(); SR.waiting++;
+  SR.queue = SR.queue.then(() => srRun(rec, cut, W, H)).catch(() => { if (SR.worker) { SR.worker.terminate(); SR.worker = null; } })
+    .then(() => { if (rec.sr !== 'done') rec.sr = 'no'; mark(); if (!--SR.waiting && SR.worker) { SR.worker.terminate(); SR.worker = null; } });
 }
 
 /* --- moving and resizing. A finger or the mouse on the solid part of a cut-out picks it up (the front one, if
@@ -7924,7 +8044,7 @@ window.FW = {
     canvas: () => (cam.mode === 'green' ? cam.keyCv : cam.cutCv) || null, layer: () => meCv,
     cuts: () => state.cuts.slice(), all: () => photos.filter((p) => p.cut).map((p) => p.id), setCut: (id, on) => setCut(id, !!on), picked: () => sel,
     place: (id) => { const r = cutRec(id); return r ? { x: r.x, y: r.y, h: r.h, box: cutBox(r, stage.clientWidth, stage.clientHeight) } : null; },
-    picture: (id) => { const r = cutRec(id); return r ? r.cv || r.small : null; }, sharpUp: (cv) => sharpUp(cv),
+    picture: (id) => { const r = cutRec(id); return r ? r.cv || r.small : null; }, sharpUp: (cv) => sharpUp(cv), sharp: (id) => { const r = cutRec(id); return r ? r.sr || '' : ''; },
     async add(url) { return addCut(await decodePhoto(await (await fetch(url)).blob(), PHOTO_SIDE)); }
   },
   three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv, worlds: () => Object.keys(G3.worlds), memory: () => (G3.r ? Object.assign({}, G3.r.info.memory) : null) },
