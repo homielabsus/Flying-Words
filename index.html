@@ -7210,7 +7210,7 @@ function registerPhoto(rec) {
 function wakePhoto(rec) {
   if (rec.cv) return Promise.resolve(rec.cv);
   if (!rec.waking) {
-    rec.waking = decodePhoto(rec.blob, PHOTO_SIDE).then((cv) => { rec.waking = null; rec.cv = cv; if (state.scene === rec.id) refreshScene(); if (cutOn(rec.id)) drawCut(); return cv; },
+    rec.waking = decodePhoto(rec.blob, PHOTO_SIDE).then((cv) => { rec.waking = null; if (!rec.cv) rec.cv = cv; /* a sharper picture that arrived meanwhile stays */ if (state.scene === rec.id) refreshScene(); if (cutOn(rec.id)) drawCut(); return rec.cv; },
       (e) => { rec.waking = null; throw e; });
   }
   return rec.waking;
@@ -7413,7 +7413,7 @@ function addCut(full) {
   photos.unshift(rec); trimPhotos();
   renderPhotoTiles(); setCut(id, true);
   rec.saved = saveCut(rec, cv);
-  sharper(rec, cut);
+  sharper(rec, cut, cv.width, cv.height);
   return id;
 }
 /* a cut-out's picture goes into the device's store (again, when a sharper one has been made) */
@@ -7428,7 +7428,7 @@ function saveCut(rec, cv) {
 /* --- ✨ sharper still. The quick sharpening above is there at once; behind it Real-ESRGAN (its small general model,
    models/realesr-general-x4v3.onnx, run by ONNX Runtime Web) draws the cut-out again, four times as big and clean,
    and that picture takes the place of the quick one when it is done. It works in a worker, piece by piece, so the
-   page stays lively; it takes from seconds to a minute. Every file is hash-checked before use, as for "Just me".
+   page stays lively; it takes from seconds to a minute or two. Every file is hash-checked before use, as for "Just me".
    No internet, or a browser that can not do it: the quick picture simply stays. --- */
 const SR = {
   lib: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/',
@@ -7440,7 +7440,7 @@ const SR = {
     'ort-wasm-simd-threaded.wasm': 'sha384-t24pimTffN4djMKJaYLDupLzilNBHTgwqbjacQNJObCC4RrMH4UjfZgDkwHEU04k',
     model: 'sha384-fynWnNZB1PjUlaYpM80JmLBwm9DHuhg08A6J7fMDUbtoVca46168enKecK9sGs2J'
   },
-  files: null, worker: null, queue: Promise.resolve(), waiting: 0,
+  files: null, worker: null, queue: Promise.resolve(), waiting: 0, off: false,
 };
 /* the worker (ONNX Runtime's own code is put in front of this): it takes a piece of picture (RGBA bytes) and gives
    back the same piece four times as big. It is handed the files themselves, not addresses: a page opened from a
@@ -7467,7 +7467,7 @@ function srFiles() {
   const get = async (f) => {
     for (const url of f === 'model' ? SR.model : [SR.lib + f]) {
       try {
-        const r = await fetch(url, { integrity: SR.sri[f], mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' });
+        const r = await fetch(url, { integrity: SR.sri[f], mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout ? AbortSignal.timeout(180000) : undefined });
         if (r.ok) return new Blob([await r.arrayBuffer()], { type: TYPE[f.split('.').pop()] || 'application/octet-stream' });
       } catch (e) { /* the next place, if there is one */ }
     }
@@ -7475,10 +7475,16 @@ function srFiles() {
   };
   return (SR.files = Promise.all(Object.keys(SR.sri).map(get)).then((got) => ({ js: got[0], mjs: got[1], wasm: got[2], model: got[3] }), (e) => { SR.files = null; throw e; })); /* another cut-out, another try */
 }
-const srAsk = (worker, msg, ms) => inTime(new Promise((res, rej) => {
-  worker.onmessage = (e) => (e.data.fail ? rej(new Error(e.data.fail)) : res(e.data)); worker.onerror = () => rej(new Error('worker'));
+/* one question to the worker, and its answer. Too long without one is 'slow'; time the page spent out of sight does
+   not count, for a phone freezes a page and its worker together. */
+const srAsk = (worker, msg, ms) => new Promise((res, rej) => {
+  let hid = document.hidden, timer = 0;
+  const seen = () => { hid = true; }, done = (f, v) => { clearTimeout(timer); document.removeEventListener('visibilitychange', seen); f(v); };
+  const late = () => { if (hid) { hid = document.hidden; timer = setTimeout(late, ms); } else done(rej, new Error('slow')); };
+  document.addEventListener('visibilitychange', seen); timer = setTimeout(late, ms);
+  worker.onmessage = (e) => (e.data.fail ? done(rej, new Error(e.data.fail)) : done(res, e.data)); worker.onerror = () => done(rej, new Error('worker'));
   worker.postMessage(msg);
-}), ms);
+});
 /* colours are spread a few pixels into the see-through part, so the model sees no black rim around the kid */
 function bleed(d, w, h) {
   const n = w * h, has = new Uint8Array(n); let r, g, b, k, pass;
@@ -7500,18 +7506,16 @@ async function srRun(rec, cut, W, H) {
     try { await srAsk(worker, { init: { mjs: files.mjs, wasm: files.wasm, model: files.model } }, 60000); } catch (e) { worker.terminate(); throw e; }
     SR.worker = worker;
   }
-  /* at most 800 pixels go in: four times that is plenty, and the wait stays bearable */
-  const s = Math.min(1, 800 / Math.max(cut.width, cut.height)), w = Math.max(1, Math.round(cut.width * s)), h = Math.max(1, Math.round(cut.height * s));
-  const small = document.createElement('canvas'); small.width = w; small.height = h;
-  const sc = cx2(small); sc.imageSmoothingQuality = 'high'; sc.drawImage(cut, 0, 0, w, h);
-  const d = sc.getImageData(0, 0, w, h).data, solid = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) solid[i] = d[i * 4 + 3] > 24 ? 1 : 0;
+  const w = cut.width, h = cut.height, d = cx2(cut).getImageData(0, 0, w, h).data, solid = new Uint8Array(w * h); let full = -1;
+  for (let i = 0; i < w * h; i++) { solid[i] = d[i * 4 + 3] > 24 ? 1 : 0; if (full < 0 && d[i * 4 + 3] === 255) full = i; }
   bleed(d, w, h);
   const out = document.createElement('canvas'); out.width = W; out.height = H;
   const oc = cx2(out), piece = document.createElement('canvas'), T = 192, P = 8, fx = W / w, fy = H / h; oc.imageSmoothingQuality = 'high';
   for (let ty = 0; ty < h; ty += T) for (let tx = 0; tx < w; tx += T) {
     if (photos.indexOf(rec) < 0) return; /* it was thrown away meanwhile */
     const tw = Math.min(T, w - tx), th = Math.min(T, h - ty); let any = false;
-    for (let y = ty; y < ty + th && !any; y++) for (let x = tx; x < tx + tw; x++) if (solid[y * w + x]) { any = true; break; }
+    /* (looked at one pixel beyond the piece too: the soft edge of the outline reaches that far) */
+    for (let y = Math.max(0, ty - 1); y < Math.min(h, ty + th + 1) && !any; y++) for (let x = Math.max(0, tx - 1); x < Math.min(w, tx + tw + 1); x++) if (solid[y * w + x]) { any = true; break; }
     if (!any) continue; /* nothing of the kid in this piece */
     /* each piece is given a rim of its neighbours, which is cut off again: no seams */
     const x0 = Math.max(0, tx - P), y0 = Math.max(0, ty - P), pw = Math.min(w, tx + tw + P) - x0, ph = Math.min(h, ty + th + P) - y0, rgba = new Uint8ClampedArray(pw * ph * 4);
@@ -7523,15 +7527,21 @@ async function srRun(rec, cut, W, H) {
   }
   if (photos.indexOf(rec) < 0) return;
   oc.globalCompositeOperation = 'destination-in'; oc.drawImage(cut, 0, 0, W, H); /* the outline is the one that was cut */
-  rec.sr = 'done'; rec.cv = out;
+  /* a browser short of memory may have drawn nothing: where the kid was solid there must be something now, or the quick picture stays */
+  if (full < 0 || !oc.getImageData(Math.min(W - 1, Math.round((full % w + .5) * fx)), Math.min(H - 1, Math.round((Math.floor(full / w) + .5) * fy)), 1, 1).data[3]) throw new Error('empty');
+  /* the new picture counts as not yet stored, so nothing lets go of it, and a decode of the old one that is under way does not take its place */
+  rec.sr = 'done'; rec.blob = null; rec.cv = out;
   rec.saved = (rec.saved || Promise.resolve()).then(() => saveCut(rec, out));
   if (cutOn(rec.id)) { drawCut(); toast('✨ Sharper!', 1800); }
 }
-/* one cut-out at a time; when none is waiting the worker is let go, and its memory with it */
-function sharper(rec, cut) {
-  const W = rec.cv.width, H = rec.cv.height, mark = () => { const t = scenesEl.querySelector('.tile[data-cut="' + rec.id + '"]'); if (t) t.classList.toggle('wait', rec.sr === 'wait'); };
+/* One cut-out at a time; when none is waiting the worker is let go, and its memory with it. Not every cut-out is
+   sent: a big one (over 800 pixels) has detail enough of its own and would take minutes; a device that proved too
+   slow once is not asked again this visit; and somebody saving data is not made to fetch 16 MB. */
+function sharper(rec, cut, W, H) {
+  if (SR.off || Math.max(cut.width, cut.height) > 800 || (navigator.connection && navigator.connection.saveData)) return;
+  const mark = () => { const t = scenesEl.querySelector('.tile[data-cut="' + rec.id + '"]'); if (t) t.classList.toggle('wait', rec.sr === 'wait'); };
   rec.sr = 'wait'; mark(); SR.waiting++;
-  SR.queue = SR.queue.then(() => srRun(rec, cut, W, H)).catch(() => { if (SR.worker) { SR.worker.terminate(); SR.worker = null; } })
+  SR.queue = SR.queue.then(() => srRun(rec, cut, W, H)).catch((e) => { if (e && e.message === 'slow') SR.off = true; if (SR.worker) { SR.worker.terminate(); SR.worker = null; } })
     .then(() => { if (rec.sr !== 'done') rec.sr = 'no'; mark(); if (!--SR.waiting && SR.worker) { SR.worker.terminate(); SR.worker = null; } });
 }
 
