@@ -7734,7 +7734,7 @@ function segCut(src, out, seg, soft) {
       const t = lab[i] && sizes[lab[i]] >= big * .05 ? Math.min(1, (edge - room[i]) / (soft ? .6 : .24)) : 0;
       if (soft) room[i] = t; else d[i * 4 + 3] = 255 * t * t * (3 - 2 * t);
     }
-    if (soft) { const q = follow(d, room, w, h); for (let i = 0; i < n; i++) d[i * 4 + 3] = 255 * within(q[i], 0, 1); }
+    if (soft) { const cl = res.confidenceMasks[4] && res.confidenceMasks[4].getAsFloat32Array(), q = follow(d, room, w, h, cl && cl.length === n ? cl : null); for (let i = 0; i < n; i++) d[i * 4 + 3] = 255 * within(q[i], 0, 1); }
   });
   c.putImageData(im, 0, 0);
 }
@@ -7742,12 +7742,23 @@ function segCut(src, out, seg, soft) {
    moves the soft outline `p` onto the edges that are in the photo itself (`rgba`, w by h): the guided filter of
    He, Sun and Tang, with the photo's colours as the guide, in its fast form (worked out on a picture of at most
    640 pixels, applied at full size). Near an edge of the photo, the outline is redrawn as the best straight-line
-   mix of the colours around it, so it turns where the colours turn. */
-function follow(rgba, p, w, h) {
+   mix of the colours around it, so it turns where the colours turn. `clothes` (how sure the person finder is that a
+   pixel is clothes, w by h) may be left out. */
+function follow(rgba, p, w, h, clothes) {
   const s = Math.max(1, Math.ceil(Math.max(w, h) / 640)), W = Math.ceil(w / s), H = Math.ceil(h / s), N = W * H, r = Math.max(2, Math.round(Math.max(W, H) / 80)), eps = 1e-4;
   const R = new Float32Array(N), G = new Float32Array(N), B = new Float32Array(N), P = new Float32Array(N), cnt = new Float32Array(N), tmp = new Float32Array(N);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x, j = Math.floor(y / s) * W + Math.floor(x / s); R[j] += rgba[i * 4]; G[j] += rgba[i * 4 + 1]; B[j] += rgba[i * 4 + 2]; P[j] += p[i]; cnt[j]++; }
   for (let j = 0; j < N; j++) { R[j] /= cnt[j] * 255; G[j] /= cnt[j] * 255; B[j] /= cnt[j] * 255; P[j] /= cnt[j]; }
+  /* Where there are clothes, a thin bite out of the outline is the person finder's own slip: a white sleeve in shade
+     looks just like a pale sky. There it is closed (grown by g pixels, then shrunk back). Not on skin or hair, where
+     a narrow gap is real: the one between two raised fingers. */
+  if (clothes) {
+    const g = Math.max(1, Math.round(Math.max(W, H) / 200)), C = new Float32Array(N);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) C[Math.floor(y / s) * W + Math.floor(x / s)] += clothes[y * w + x];
+    for (let j = 0; j < N; j++) C[j] /= cnt[j];
+    const near = around(C, W, H, g, true), healed = around(around(P, W, H, g, true), W, H, g, false);
+    for (let j = 0; j < N; j++) P[j] += (healed[j] - P[j]) * within((near[j] - .15) / .2, 0, 1);
+  }
   const mean = (a, b) => { const o = new Float32Array(N); if (b) for (let j = 0; j < N; j++) o[j] = a[j] * b[j]; else o.set(a); boxBlur(o, tmp, W, H, r); return o; };
   const mR = mean(R), mG = mean(G), mB = mean(B), mP = mean(P), rp = mean(R, P), gp = mean(G, P), bp = mean(B, P);
   const rr = mean(R, R), rg = mean(R, G), rb = mean(R, B), gg = mean(G, G), gb = mean(G, B), bb = mean(B, B);
