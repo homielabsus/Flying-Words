@@ -7379,15 +7379,29 @@ function boxBlur(a, t, w, h, r) {
     for (let y = 0; y < h; y++) { a[y * w + x] = s * k; s += t[Math.min(h - 1, y + r + 1) * w + x] - t[Math.max(0, y - r) * w + x]; }
   }
 }
+/* The cut-out at its final size, w by h. A soft outline (from "Just me") is cut thin only now, at this size, and
+   after a slight blur: the person finder's answer has steps the size of a camera pixel, which the blur rounds off,
+   and cut here it comes out crisp and smooth, where an outline cut at camera size and then enlarged would show
+   every step. It is cut a touch inside the middle of the slope, which leaves the room's colour off the rim. */
+function sized(cut, w, h) {
+  const out = document.createElement('canvas'); out.width = w; out.height = h;
+  const c = cx2(out); c.imageSmoothingQuality = 'high'; c.drawImage(cut, 0, 0, w, h);
+  const im = c.getImageData(0, 0, w, h), d = im.data;
+  if (cut.soft) {
+    const n = w * h, a = new Float32Array(n), t = new Float32Array(n), r = Math.max(1, Math.round(1.5 * w / cut.width));
+    for (let i = 0; i < n; i++) a[i] = d[i * 4 + 3];
+    boxBlur(a, t, w, h, r); boxBlur(a, t, w, h, r);
+    for (let i = 0; i < n; i++) { const u = within((a[i] - 115) / 51, 0, 1); d[i * 4 + 3] = 255 * u * u * (3 - 2 * u); }
+  }
+  return { out, c, im };
+}
 /* A cut-out is shown bigger than the camera took it, so it is enlarged here, once and well (up to twice, to 1600
    pixels at most), and then sharpened with an unsharp mask, the way Pillow's UnsharpMask works: every pixel is
    pushed away from a blurred copy of the picture, unless it hardly differs from it (that would only sharpen the
    camera's noise). Only where the cut-out is solid all around: the outline stays as clean as it was cut. */
 function sharpUp(src) {
   const k = Math.min(2, Math.max(1, 1600 / Math.max(src.width, src.height))), w = Math.round(src.width * k), h = Math.round(src.height * k), n = w * h, r = k > 1.5 ? 2 : 1;
-  const out = document.createElement('canvas'); out.width = w; out.height = h;
-  const c = cx2(out); c.imageSmoothingQuality = 'high'; c.drawImage(src, 0, 0, w, h);
-  const im = c.getImageData(0, 0, w, h), d = im.data, a = new Float32Array(n), t = new Float32Array(n), solid = new Uint8Array(n);
+  const { out, c, im } = sized(src, w, h), d = im.data, a = new Float32Array(n), t = new Float32Array(n), solid = new Uint8Array(n);
   for (let i = 0; i < n; i++) a[i] = d[i * 4 + 3];
   boxBlur(a, t, w, h, r); boxBlur(a, t, w, h, r);
   for (let i = 0; i < n; i++) solid[i] = a[i] > 253.5 ? 1 : 0;
@@ -7403,9 +7417,10 @@ function sharpUp(src) {
    and put on the stage exactly where the kid was just seen. */
 function addCut(full) {
   const fw = full.width, fh = full.height, im = cx2(full).getImageData(0, 0, fw, fh), d = im.data;
-  let x0 = fw, y0 = fh, x1 = 0, y1 = 0;
-  for (let y = 0, i = 3; y < fh; y++) for (let x = 0; x < fw; x++, i += 4) if (d[i] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-  const bw = Math.max(1, x1 - x0 + 1), bh = Math.max(1, y1 - y0 + 1), cut = document.createElement('canvas'); cut.width = bw; cut.height = bh; cx2(cut).putImageData(im, -x0, -y0); /* the pixels themselves: no tie to the camera picture is kept */
+  let x0 = fw, y0 = fh, x1 = 0, y1 = 0; const low = full.soft ? 101 : 24; /* a soft outline counts from where it will be cut */
+  for (let y = 0, i = 3; y < fh; y++) for (let x = 0; x < fw; x++, i += 4) if (d[i] > low) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (full.soft) { x0 = Math.max(0, x0 - 2); y0 = Math.max(0, y0 - 2); x1 = Math.min(fw - 1, x1 + 2); y1 = Math.min(fh - 1, y1 + 2); } /* and keeps a little of its slope around it */
+  const bw = Math.max(1, x1 - x0 + 1), bh = Math.max(1, y1 - y0 + 1), cut = document.createElement('canvas'); cut.width = bw; cut.height = bh; cx2(cut).putImageData(im, -x0, -y0); cut.soft = !!full.soft; /* the pixels themselves: no tie to the camera picture is kept */
   const cv = sharpUp(cut);
   const W = stage.clientWidth || fw, H = stage.clientHeight || fh, s = Math.max(W / fw, H / fh), ox = (fw - W / s) / 2, oy = (fh - H / s) * .42; /* as coverDraw showed it */
   const t = Date.now() * 1000 + photoN % 1000, id = 'cut-' + Date.now().toString(36) + '-' + (photoN++);
@@ -7486,10 +7501,10 @@ const srAsk = (worker, msg, ms) => new Promise((res, rej) => {
   worker.postMessage(msg);
 });
 /* colours are spread a few pixels into the see-through part, so the model sees no black rim around the kid */
-function bleed(d, w, h) {
+function bleed(d, w, h, low) {
   const n = w * h, has = new Uint8Array(n); let r, g, b, k, pass;
   const take = (j) => { if (has[j] && has[j] < pass) { r += d[j * 4]; g += d[j * 4 + 1]; b += d[j * 4 + 2]; k++; } }; /* only from pixels coloured in an earlier round */
-  for (let i = 0; i < n; i++) has[i] = d[i * 4 + 3] > 24 ? 1 : 0;
+  for (let i = 0; i < n; i++) has[i] = d[i * 4 + 3] > low ? 1 : 0;
   for (pass = 2; pass < 10; pass++) for (let i = 0; i < n; i++) {
     if (has[i]) continue;
     const x = i % w; r = g = b = k = 0;
@@ -7507,8 +7522,9 @@ async function srRun(rec, cut, W, H) {
     SR.worker = worker;
   }
   const w = cut.width, h = cut.height, d = cx2(cut).getImageData(0, 0, w, h).data, solid = new Uint8Array(w * h); let full = -1;
-  for (let i = 0; i < w * h; i++) { solid[i] = d[i * 4 + 3] > 24 ? 1 : 0; if (full < 0 && d[i * 4 + 3] === 255) full = i; }
-  bleed(d, w, h);
+  const low = cut.soft ? 63 : 24; /* far down a soft slope the colours are too coarse to show the model */
+  for (let i = 0; i < w * h; i++) { solid[i] = d[i * 4 + 3] > low ? 1 : 0; if (full < 0 && d[i * 4 + 3] === 255) full = i; }
+  bleed(d, w, h, low);
   const out = document.createElement('canvas'); out.width = W; out.height = H;
   const oc = cx2(out), piece = document.createElement('canvas'), T = 192, P = 8, fx = W / w, fy = H / h; oc.imageSmoothingQuality = 'high';
   for (let ty = 0; ty < h; ty += T) for (let tx = 0; tx < w; tx += T) {
@@ -7526,7 +7542,8 @@ async function srRun(rec, cut, W, H) {
     oc.drawImage(piece, (tx - x0) * 4, (ty - y0) * 4, tw * 4, th * 4, dx, dy, Math.round((tx + tw) * fx) - dx, Math.round((ty + th) * fy) - dy);
   }
   if (photos.indexOf(rec) < 0) return;
-  oc.globalCompositeOperation = 'destination-in'; oc.drawImage(cut, 0, 0, W, H); /* the outline is the one that was cut */
+  const shape = sized(cut, W, H); shape.c.putImageData(shape.im, 0, 0);
+  oc.globalCompositeOperation = 'destination-in'; oc.drawImage(shape.out, 0, 0); /* the outline is the same as the quick picture's */
   /* a browser short of memory may have drawn nothing: where the kid was solid there must be something now, or the quick picture stays */
   if (full < 0 || !oc.getImageData(Math.min(W - 1, Math.round((full % w + .5) * fx)), Math.min(H - 1, Math.round((Math.floor(full / w) + .5) * fy)), 1, 1).data[3]) throw new Error('empty');
   /* the new picture counts as not yet stored, so nothing lets go of it, and a decode of the old one that is under way does not take its place */
@@ -7639,31 +7656,32 @@ const SEG = {
 };
 const inTime = (p, ms) => new Promise((res, rej) => { const slow = setTimeout(() => rej(new Error('slow')), ms); p.then((v) => { clearTimeout(slow); res(v); }, (e) => { clearTimeout(slow); rej(e); }); });
 /* `src` is drawn into the canvas `out`, and everything that is not the person is made see-through. The model's
-   answer is how sure it is, pixel by pixel, that this is the room: the edge is the thin band where it is in two minds
-   (thin, so the outline is crisp and no haze of the room hangs on it), and specks it kept that stand apart from the
-   person are dropped. */
-function segCut(src, out, seg) {
-  const w = out.width, h = out.height, n = w * h, c = cx2(out);
+   answer is how sure it is, pixel by pixel, that this is the room: the edge is the band where it is in two minds, and
+   specks it kept that stand apart from the person are dropped. For the live view the band is cut here, a little
+   more than a pixel wide. For a snap (`soft`) the outline is left soft, a wide slope: it is cut thin only when the
+   picture has its final size (see `sized`), for a thin outline that is enlarged afterwards shows steps. */
+function segCut(src, out, seg, soft) {
+  const w = out.width, h = out.height, n = w * h, c = cx2(out), edge = soft ? .8 : .62;
   c.globalCompositeOperation = 'copy'; c.drawImage(src, 0, 0, w, h); c.globalCompositeOperation = 'source-over';
   if (SEG.lab.length !== n) { SEG.lab = new Int32Array(n); SEG.stack = new Int32Array(n); } else SEG.lab.fill(0);
   const im = c.getImageData(0, 0, w, h), d = im.data, lab = SEG.lab, stack = SEG.stack, sizes = [0]; let big = 0;
   (seg || SEG.seg).segment(out, (res) => { /* the masks are only lent for the length of this call */
     const room = res.confidenceMasks[0].getAsFloat32Array(); if (room.length !== n) throw new Error('mask');
     for (let i = 0; i < n; i++) {
-      if (room[i] > .56 || lab[i]) continue;
+      if (room[i] > edge || lab[i]) continue;
       const id = sizes.length; let top = 0, size = 0; stack[top++] = i; lab[i] = id;
       while (top) {
         const j = stack[--top], x = j % w; size++;
-        if (x > 0 && !lab[j - 1] && room[j - 1] <= .56) { lab[j - 1] = id; stack[top++] = j - 1; }
-        if (x < w - 1 && !lab[j + 1] && room[j + 1] <= .56) { lab[j + 1] = id; stack[top++] = j + 1; }
-        if (j >= w && !lab[j - w] && room[j - w] <= .56) { lab[j - w] = id; stack[top++] = j - w; }
-        if (j < n - w && !lab[j + w] && room[j + w] <= .56) { lab[j + w] = id; stack[top++] = j + w; }
+        if (x > 0 && !lab[j - 1] && room[j - 1] <= edge) { lab[j - 1] = id; stack[top++] = j - 1; }
+        if (x < w - 1 && !lab[j + 1] && room[j + 1] <= edge) { lab[j + 1] = id; stack[top++] = j + 1; }
+        if (j >= w && !lab[j - w] && room[j - w] <= edge) { lab[j - w] = id; stack[top++] = j - w; }
+        if (j < n - w && !lab[j + w] && room[j + w] <= edge) { lab[j + w] = id; stack[top++] = j + w; }
       }
       sizes.push(size); if (size > big) big = size;
     }
     for (let i = 0; i < n; i++) {
-      const t = lab[i] && sizes[lab[i]] >= big * .05 ? Math.min(1, (.56 - room[i]) / .12) : 0;
-      d[i * 4 + 3] = 255 * t * t * (3 - 2 * t);
+      const t = lab[i] && sizes[lab[i]] >= big * .05 ? Math.min(1, (edge - room[i]) / (soft ? .6 : .24)) : 0;
+      d[i * 4 + 3] = soft ? 255 * t : 255 * t * t * (3 - 2 * t);
     }
   });
   c.putImageData(im, 0, 0);
@@ -7816,7 +7834,7 @@ function boothLoop() {
 /* the picture Snap! took, cut out at full size */
 function cutOut(full) {
   const out = document.createElement('canvas'); out.width = full.width; out.height = full.height;
-  if (cam.mode === 'green') greenCut(full, out, false); else segCut(full, out);
+  if (cam.mode === 'green') greenCut(full, out, false); else { segCut(full, out, null, true); out.soft = true; }
   const d = cx2(out).getImageData(0, 0, out.width, out.height).data;
   let on = 0, n = 0;
   for (let i = 3; i < d.length; i += 28) { n++; if (d[i] > 127) on++; }
