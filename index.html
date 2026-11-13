@@ -887,6 +887,13 @@ html.calm .booth-b.busy { animation: none; }
 @media (prefers-reduced-motion: reduce) { .booth-b.busy { animation: none; } }
 .booth-b:focus-visible { outline: 4px solid #fff; outline-offset: 2px; }
 #stage.cam #toast { bottom: 144px; }
+/* ✨ the touch-up's two sliders, over the bar */
+#touchBox { position: absolute; right: 0; bottom: calc(100% + 10px); display: grid; gap: 10px; min-width: 230px; padding: 12px 14px; border-radius: 18px;
+  background: #fff; color: var(--ink); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); font: 800 15px/1.2 var(--font); }
+#touchBox[hidden] { display: none; }
+.touch-l { display: grid; gap: 4px; }
+.touch-l input { width: 100%; min-height: 32px; margin: 0; accent-color: var(--ink); cursor: pointer; }
+.touch-l input:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
 html.short #boothBar { bottom: 64px; gap: 6px; }
 html.short .booth-b { min-height: 38px; min-width: 38px; padding: 0 10px; font-size: 13px; }
 html.short #stage.cam #toast { bottom: auto; top: 6px; } /* a short stage has no room left below: the note goes on top */
@@ -930,6 +937,11 @@ html.calm .tile.cutout.wait .sw::after { animation: none; }
         <button type="button" class="booth-b" data-mode="me" aria-pressed="false" aria-label="Just me: cut me out and stand me in the scene" title="Just me: cut me out and stand me in the scene"><span aria-hidden="true">✂️</span><span aria-hidden="true">Just me</span></button>
         <button type="button" class="booth-b" data-mode="green" aria-pressed="false" aria-label="Green screen: stand in front of a green or blue cloth" title="Green screen: stand in front of a green or blue cloth"><span aria-hidden="true">🟩</span><span aria-hidden="true">Green<span class="long"> screen</span></span></button>
         <button type="button" class="booth-b" id="boothPick" aria-label="Match the cloth's colour again" title="Match the cloth's colour again" hidden><span aria-hidden="true">🎯</span></button>
+        <button type="button" class="booth-b" id="boothTouch" aria-expanded="false" aria-pressed="false" aria-controls="touchBox" aria-label="Touch up: smooth skin and more light" title="Touch up: smooth skin and more light"><span aria-hidden="true">✨</span></button>
+        <div id="touchBox" role="group" aria-label="Touch up" hidden>
+          <label class="touch-l"><span><span aria-hidden="true">✨</span> Smooth skin</span><input type="range" id="touchSmooth" min="0" max="100" step="5"></label>
+          <label class="touch-l"><span><span aria-hidden="true">☀️</span> Brighter</span><input type="range" id="touchLight" min="0" max="100" step="5"></label>
+        </div>
       </div>
       <div id="camBar" role="group" aria-label="Camera" hidden>
         <button id="camOff" class="cam-b" type="button" aria-label="Close the camera" title="Close the camera"><span aria-hidden="true">✕</span></button>
@@ -3021,7 +3033,7 @@ stage.addEventListener('pointerup', (e) => {
   const now = performance.now();
   if (now - lastTap < 350) { lastTap = 0; again(); } else lastTap = now;
 });
-stage.addEventListener('mousedown', (e) => { if (!e.target.closest('button')) e.preventDefault(); });
+stage.addEventListener('mousedown', (e) => { if (!e.target.closest('button, input')) e.preventDefault(); });
 
 /* placeholder rotation */
 const PH = ['Type a word…', '🦖🦖🦖', 'your name?', 'pizza', 'こんにちは', '#1 BEST!'];
@@ -7897,6 +7909,7 @@ async function setBooth(mode, quiet) {
     if (!ok) { cam.mode = 'all'; markBooth(); camSnap.disabled = cam.counting; tell('✂️ No scissors: they come over the internet. Try the green screen!', 4600); return; }
   }
   camSnap.disabled = cam.counting;
+  if (mode !== 'me' && (touch.smooth > 0 || touch.light > 0) && SEG.state === 'idle') loadSeg(); /* the touch-up wants to know where the skin is */
   boothOn(mode !== 'all');
   if (!quiet) toast(mode === 'me' ? '✂️ Just you! Now pick a scene' : mode === 'green' ? '🟩 Stand in front of a green or blue cloth' : '🖼️ The whole picture', 2800);
   announceEl.textContent = mode === 'me' ? 'Just you, in the scene.' : mode === 'green' ? 'Green screen on.' : 'The whole camera picture.';
@@ -7948,13 +7961,79 @@ function boothSnap(full) {
   if (why) { cam.counting = false; camSnap.disabled = false; tell(why, 3800); return false; }
   return cut;
 }
+/* ✨ The touch-up for a snapped photo, the way video-call apps do it. Only the snapped picture is changed, never the
+   live view, and only after it was cut out, so the scissors and the green screen see the photo as the camera took it.
+   Brighter (LIME, Guo, Li and Ling; pvnieo/Low-light-Image-Enhancement, MIT): how much light falls on each part of the
+   picture is guessed from its brightest colour, smoothed with the photo's edges kept, and dark parts get more gain
+   than bright ones, the same for red, green and blue so no colour shifts. How dark the face is decides how much.
+   Smooth skin (the beauty filter of GPUPixel, Apache-2.0): where the skin's colour barely varies (pores, blotches) it
+   moves towards the colour around it; where it varies a lot (eyes, brows, lips, the outline) it stays as it is. The
+   person finder says where skin and hair are; without it (offline) the smoothing is gentler and goes everywhere. */
+const touch = (() => { const t = load('fw.touch', null), ok = (v) => typeof v === 'number' && v >= 0 && v <= 1;
+  return { smooth: t && ok(t.smooth) ? t.smooth : .3, light: t && ok(t.light) ? t.light : .35 }; })();
+const touchStep = (a, b, v) => { const t = within((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+function touchUp(cv, src) {
+  const ss = touch.smooth, sb = touch.light; if (!(ss > 0) && !(sb > 0)) return;
+  const w = cv.width, h = cv.height, n = w * h, c = cx2(cv), im = c.getImageData(0, 0, w, h), d = im.data;
+  let skin = null, face = null, hair = null;
+  if (SEG.seg) try {
+    SEG.seg.segment(src || cv, (res) => { /* the masks are only lent for the length of this call */
+      const m = res.confidenceMasks; if (!m || m.length < 4) return;
+      const H1 = m[1].getAsFloat32Array(), B1 = m[2].getAsFloat32Array(), F1 = m[3].getAsFloat32Array(); if (F1.length !== n) return;
+      skin = new Float32Array(n); face = new Float32Array(F1); hair = new Float32Array(n);
+      for (let i = 0; i < n; i++) { skin[i] = touchStep(.35, .75, B1[i] + F1[i]); hair[i] = touchStep(.3, .6, H1[i]); }
+    });
+  } catch (e) { skin = face = hair = null; }
+  /* both work on a picture of at most 640 pixels and are read back at full size (the fast guided filter of He, Sun and Tang) */
+  const s = Math.max(1, Math.ceil(Math.max(w, h) / 640)), W = Math.ceil(w / s), H = Math.ceil(h / s), N = W * H, tmp = new Float32Array(N);
+  const down = (get) => { const o = new Float32Array(N), k = new Float32Array(N);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const j = Math.floor(y / s) * W + Math.floor(x / s); o[j] += get(y * w + x); k[j]++; }
+    for (let j = 0; j < N; j++) o[j] /= k[j]; return o; };
+  const guide = (I, r, eps) => { const m = new Float32Array(I), q = new Float32Array(N); for (let j = 0; j < N; j++) q[j] = I[j] * I[j];
+    boxBlur(m, tmp, W, H, r); boxBlur(q, tmp, W, H, r); const A = new Float32Array(N), B = new Float32Array(N);
+    for (let j = 0; j < N; j++) { const v = Math.max(0, q[j] - m[j] * m[j]), a = v / (v + eps); A[j] = a; B[j] = m[j] - a * m[j]; }
+    boxBlur(A, tmp, W, H, r); boxBlur(B, tmp, W, H, r); return [A, B]; };
+  const up = (A, B, fn) => { for (let y = 0; y < h; y++) {
+    const fy = within((y + .5) / s - .5, 0, H - 1), y0 = Math.floor(fy), y1 = Math.min(H - 1, y0 + 1), ty = fy - y0;
+    for (let x = 0; x < w; x++) { const fx = within((x + .5) / s - .5, 0, W - 1), x0 = Math.floor(fx), x1 = Math.min(W - 1, x0 + 1), tx = fx - x0;
+      const j0 = y0 * W + x0, j1 = y0 * W + x1, j2 = y1 * W + x0, j3 = y1 * W + x1, k0 = (1 - tx) * (1 - ty), k1 = tx * (1 - ty), k2 = (1 - tx) * ty, k3 = tx * ty;
+      fn(y * w + x, A[j0] * k0 + A[j1] * k1 + A[j2] * k2 + A[j3] * k3, B[j0] * k0 + B[j1] * k1 + B[j2] * k2 + B[j3] * k3); } } };
+  if (sb > 0) {
+    const top = (i) => Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) / 255, [A, B] = guide(down(top), Math.max(2, Math.round(Math.max(W, H) / 53)), .01);
+    const meter = (wt) => { let sum = 0, cnt = 0; for (let i = 0; i < n; i += 3) { const k = wt(i); if (k > 0) { sum += k * (.299 * d[i * 4] + .587 * d[i * 4 + 1] + .114 * d[i * 4 + 2]) / 255; cnt += k; } } return cnt > n / 3 * .002 ? sum / cnt : -1; };
+    let ym = face ? meter((i) => (face[i] > .5 && d[i * 4 + 3] > 127 ? 1 : 0)) : -1;
+    if (ym < 0 && skin) ym = meter((i) => skin[i] * d[i * 4 + 3] / 255);
+    if (ym < 0) ym = meter((i) => (1 - Math.abs((i % w) / w * 2 - 1)) * (1 - Math.abs(Math.floor(i / w) / h * 2 - 1)) * d[i * 4 + 3] / 255);
+    const auto = within((.6 - ym) / .3, 0, 1), gam = .6 * sb * (.3 + .7 * auto), cap = 1 + 2 * sb, lut = new Float32Array(1025);
+    for (let k = 0; k <= 1024; k++) lut[k] = Math.min(cap, Math.pow(Math.max(.05, k / 1024), -gam));
+    /* brightness gets the whole gain, colour only half of it: the same gain on red, green and blue would also make the skin redder */
+    up(A, B, (i, a, b) => { let g = lut[Math.round(within(a * top(i) + b, 0, 1) * 1024)]; if (hair) g = 1 + (g - 1) * (1 - .5 * hair[i]);
+      const r = d[i * 4], gr = d[i * 4 + 1], bl = d[i * 4 + 2], y = .299 * r + .587 * gr + .114 * bl, yg = y * g, gc = 1 + (g - 1) * .5;
+      d[i * 4] = yg + (r - y) * gc; d[i * 4 + 1] = yg + (gr - y) * gc; d[i * 4 + 2] = yg + (bl - y) * gc; });
+  }
+  if (ss > 0) {
+    let rf = .02 * Math.min(w, h);
+    if (face) { let y0 = h, y1 = -1; for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 4) if (face[y * w + x] > .5) { if (y < y0) y0 = y; y1 = y; } if (y1 > y0) rf = within(.05 * (y1 - y0), 6, 24); }
+    const r = Math.max(1, Math.round(rf / s)), eps = .001 + .004 * ss, dmax = (.06 + .06 * ss) * 255;
+    for (let ch = 0; ch < 3; ch++) {
+      const [A, B] = guide(down((i) => d[i * 4 + ch] / 255), r, eps);
+      up(A, B, (i, a, b) => { const k = skin ? ss * skin[i] * (1 - .7 * hair[i]) : .5 * ss; if (k <= 0) return; const v = d[i * 4 + ch]; d[i * 4 + ch] = v + k * within((a * v / 255 + b) * 255 - v, -dmax, dmax); });
+    }
+  }
+  c.putImageData(im, 0, 0);
+}
+const touchBox = $('#touchBox'), touchBtn = $('#boothTouch'), touchS = $('#touchSmooth'), touchL = $('#touchLight');
+touchS.value = Math.round(touch.smooth * 100); touchL.value = Math.round(touch.light * 100);
+const touchShow = (on) => { touchBox.hidden = !on; touchBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); touchBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); };
+touchBox.addEventListener('input', () => { touch.smooth = touchS.value / 100; touch.light = touchL.value / 100; save('fw.touch', touch); });
 boothBar.addEventListener('click', (e) => {
   if (cam.counting) return; /* 3, 2, 1 is running: the photo will be the kind that was asked for */
   const b = e.target.closest('[data-mode]');
   if (b) { setBooth(b.dataset.mode); sound.pop(); return; }
   if (e.target.closest('#boothPick')) { cam.key = null; cam.warned = false; cam.keyUntil = 0; toast('🎯 Matched the cloth again', 2000); sound.pop(); }
+  if (e.target.closest('#boothTouch')) { touchShow(touchBox.hidden); sound.pop(); }
 });
-boothBar.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); stopCamera(); } });
+boothBar.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; e.preventDefault(); if (!touchBox.hidden) { touchShow(false); touchBtn.focus(); } else stopCamera(); });
 cam.mode = ['all', 'me', 'green'].indexOf(load('fw.booth', 'all')) >= 0 ? load('fw.booth', 'all') : 'all';
 markBooth();
 const camOK = () => !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
@@ -8028,7 +8107,7 @@ async function snap(quick) {
   camCount.textContent = ''; camCount.classList.remove('go');
   const w = camVid.videoWidth, h = camVid.videoHeight;
   if (!w || !h) { cam.counting = false; camSnap.disabled = false; toast('No picture yet. Try again!', 2600); return null; }
-  const cv = photoCanvas(camVid, w, h, cam.mirror); const cut = cam.booth ? boothSnap(cv) : null; if (cut === false) return null; /* the photo looks just like what the kid saw */
+  const cv = photoCanvas(camVid, w, h, cam.mirror); const cut = cam.booth ? boothSnap(cv) : null; if (cut === false) return null; try { touchUp(cut ? cut.cv : cv, cv); } catch (e) { /* the photo stays as it was taken */ } /* the photo looks just like what the kid saw */
   if (!isReduced() && FEAT.animate) { try { flashEl.animate([{ opacity: .95 }, { opacity: 0 }], { duration: 380, easing: 'ease-out' }); } catch (e) { /* ignore */ } }
   sound.pop();
   stopCamera();
@@ -8170,7 +8249,7 @@ window.FW = {
     canvas: () => (cam.mode === 'green' ? cam.keyCv : cam.cutCv) || null, layer: () => meCv,
     cuts: () => state.cuts.slice(), all: () => photos.filter((p) => p.cut).map((p) => p.id), setCut: (id, on) => setCut(id, !!on), picked: () => sel,
     place: (id) => { const r = cutRec(id); return r ? { x: r.x, y: r.y, h: r.h, box: cutBox(r, stage.clientWidth, stage.clientHeight) } : null; },
-    picture: (id) => { const r = cutRec(id); return r ? r.cv || r.small : null; }, sharpUp: (cv) => sharpUp(cv), sharp: (id) => { const r = cutRec(id); return r ? r.sr || '' : ''; },
+    picture: (id) => { const r = photos.find((q) => q.id === id); return r ? r.cv || r.small : null; }, sharpUp: (cv) => sharpUp(cv), sharp: (id) => { const r = cutRec(id); return r ? r.sr || '' : ''; },
     async add(url) { return addCut(await decodePhoto(await (await fetch(url)).blob(), PHOTO_SIDE)); }
   },
   three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv, worlds: () => Object.keys(G3.worlds), memory: () => (G3.r ? Object.assign({}, G3.r.info.memory) : null) },
