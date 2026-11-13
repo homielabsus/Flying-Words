@@ -7382,7 +7382,8 @@ function boxBlur(a, t, w, h, r) {
 /* The cut-out at its final size, w by h. A soft outline (from "Just me") is cut thin only now, at this size, and
    after a slight blur: the person finder's answer has steps the size of a camera pixel, which the blur rounds off,
    and cut here it comes out crisp and smooth, where an outline cut at camera size and then enlarged would show
-   every step. It is cut a touch inside the middle of the slope, which leaves the room's colour off the rim. */
+   every step. It is cut a touch inside the middle of the slope, and the rim that is left takes its colour from
+   inside the kid: none of the room's colour hangs on it. */
 function sized(cut, w, h) {
   const out = document.createElement('canvas'); out.width = w; out.height = h;
   const c = cx2(out); c.imageSmoothingQuality = 'high'; c.drawImage(cut, 0, 0, w, h);
@@ -7392,6 +7393,7 @@ function sized(cut, w, h) {
     for (let i = 0; i < n; i++) a[i] = d[i * 4 + 3];
     boxBlur(a, t, w, h, r); boxBlur(a, t, w, h, r);
     for (let i = 0; i < n; i++) { const u = within((a[i] - 115) / 51, 0, 1); d[i * 4 + 3] = 255 * u * u * (3 - 2 * u); }
+    bleed(d, w, h, 254); /* the half see-through rim still carries some of the room's colour: it takes the kid's own, from just inside */
   }
   return { out, c, im };
 }
@@ -7544,6 +7546,7 @@ async function srRun(rec, cut, W, H) {
   if (photos.indexOf(rec) < 0) return;
   const shape = sized(cut, W, H); shape.c.putImageData(shape.im, 0, 0);
   oc.globalCompositeOperation = 'destination-in'; oc.drawImage(shape.out, 0, 0); /* the outline is the same as the quick picture's */
+  if (cut.soft) { const om = oc.getImageData(0, 0, W, H); bleed(om.data, W, H, 254); oc.globalCompositeOperation = 'copy'; oc.putImageData(om, 0, 0); } /* and so is the rim's colour: from inside */
   /* a browser short of memory may have drawn nothing: where the kid was solid there must be something now, or the quick picture stays */
   if (full < 0 || !oc.getImageData(Math.min(W - 1, Math.round((full % w + .5) * fx)), Math.min(H - 1, Math.round((Math.floor(full / w) + .5) * fy)), 1, 1).data[3]) throw new Error('empty');
   /* the new picture counts as not yet stored, so nothing lets go of it, and a decode of the old one that is under way does not take its place */
@@ -7681,10 +7684,46 @@ function segCut(src, out, seg, soft) {
     }
     for (let i = 0; i < n; i++) {
       const t = lab[i] && sizes[lab[i]] >= big * .05 ? Math.min(1, (edge - room[i]) / (soft ? .6 : .24)) : 0;
-      d[i * 4 + 3] = soft ? 255 * t : 255 * t * t * (3 - 2 * t);
+      if (soft) room[i] = t; else d[i * 4 + 3] = 255 * t * t * (3 - 2 * t);
     }
+    if (soft) { const q = follow(d, room, w, h); for (let i = 0; i < n; i++) d[i * 4 + 3] = 255 * within(q[i], 0, 1); }
   });
   c.putImageData(im, 0, 0);
+}
+/* The person finder draws its outline on a small picture, a few pixels beside the real edge here and there. This
+   moves the soft outline `p` onto the edges that are in the photo itself (`rgba`, w by h): the guided filter of
+   He, Sun and Tang, with the photo's colours as the guide, in its fast form (worked out on a picture of at most
+   640 pixels, applied at full size). Near an edge of the photo, the outline is redrawn as the best straight-line
+   mix of the colours around it, so it turns where the colours turn. */
+function follow(rgba, p, w, h) {
+  const s = Math.max(1, Math.ceil(Math.max(w, h) / 640)), W = Math.ceil(w / s), H = Math.ceil(h / s), N = W * H, r = Math.max(2, Math.round(Math.max(W, H) / 80)), eps = 1e-4;
+  const R = new Float32Array(N), G = new Float32Array(N), B = new Float32Array(N), P = new Float32Array(N), cnt = new Float32Array(N), tmp = new Float32Array(N);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x, j = Math.floor(y / s) * W + Math.floor(x / s); R[j] += rgba[i * 4]; G[j] += rgba[i * 4 + 1]; B[j] += rgba[i * 4 + 2]; P[j] += p[i]; cnt[j]++; }
+  for (let j = 0; j < N; j++) { R[j] /= cnt[j] * 255; G[j] /= cnt[j] * 255; B[j] /= cnt[j] * 255; P[j] /= cnt[j]; }
+  const mean = (a, b) => { const o = new Float32Array(N); if (b) for (let j = 0; j < N; j++) o[j] = a[j] * b[j]; else o.set(a); boxBlur(o, tmp, W, H, r); return o; };
+  const mR = mean(R), mG = mean(G), mB = mean(B), mP = mean(P), rp = mean(R, P), gp = mean(G, P), bp = mean(B, P);
+  const rr = mean(R, R), rg = mean(R, G), rb = mean(R, B), gg = mean(G, G), gb = mean(G, B), bb = mean(B, B);
+  const aR = new Float32Array(N), aG = new Float32Array(N), aB = new Float32Array(N), a0 = new Float32Array(N);
+  for (let j = 0; j < N; j++) {
+    /* the colours' spread around this pixel (a 3 by 3 table), turned round, times how the outline goes with each colour */
+    const s00 = rr[j] - mR[j] * mR[j] + eps, s01 = rg[j] - mR[j] * mG[j], s02 = rb[j] - mR[j] * mB[j], s11 = gg[j] - mG[j] * mG[j] + eps, s12 = gb[j] - mG[j] * mB[j], s22 = bb[j] - mB[j] * mB[j] + eps;
+    const c0 = rp[j] - mR[j] * mP[j], c1 = gp[j] - mG[j] * mP[j], c2 = bp[j] - mB[j] * mP[j];
+    const i00 = s11 * s22 - s12 * s12, i01 = s02 * s12 - s01 * s22, i02 = s01 * s12 - s02 * s11, i11 = s00 * s22 - s02 * s02, i12 = s01 * s02 - s00 * s12, i22 = s00 * s11 - s01 * s01, det = s00 * i00 + s01 * i01 + s02 * i02;
+    aR[j] = (i00 * c0 + i01 * c1 + i02 * c2) / det; aG[j] = (i01 * c0 + i11 * c1 + i12 * c2) / det; aB[j] = (i02 * c0 + i12 * c1 + i22 * c2) / det;
+    a0[j] = mP[j] - aR[j] * mR[j] - aG[j] * mG[j] - aB[j] * mB[j];
+  }
+  boxBlur(aR, tmp, W, H, r); boxBlur(aG, tmp, W, H, r); boxBlur(aB, tmp, W, H, r); boxBlur(a0, tmp, W, H, r);
+  const q = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const fy = within((y + .5) / s - .5, 0, H - 1), y0 = Math.floor(fy), y1 = Math.min(H - 1, y0 + 1), ty = fy - y0;
+    for (let x = 0; x < w; x++) {
+      const fx = within((x + .5) / s - .5, 0, W - 1), x0 = Math.floor(fx), x1 = Math.min(W - 1, x0 + 1), tx = fx - x0;
+      const j0 = y0 * W + x0, j1 = y0 * W + x1, j2 = y1 * W + x0, j3 = y1 * W + x1, k0 = (1 - tx) * (1 - ty), k1 = tx * (1 - ty), k2 = (1 - tx) * ty, k3 = tx * ty, i = (y * w + x) * 4;
+      q[y * w + x] = (aR[j0] * k0 + aR[j1] * k1 + aR[j2] * k2 + aR[j3] * k3) * rgba[i] / 255 + (aG[j0] * k0 + aG[j1] * k1 + aG[j2] * k2 + aG[j3] * k3) * rgba[i + 1] / 255
+        + (aB[j0] * k0 + aB[j1] * k1 + aB[j2] * k2 + aB[j3] * k3) * rgba[i + 2] / 255 + a0[j0] * k0 + a0[j1] * k1 + a0[j2] * k2 + a0[j3] * k3;
+    }
+  }
+  return q;
 }
 /* `box` holds what has to be cleared away again; `box.dead` says nobody is waiting any more */
 async function segBoot(box) {
