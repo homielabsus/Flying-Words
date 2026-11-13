@@ -7663,13 +7663,61 @@ const inTime = (p, ms) => new Promise((res, rej) => { const slow = setTimeout(()
    specks it kept that stand apart from the person are dropped. For the live view the band is cut here, a little
    more than a pixel wide. For a snap (`soft`) the outline is left soft, a wide slope: it is cut thin only when the
    picture has its final size (see `sized`), for a thin outline that is enlarged afterwards shows steps. */
+/* For a snap the person finder also looks at four overlapping pieces of the picture, each two thirds of it, so it
+   sees them half as big again: on the whole picture it works at 256 pixels and misses the gap between two raised fingers,
+   or takes a white sleeve against a pale sky for sky. The pieces are blended smoothly into one answer (`room`: how
+   sure it is that a pixel is the room). A piece showing only part of the kid can be wrong far from the kid (a dark
+   patch of wall taken for a coat, a flag's pale stripe for skin), so `hold` lets the pieces move the whole-picture
+   outline by a few pixels only: up to 1/128 of the picture to take room away from the kid, and less than 1/400 to
+   add to the kid (that is enough to fill in the sleeve, and keeps a pale patch of wall from growing onto a shoulder).
+   Each piece goes to the person finder at 512 pixels at most (it looks at 256 anyway), and its answer is enlarged
+   smoothly as it is blended in. */
+function roomTiles(seg, src, w, h) {
+  const tw = Math.round(w * 2 / 3), th = Math.round(h * 2 / 3), f = Math.min(1, 512 / Math.max(tw, th)), sw = Math.max(1, Math.round(tw * f)), sh = Math.max(1, Math.round(th * f));
+  const t = document.createElement('canvas'), tc = cx2(t), sum = new Float32Array(w * h), wt = new Float32Array(w * h);
+  t.width = sw; t.height = sh;
+  for (const y0 of [0, h - th]) for (const x0 of [0, w - tw]) {
+    tc.drawImage(src, x0, y0, tw, th, 0, 0, sw, sh);
+    seg.segment(t, (res) => {
+      const m = res.confidenceMasks[0].getAsFloat32Array(); if (m.length !== sw * sh) throw new Error('mask');
+      for (let y = 0; y < th; y++) {
+        const ky = Math.max(.02, 1 - Math.abs((y + .5) / th * 2 - 1)), fy = within((y + .5) * sh / th - .5, 0, sh - 1), y1 = Math.floor(fy), y2 = Math.min(sh - 1, y1 + 1), v = fy - y1;
+        for (let x = 0; x < tw; x++) {
+          const k = ky * Math.max(.02, 1 - Math.abs((x + .5) / tw * 2 - 1)), fx = within((x + .5) * sw / tw - .5, 0, sw - 1), x1 = Math.floor(fx), x2 = Math.min(sw - 1, x1 + 1), u = fx - x1;
+          const i = (y0 + y) * w + x0 + x; sum[i] += k * ((m[y1 * sw + x1] * (1 - u) + m[y1 * sw + x2] * u) * (1 - v) + (m[y2 * sw + x1] * (1 - u) + m[y2 * sw + x2] * u) * v); wt[i] += k;
+        }
+      }
+    });
+  }
+  for (let i = 0; i < w * h; i++) sum[i] /= wt[i];
+  return sum;
+}
+/* the most (`most` true) or the least of `a` within r pixels, w by h */
+function around(a, w, h, r, most) {
+  const t = new Float32Array(w * h), o = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) { const row = y * w; for (let x = 0; x < w; x++) { let m = a[row + x]; const e = Math.min(w - 1, x + r); for (let k = Math.max(0, x - r); k <= e; k++) { const v = a[row + k]; if (most ? v > m : v < m) m = v; } t[row + x] = m; } }
+  for (let y = 0; y < h; y++) { const e = Math.min(h - 1, y + r); for (let x = 0; x < w; x++) { let m = t[y * w + x]; for (let k = Math.max(0, y - r); k <= e; k++) { const v = t[k * w + x]; if (most ? v > m : v < m) m = v; } o[y * w + x] = m; } }
+  return o;
+}
+/* The limits are worked out on a picture of at most 640 pixels, as `follow` works on one: the person finder's answer
+   has no finer detail, and a full camera picture (1920 by 1080) would take far longer. */
+function hold(room, tiles, w, h) {
+  const s = Math.max(1, Math.ceil(Math.max(w, h) / 640)), W = Math.ceil(w / s), H = Math.ceil(h / s), g = new Float32Array(W * H), cnt = new Float32Array(W * H);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const j = Math.floor(y / s) * W + Math.floor(x / s); g[j] += room[y * w + x]; cnt[j]++; }
+  for (let j = 0; j < W * H; j++) g[j] /= cnt[j];
+  const big = Math.max(W, H), lo = around(g, W, H, Math.max(1, Math.round(big / 400)), false), hi = around(g, W, H, Math.max(1, Math.round(big / 128)), true);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x, j = Math.floor(y / s) * W + Math.floor(x / s); room[i] = within(tiles[i], Math.min(lo[j], room[i]), Math.max(hi[j], room[i])); }
+}
 function segCut(src, out, seg, soft) {
   const w = out.width, h = out.height, n = w * h, c = cx2(out), edge = soft ? .8 : .62;
   c.globalCompositeOperation = 'copy'; c.drawImage(src, 0, 0, w, h); c.globalCompositeOperation = 'source-over';
+  let tiles = null; /* the pieces only sharpen the outline: if they fail, the snap is cut as before */
+  if (soft) try { tiles = roomTiles(seg || SEG.seg, out, w, h); } catch (e) { tiles = null; }
   if (SEG.lab.length !== n) { SEG.lab = new Int32Array(n); SEG.stack = new Int32Array(n); } else SEG.lab.fill(0);
   const im = c.getImageData(0, 0, w, h), d = im.data, lab = SEG.lab, stack = SEG.stack, sizes = [0]; let big = 0;
   (seg || SEG.seg).segment(out, (res) => { /* the masks are only lent for the length of this call */
     const room = res.confidenceMasks[0].getAsFloat32Array(); if (room.length !== n) throw new Error('mask');
+    if (tiles) hold(room, tiles, w, h);
     for (let i = 0; i < n; i++) {
       if (room[i] > edge || lab[i]) continue;
       const id = sizes.length; let top = 0, size = 0; stack[top++] = i; lab[i] = id;
@@ -7700,16 +7748,6 @@ function follow(rgba, p, w, h) {
   const R = new Float32Array(N), G = new Float32Array(N), B = new Float32Array(N), P = new Float32Array(N), cnt = new Float32Array(N), tmp = new Float32Array(N);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x, j = Math.floor(y / s) * W + Math.floor(x / s); R[j] += rgba[i * 4]; G[j] += rgba[i * 4 + 1]; B[j] += rgba[i * 4 + 2]; P[j] += p[i]; cnt[j]++; }
   for (let j = 0; j < N; j++) { R[j] /= cnt[j] * 255; G[j] /= cnt[j] * 255; B[j] /= cnt[j] * 255; P[j] /= cnt[j]; }
-  /* First the person finder's own slips are healed: where the kid and the room are much the same colour (a white
-     sleeve, a pale sky) it cuts thin notches into the kid. The outline is grown by a few pixels and shrunk by as
-     much, which closes notches and holes narrower than that and leaves everything else where it was. A closed
-     notch is only a guess: where the photo has a clear edge (the gap between two raised fingers) the step below
-     opens it again. */
-  const g = Math.max(1, Math.round(Math.max(W, H) / 200));
-  for (const pick of [Math.max, Math.min]) {
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { let m = P[y * W + x]; for (let k = Math.max(0, x - g); k <= Math.min(W - 1, x + g); k++) m = pick(m, P[y * W + k]); tmp[y * W + x] = m; }
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { let m = tmp[y * W + x]; for (let k = Math.max(0, y - g); k <= Math.min(H - 1, y + g); k++) m = pick(m, tmp[k * W + x]); P[y * W + x] = m; }
-  }
   const mean = (a, b) => { const o = new Float32Array(N); if (b) for (let j = 0; j < N; j++) o[j] = a[j] * b[j]; else o.set(a); boxBlur(o, tmp, W, H, r); return o; };
   const mR = mean(R), mG = mean(G), mB = mean(B), mP = mean(P), rp = mean(R, P), gp = mean(G, P), bp = mean(B, P);
   const rr = mean(R, R), rg = mean(R, G), rb = mean(R, B), gg = mean(G, G), gb = mean(G, B), bb = mean(B, B);
