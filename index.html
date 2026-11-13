@@ -7363,16 +7363,49 @@ function trimPhotos() {
   }
 }
 const toCutBlob = (cv) => new Promise((res) => { try { cv.toBlob(res, 'image/webp', .92); } catch (e) { res(null); } }); /* a browser that can not write WebP writes a PNG */
-/* `full` is the camera picture with the background gone. It is trimmed to what is left, and put on the stage
-   exactly where the kid was just seen. */
+/* one pass of a box blur over the plane `a` (w by h), edges held; `t` is room to work in */
+function boxBlur(a, t, w, h, r) {
+  const k = 1 / (2 * r + 1);
+  for (let y = 0; y < h; y++) {
+    const o = y * w; let s = a[o] * (r + 1); for (let x = 1; x <= r; x++) s += a[o + Math.min(w - 1, x)];
+    for (let x = 0; x < w; x++) { t[o + x] = s * k; s += a[o + Math.min(w - 1, x + r + 1)] - a[o + Math.max(0, x - r)]; }
+  }
+  for (let x = 0; x < w; x++) {
+    let s = t[x] * (r + 1); for (let y = 1; y <= r; y++) s += t[Math.min(h - 1, y) * w + x];
+    for (let y = 0; y < h; y++) { a[y * w + x] = s * k; s += t[Math.min(h - 1, y + r + 1) * w + x] - t[Math.max(0, y - r) * w + x]; }
+  }
+}
+/* A cut-out is shown bigger than the camera took it, so it is enlarged here, once and well (up to twice, to 1600
+   pixels at most), and then sharpened with an unsharp mask, the way Pillow's UnsharpMask works: every pixel is
+   pushed away from a blurred copy of the picture, unless it hardly differs from it (that would only sharpen the
+   camera's noise). Only where the cut-out is solid all around: the outline stays as clean as it was cut. */
+function sharpUp(src) {
+  const k = Math.min(2, Math.max(1, 1600 / Math.max(src.width, src.height))), w = Math.round(src.width * k), h = Math.round(src.height * k), n = w * h, r = k > 1.5 ? 2 : 1;
+  const out = document.createElement('canvas'); out.width = w; out.height = h;
+  const c = cx2(out); c.imageSmoothingQuality = 'high'; c.drawImage(src, 0, 0, w, h);
+  const im = c.getImageData(0, 0, w, h), d = im.data, a = new Float32Array(n), t = new Float32Array(n), solid = new Uint8Array(n);
+  for (let i = 0; i < n; i++) a[i] = d[i * 4 + 3];
+  boxBlur(a, t, w, h, r); boxBlur(a, t, w, h, r);
+  for (let i = 0; i < n; i++) solid[i] = a[i] > 253.5 ? 1 : 0;
+  for (let ch = 0; ch < 3; ch++) {
+    for (let i = 0; i < n; i++) a[i] = d[i * 4 + ch];
+    boxBlur(a, t, w, h, r); boxBlur(a, t, w, h, r);
+    for (let i = 0; i < n; i++) { if (!solid[i]) continue; const v = d[i * 4 + ch], df = v - a[i]; if (df > 2 || df < -2) d[i * 4 + ch] = v + df; }
+  }
+  c.putImageData(im, 0, 0);
+  return out;
+}
+/* `full` is the camera picture with the background gone. It is trimmed to what is left, enlarged and sharpened,
+   and put on the stage exactly where the kid was just seen. */
 function addCut(full) {
   const fw = full.width, fh = full.height, d = cx2(full).getImageData(0, 0, fw, fh).data;
   let x0 = fw, y0 = fh, x1 = 0, y1 = 0;
   for (let y = 0, i = 3; y < fh; y++) for (let x = 0; x < fw; x++, i += 4) if (d[i] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-  const bw = Math.max(1, x1 - x0 + 1), bh = Math.max(1, y1 - y0 + 1), cv = document.createElement('canvas'); cv.width = bw; cv.height = bh; cv.getContext('2d').drawImage(full, -x0, -y0);
+  const bw = Math.max(1, x1 - x0 + 1), bh = Math.max(1, y1 - y0 + 1), cut = document.createElement('canvas'); cut.width = bw; cut.height = bh; cut.getContext('2d').drawImage(full, -x0, -y0);
+  const cv = sharpUp(cut);
   const W = stage.clientWidth || fw, H = stage.clientHeight || fh, s = Math.max(W / fw, H / fh), ox = (fw - W / s) / 2, oy = (fh - H / s) * .42; /* as coverDraw showed it */
   const t = Date.now() * 1000 + photoN % 1000, id = 'cut-' + Date.now().toString(36) + '-' + (photoN++);
-  const rec = { id, cut: true, cv, blob: null, small: photoCanvas(cv, bw, bh, false, PHOTO_SMALL), x: within((x0 + bw / 2 - ox) * s / W, 0, 1), y: within((y0 + bh / 2 - oy) * s / H, 0, 1), h: bh * s / H };
+  const rec = { id, cut: true, cv, blob: null, small: photoCanvas(cv, cv.width, cv.height, false, PHOTO_SMALL), x: within((x0 + bw / 2 - ox) * s / W, 0, 1), y: within((y0 + bh / 2 - oy) * s / H, 0, 1), h: bh * s / H };
   photos.unshift(rec); trimPhotos();
   renderPhotoTiles(); setCut(id, true);
   rec.saved = toCutBlob(cv).then(async (blob) => {
@@ -7891,6 +7924,7 @@ window.FW = {
     canvas: () => (cam.mode === 'green' ? cam.keyCv : cam.cutCv) || null, layer: () => meCv,
     cuts: () => state.cuts.slice(), all: () => photos.filter((p) => p.cut).map((p) => p.id), setCut: (id, on) => setCut(id, !!on), picked: () => sel,
     place: (id) => { const r = cutRec(id); return r ? { x: r.x, y: r.y, h: r.h, box: cutBox(r, stage.clientWidth, stage.clientHeight) } : null; },
+    picture: (id) => { const r = cutRec(id); return r ? r.cv || r.small : null; }, sharpUp: (cv) => sharpUp(cv),
     async add(url) { return addCut(await decodePhoto(await (await fetch(url)).blob(), PHOTO_SIDE)); }
   },
   three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv, worlds: () => Object.keys(G3.worlds), memory: () => (G3.r ? Object.assign({}, G3.r.info.memory) : null) },
