@@ -886,7 +886,7 @@ html.fs.fs-nofield #f { opacity: 0; pointer-events: none; }
 html.calm .booth-b.busy { animation: none; }
 @media (prefers-reduced-motion: reduce) { .booth-b.busy { animation: none; } }
 .booth-b:focus-visible { outline: 4px solid #fff; outline-offset: 2px; }
-#stage.cam #toast { bottom: 144px; }
+#stage.cam #toast { bottom: 144px; z-index: 7; } /* over the touch-up's sliders too */
 /* ✨ the touch-up's two sliders, over the bar */
 #touchBox { position: absolute; right: 0; bottom: calc(100% + 10px); display: grid; gap: 10px; min-width: 230px; padding: 12px 14px; border-radius: 18px;
   background: #fff; color: var(--ink); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); font: 800 15px/1.2 var(--font); }
@@ -894,11 +894,16 @@ html.calm .booth-b.busy { animation: none; }
 .touch-l { display: grid; gap: 4px; }
 .touch-l input { width: 100%; min-height: 32px; margin: 0; accent-color: var(--ink); cursor: pointer; }
 .touch-l input:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+#boothTouch[aria-expanded="true"] { background: var(--sun); box-shadow: 0 1px 0 var(--ink); transform: translateY(2px); }
+/* a short stage (a phone on its side) has no room above the bar: the sliders lie over the bar itself, beside ✨ */
+html.short #touchBox { top: 0; bottom: 0; left: 0; right: 44px; min-width: 0; padding: 2px 10px; grid-template-columns: 1fr 1fr; align-content: center; gap: 2px 10px; font-size: 12px; border-radius: 14px; }
+html.short .touch-l { grid-template-columns: auto 1fr; align-items: center; gap: 6px; }
+html.short .touch-l input { min-height: 28px; }
 html.short #boothBar { bottom: 64px; gap: 6px; }
 html.short .booth-b { min-height: 38px; min-width: 38px; padding: 0 10px; font-size: 13px; }
 html.short #stage.cam #toast { bottom: auto; top: 6px; } /* a short stage has no room left below: the note goes on top */
 @media (max-width: 480px) { #boothBar { gap: 6px; } .booth-b { padding: 0 9px; font-size: 13.5px; gap: 4px; } .booth-b .long { display: none; } }
-@media (max-width: 380px) { #boothBar { gap: 4px; } .booth-b, html.short .booth-b { padding: 0 6px; font-size: 12.5px; gap: 3px; min-width: 38px; } }
+@media (max-width: 380px) { #boothBar, html.short #boothBar { gap: 4px; } .booth-b, html.short .booth-b { padding: 0 6px; font-size: 12.5px; gap: 3px; min-width: 38px; } .booth-b[data-mode="green"] > span:last-child { display: none; } }
 /* a cut-out says so on its tile, and lies on a checked cloth so the see-through part shows */
 .tile.cutout .sw { position: relative; background: repeating-conic-gradient(#dfe4f2 0 25%, #fff 0 50%) 0 0 / 14px 14px; }
 .tile.cutout .sw::after { content: '✂️'; position: absolute; right: 2px; bottom: 1px; font-size: 14px; line-height: 1; }
@@ -937,7 +942,7 @@ html.calm .tile.cutout.wait .sw::after { animation: none; }
         <button type="button" class="booth-b" data-mode="me" aria-pressed="false" aria-label="Just me: cut me out and stand me in the scene" title="Just me: cut me out and stand me in the scene"><span aria-hidden="true">✂️</span><span aria-hidden="true">Just me</span></button>
         <button type="button" class="booth-b" data-mode="green" aria-pressed="false" aria-label="Green screen: stand in front of a green or blue cloth" title="Green screen: stand in front of a green or blue cloth"><span aria-hidden="true">🟩</span><span aria-hidden="true">Green<span class="long"> screen</span></span></button>
         <button type="button" class="booth-b" id="boothPick" aria-label="Match the cloth's colour again" title="Match the cloth's colour again" hidden><span aria-hidden="true">🎯</span></button>
-        <button type="button" class="booth-b" id="boothTouch" aria-expanded="false" aria-pressed="false" aria-controls="touchBox" aria-label="Touch up: smooth skin and more light" title="Touch up: smooth skin and more light"><span aria-hidden="true">✨</span></button>
+        <button type="button" class="booth-b" id="boothTouch" aria-expanded="false" aria-controls="touchBox" aria-label="Touch up: smooth skin and more light" title="Touch up: smooth skin and more light"><span aria-hidden="true">✨</span></button>
         <div id="touchBox" role="group" aria-label="Touch up" hidden>
           <label class="touch-l"><span><span aria-hidden="true">✨</span> Smooth skin</span><input type="range" id="touchSmooth" min="0" max="100" step="5"></label>
           <label class="touch-l"><span><span aria-hidden="true">☀️</span> Brighter</span><input type="range" id="touchLight" min="0" max="100" step="5"></label>
@@ -3019,7 +3024,7 @@ document.addEventListener('visibilitychange', () => {
 });
 let lastTap = 0;
 stage.addEventListener('pointerup', (e) => {
-  if (e.target.closest('button')) return;
+  if (e.target.closest('button, input, #boothBar')) return;
   const r = stage.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
   const ch = e.target.closest('.ch');
   if (ch && state.ctx && !ch.classList.contains('space')) {
@@ -7909,6 +7914,7 @@ async function setBooth(mode, quiet) {
     if (!ok) { cam.mode = 'all'; markBooth(); camSnap.disabled = cam.counting; tell('✂️ No scissors: they come over the internet. Try the green screen!', 4600); return; }
   }
   camSnap.disabled = cam.counting;
+  if (quiet && SEG.state === 'failed' && !SEG.seg) { SEG.wait = null; SEG.state = 'idle'; } /* the camera was just opened: worth another try */
   if (mode !== 'me' && (touch.smooth > 0 || touch.light > 0) && SEG.state === 'idle') loadSeg(); /* the touch-up wants to know where the skin is */
   boothOn(mode !== 'all');
   if (!quiet) toast(mode === 'me' ? '✂️ Just you! Now pick a scene' : mode === 'green' ? '🟩 Stand in front of a green or blue cloth' : '🖼️ The whole picture', 2800);
@@ -7985,53 +7991,64 @@ function touchUp(cv, src) {
     });
   } catch (e) { skin = face = hair = null; }
   /* both work on a picture of at most 640 pixels and are read back at full size (the fast guided filter of He, Sun and Tang) */
-  const s = Math.max(1, Math.ceil(Math.max(w, h) / 640)), W = Math.ceil(w / s), H = Math.ceil(h / s), N = W * H, tmp = new Float32Array(N);
-  const down = (get) => { const o = new Float32Array(N), k = new Float32Array(N);
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const j = Math.floor(y / s) * W + Math.floor(x / s); o[j] += get(y * w + x); k[j]++; }
-    for (let j = 0; j < N; j++) o[j] /= k[j]; return o; };
+  const s = Math.max(1, Math.ceil(Math.max(w, h) / 640)), W = Math.ceil(w / s), H = Math.ceil(h / s), N = W * H, tmp = new Float32Array(N), cnt = new Float32Array(N);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) cnt[Math.floor(y / s) * W + Math.floor(x / s)]++;
   const guide = (I, r, eps) => { const m = new Float32Array(I), q = new Float32Array(N); for (let j = 0; j < N; j++) q[j] = I[j] * I[j];
     boxBlur(m, tmp, W, H, r); boxBlur(q, tmp, W, H, r); const A = new Float32Array(N), B = new Float32Array(N);
     for (let j = 0; j < N; j++) { const v = Math.max(0, q[j] - m[j] * m[j]), a = v / (v + eps); A[j] = a; B[j] = m[j] - a * m[j]; }
     boxBlur(A, tmp, W, H, r); boxBlur(B, tmp, W, H, r); return [A, B]; };
-  const up = (A, B, fn) => { for (let y = 0; y < h; y++) {
+  /* every full-size pixel with the four grid points around it and their weights */
+  const up = (fn) => { for (let y = 0; y < h; y++) {
     const fy = within((y + .5) / s - .5, 0, H - 1), y0 = Math.floor(fy), y1 = Math.min(H - 1, y0 + 1), ty = fy - y0;
     for (let x = 0; x < w; x++) { const fx = within((x + .5) / s - .5, 0, W - 1), x0 = Math.floor(fx), x1 = Math.min(W - 1, x0 + 1), tx = fx - x0;
-      const j0 = y0 * W + x0, j1 = y0 * W + x1, j2 = y1 * W + x0, j3 = y1 * W + x1, k0 = (1 - tx) * (1 - ty), k1 = tx * (1 - ty), k2 = (1 - tx) * ty, k3 = tx * ty;
-      fn(y * w + x, A[j0] * k0 + A[j1] * k1 + A[j2] * k2 + A[j3] * k3, B[j0] * k0 + B[j1] * k1 + B[j2] * k2 + B[j3] * k3); } } };
+      fn(y * w + x, y0 * W + x0, y0 * W + x1, y1 * W + x0, y1 * W + x1, (1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty); } } };
   if (sb > 0) {
-    const top = (i) => Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) / 255, [A, B] = guide(down(top), Math.max(2, Math.round(Math.max(W, H) / 53)), .01);
-    const meter = (wt) => { let sum = 0, cnt = 0; for (let i = 0; i < n; i += 3) { const k = wt(i); if (k > 0) { sum += k * (.299 * d[i * 4] + .587 * d[i * 4 + 1] + .114 * d[i * 4 + 2]) / 255; cnt += k; } } return cnt > n / 3 * .002 ? sum / cnt : -1; };
-    let ym = face ? meter((i) => (face[i] > .5 && d[i * 4 + 3] > 127 ? 1 : 0)) : -1;
-    if (ym < 0 && skin) ym = meter((i) => skin[i] * d[i * 4 + 3] / 255);
-    if (ym < 0) ym = meter((i) => (1 - Math.abs((i % w) / w * 2 - 1)) * (1 - Math.abs(Math.floor(i / w) / h * 2 - 1)) * d[i * 4 + 3] / 255);
-    const auto = within((.6 - ym) / .3, 0, 1), gam = .6 * sb * (.3 + .7 * auto), cap = 1 + 2 * sb, lut = new Float32Array(1025);
+    /* How dark the photo is: one taken in good light has its brightest parts near white, whoever is in it. (A face's own
+       colour says nothing about the light: darker skin is not a dark photo, and is not made lighter.) */
+    const sd = !src || src === cv ? d : cx2(src).getImageData(0, 0, src.width, src.height).data, hist = new Uint32Array(256); let total = 0;
+    for (let k = 0; k < sd.length; k += 28) { if (sd[k + 3] < 128) continue; hist[Math.max(sd[k], sd[k + 1], sd[k + 2])]++; total++; }
+    let p = 255; for (let acc = 0; p > 0; p--) { acc += hist[p]; if (acc >= total * .02) break; }
+    const auto = total ? within((.85 - p / 255) / .35, 0, 1) : 0, gam = .6 * sb * (.2 + .8 * auto), cap = 1 + 2 * sb, lut = new Float32Array(1025);
     for (let k = 0; k <= 1024; k++) lut[k] = Math.min(cap, Math.pow(Math.max(.05, k / 1024), -gam));
+    const top = (i) => Math.max(d[i * 4], d[i * 4 + 1], d[i * 4 + 2]) / 255, L = new Float32Array(N);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) L[Math.floor(y / s) * W + Math.floor(x / s)] += top(y * w + x);
+    for (let j = 0; j < N; j++) L[j] /= cnt[j];
+    const [A, B] = guide(L, Math.max(2, Math.round(Math.max(W, H) / 53)), .01);
     /* brightness gets the whole gain, colour only half of it: the same gain on red, green and blue would also make the skin redder */
-    up(A, B, (i, a, b) => { let g = lut[Math.round(within(a * top(i) + b, 0, 1) * 1024)]; if (hair) g = 1 + (g - 1) * (1 - .5 * hair[i]);
-      const r = d[i * 4], gr = d[i * 4 + 1], bl = d[i * 4 + 2], y = .299 * r + .587 * gr + .114 * bl, yg = y * g, gc = 1 + (g - 1) * .5;
-      d[i * 4] = yg + (r - y) * gc; d[i * 4 + 1] = yg + (gr - y) * gc; d[i * 4 + 2] = yg + (bl - y) * gc; });
+    up((i, j0, j1, j2, j3, k0, k1, k2, k3) => {
+      let g = lut[Math.round(within((A[j0] * k0 + A[j1] * k1 + A[j2] * k2 + A[j3] * k3) * top(i) + B[j0] * k0 + B[j1] * k1 + B[j2] * k2 + B[j3] * k3, 0, 1) * 1024)];
+      if (hair) g = 1 + (g - 1) * (1 - .5 * hair[i]);
+      const r = d[i * 4], gr = d[i * 4 + 1], bl = d[i * 4 + 2], yv = .299 * r + .587 * gr + .114 * bl, yg = yv * g, gc = 1 + (g - 1) * .5;
+      d[i * 4] = yg + (r - yv) * gc; d[i * 4 + 1] = yg + (gr - yv) * gc; d[i * 4 + 2] = yg + (bl - yv) * gc;
+    });
   }
   if (ss > 0) {
     let rf = .02 * Math.min(w, h);
     if (face) { let y0 = h, y1 = -1; for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 4) if (face[y * w + x] > .5) { if (y < y0) y0 = y; y1 = y; } if (y1 > y0) rf = within(.05 * (y1 - y0), 6, 24); }
-    const r = Math.max(1, Math.round(rf / s)), eps = .001 + .004 * ss, dmax = (.06 + .06 * ss) * 255;
-    for (let ch = 0; ch < 3; ch++) {
-      const [A, B] = guide(down((i) => d[i * 4 + ch] / 255), r, eps);
-      up(A, B, (i, a, b) => { const k = skin ? ss * skin[i] * (1 - .7 * hair[i]) : .5 * ss; if (k <= 0) return; const v = d[i * 4 + ch]; d[i * 4 + ch] = v + k * within((a * v / 255 + b) * 255 - v, -dmax, dmax); });
-    }
+    const r = Math.max(1, Math.round(rf / s)), eps = .001 + .004 * ss, dmax = (.06 + .06 * ss) * 255, I = [new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4, j = Math.floor(y / s) * W + Math.floor(x / s); I[0][j] += d[i]; I[1][j] += d[i + 1]; I[2][j] += d[i + 2]; }
+    for (let j = 0; j < N; j++) { const k = cnt[j] * 255; I[0][j] /= k; I[1][j] /= k; I[2][j] /= k; }
+    const [A0, B0] = guide(I[0], r, eps), [A1, B1] = guide(I[1], r, eps), [A2, B2] = guide(I[2], r, eps);
+    up((i, j0, j1, j2, j3, k0, k1, k2, k3) => {
+      const k = skin ? ss * skin[i] * (1 - .7 * hair[i]) : .5 * ss; if (k <= 0) return;
+      const q = (A, B, v) => (A[j0] * k0 + A[j1] * k1 + A[j2] * k2 + A[j3] * k3) * v + (B[j0] * k0 + B[j1] * k1 + B[j2] * k2 + B[j3] * k3) * 255;
+      const o = i * 4, v0 = d[o], v1 = d[o + 1], v2 = d[o + 2];
+      d[o] = v0 + k * within(q(A0, B0, v0) - v0, -dmax, dmax); d[o + 1] = v1 + k * within(q(A1, B1, v1) - v1, -dmax, dmax); d[o + 2] = v2 + k * within(q(A2, B2, v2) - v2, -dmax, dmax);
+    });
   }
   c.putImageData(im, 0, 0);
 }
 const touchBox = $('#touchBox'), touchBtn = $('#boothTouch'), touchS = $('#touchSmooth'), touchL = $('#touchLight');
 touchS.value = Math.round(touch.smooth * 100); touchL.value = Math.round(touch.light * 100);
-const touchShow = (on) => { touchBox.hidden = !on; touchBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); touchBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); };
-touchBox.addEventListener('input', () => { touch.smooth = touchS.value / 100; touch.light = touchL.value / 100; save('fw.touch', touch); });
+const touchShow = (on) => { touchBox.hidden = !on; touchBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
+touchBox.addEventListener('input', () => { touch.smooth = touchS.value / 100; touch.light = touchL.value / 100; save('fw.touch', touch);
+  if (cam.on && cam.stream && (touch.smooth > 0 || touch.light > 0) && SEG.state === 'idle') loadSeg(); /* raised from nothing: now it wants to know where the skin is */ });
 boothBar.addEventListener('click', (e) => {
+  if (e.target.closest('#boothTouch')) { touchShow(touchBox.hidden); sound.pop(); return; }
   if (cam.counting) return; /* 3, 2, 1 is running: the photo will be the kind that was asked for */
   const b = e.target.closest('[data-mode]');
   if (b) { setBooth(b.dataset.mode); sound.pop(); return; }
   if (e.target.closest('#boothPick')) { cam.key = null; cam.warned = false; cam.keyUntil = 0; toast('🎯 Matched the cloth again', 2000); sound.pop(); }
-  if (e.target.closest('#boothTouch')) { touchShow(touchBox.hidden); sound.pop(); }
 });
 boothBar.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; e.preventDefault(); if (!touchBox.hidden) { touchShow(false); touchBtn.focus(); } else stopCamera(); });
 cam.mode = ['all', 'me', 'green'].indexOf(load('fw.booth', 'all')) >= 0 ? load('fw.booth', 'all') : 'all';
@@ -8098,7 +8115,7 @@ function stopCamera() {
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 async function snap(quick) {
   if (!cam.stream || cam.counting) return null;
-  const seq = cam.seq; cam.counting = true; camSnap.disabled = true;
+  const seq = cam.seq; cam.counting = true; camSnap.disabled = true; touchShow(false);
   for (const n of quick ? [] : [3, 2, 1]) {
     camCount.textContent = String(n); bump(camCount, 'go'); sound.tick(); announceEl.textContent = String(n);
     await pause(800);
@@ -8107,10 +8124,12 @@ async function snap(quick) {
   camCount.textContent = ''; camCount.classList.remove('go');
   const w = camVid.videoWidth, h = camVid.videoHeight;
   if (!w || !h) { cam.counting = false; camSnap.disabled = false; toast('No picture yet. Try again!', 2600); return null; }
-  const cv = photoCanvas(camVid, w, h, cam.mirror); const cut = cam.booth ? boothSnap(cv) : null; if (cut === false) return null; try { touchUp(cut ? cut.cv : cv, cv); } catch (e) { /* the photo stays as it was taken */ } /* the photo looks just like what the kid saw */
+  const cv = photoCanvas(camVid, w, h, cam.mirror); const cut = cam.booth ? boothSnap(cv) : null; if (cut === false) return null; /* the photo looks just like what the kid saw */
   if (!isReduced() && FEAT.animate) { try { flashEl.animate([{ opacity: .95 }, { opacity: 0 }], { duration: 380, easing: 'ease-out' }); } catch (e) { /* ignore */ } }
   sound.pop();
   stopCamera();
+  await new Promise((r) => { requestAnimationFrame(() => setTimeout(r, 0)); setTimeout(r, 120); }); /* the flash shows first: the touch-up takes a moment */
+  try { touchUp(cut ? cut.cv : cv, cv); } catch (e) { /* the photo stays as it was taken */ }
   const id = cut ? addCut(cut.cv) : addPhoto(cv);
   toast('📸 Snap! You are in the scene!', 3000); announceEl.textContent = cut ? 'Photo taken. You are standing in the scene.' : 'Photo taken. It is the scene now.';
   if (!state.autoplay) again();
@@ -8249,7 +8268,7 @@ window.FW = {
     canvas: () => (cam.mode === 'green' ? cam.keyCv : cam.cutCv) || null, layer: () => meCv,
     cuts: () => state.cuts.slice(), all: () => photos.filter((p) => p.cut).map((p) => p.id), setCut: (id, on) => setCut(id, !!on), picked: () => sel,
     place: (id) => { const r = cutRec(id); return r ? { x: r.x, y: r.y, h: r.h, box: cutBox(r, stage.clientWidth, stage.clientHeight) } : null; },
-    picture: (id) => { const r = photos.find((q) => q.id === id); return r ? r.cv || r.small : null; }, sharpUp: (cv) => sharpUp(cv), sharp: (id) => { const r = cutRec(id); return r ? r.sr || '' : ''; },
+    picture: (id) => { const r = photos.find((q) => q.id === id); return r ? r.cv || r.small : null; }, touchUp: (cv, smooth, light) => { const was = Object.assign({}, touch); touch.smooth = smooth; touch.light = light; try { touchUp(cv, cv); } finally { Object.assign(touch, was); } }, sharpUp: (cv) => sharpUp(cv), sharp: (id) => { const r = cutRec(id); return r ? r.sr || '' : ''; },
     async add(url) { return addCut(await decodePhoto(await (await fetch(url)).blob(), PHOTO_SIDE)); }
   },
   three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv, worlds: () => Object.keys(G3.worlds), memory: () => (G3.r ? Object.assign({}, G3.r.info.memory) : null) },
