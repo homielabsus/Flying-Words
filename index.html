@@ -7476,8 +7476,9 @@ const SEG = {
 };
 const inTime = (p, ms) => new Promise((res, rej) => { const slow = setTimeout(() => rej(new Error('slow')), ms); p.then((v) => { clearTimeout(slow); res(v); }, (e) => { clearTimeout(slow); rej(e); }); });
 /* `src` is drawn into the canvas `out`, and everything that is not the person is made see-through. The model's
-   answer is how sure it is, pixel by pixel, that this is the room: the edge is the narrow band where it is unsure,
-   and specks it kept that stand apart from the person are dropped. */
+   answer is how sure it is, pixel by pixel, that this is the room: the edge is the thin band where it is in two minds
+   (thin, so the outline is crisp and no haze of the room hangs on it), and specks it kept that stand apart from the
+   person are dropped. */
 function segCut(src, out, seg) {
   const w = out.width, h = out.height, n = w * h, c = cx2(out);
   c.globalCompositeOperation = 'copy'; c.drawImage(src, 0, 0, w, h); c.globalCompositeOperation = 'source-over';
@@ -7486,19 +7487,19 @@ function segCut(src, out, seg) {
   (seg || SEG.seg).segment(out, (res) => { /* the masks are only lent for the length of this call */
     const room = res.confidenceMasks[0].getAsFloat32Array(); if (room.length !== n) throw new Error('mask');
     for (let i = 0; i < n; i++) {
-      if (room[i] > .7 || lab[i]) continue;
+      if (room[i] > .56 || lab[i]) continue;
       const id = sizes.length; let top = 0, size = 0; stack[top++] = i; lab[i] = id;
       while (top) {
         const j = stack[--top], x = j % w; size++;
-        if (x > 0 && !lab[j - 1] && room[j - 1] <= .7) { lab[j - 1] = id; stack[top++] = j - 1; }
-        if (x < w - 1 && !lab[j + 1] && room[j + 1] <= .7) { lab[j + 1] = id; stack[top++] = j + 1; }
-        if (j >= w && !lab[j - w] && room[j - w] <= .7) { lab[j - w] = id; stack[top++] = j - w; }
-        if (j < n - w && !lab[j + w] && room[j + w] <= .7) { lab[j + w] = id; stack[top++] = j + w; }
+        if (x > 0 && !lab[j - 1] && room[j - 1] <= .56) { lab[j - 1] = id; stack[top++] = j - 1; }
+        if (x < w - 1 && !lab[j + 1] && room[j + 1] <= .56) { lab[j + 1] = id; stack[top++] = j + 1; }
+        if (j >= w && !lab[j - w] && room[j - w] <= .56) { lab[j - w] = id; stack[top++] = j - w; }
+        if (j < n - w && !lab[j + w] && room[j + w] <= .56) { lab[j + w] = id; stack[top++] = j + w; }
       }
       sizes.push(size); if (size > big) big = size;
     }
     for (let i = 0; i < n; i++) {
-      const t = lab[i] && sizes[lab[i]] >= big * .05 ? Math.min(1, (.7 - room[i]) / .4) : 0;
+      const t = lab[i] && sizes[lab[i]] >= big * .05 ? Math.min(1, (.56 - room[i]) / .12) : 0;
       d[i * 4 + 3] = 255 * t * t * (3 - 2 * t);
     }
   });
