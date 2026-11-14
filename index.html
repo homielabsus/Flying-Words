@@ -723,13 +723,13 @@ html.short #stage.cam #toast { bottom: 66px; }
 #toast { max-width: calc(100% - 150px); }
 html.short #keepBtn { width: 44px; height: 44px; font-size: 21px; right: 10px; bottom: 10px; }
 
-#keep {
+#keep, #pick {
   padding: 0; margin: auto; border: 4px solid var(--ink); border-radius: 26px; background: var(--paper); color: var(--ink);
   box-shadow: 8px 8px 0 var(--ink); width: min(1000px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px);
   overflow: auto; font-family: var(--font); overscroll-behavior: contain;
 }
-#keep[open] { display: block; }
-#keep::backdrop { background: rgba(27, 27, 58, .6); }
+#keep[open], #pick[open] { display: block; }
+#keep::backdrop, #pick::backdrop { background: rgba(27, 27, 58, .6); }
 .kp { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px 20px; padding: 16px 18px 18px; }
 .kp-head { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .kp-head h2 { margin: 0; font: 900 28px/1.1 var(--font); }
@@ -797,7 +797,7 @@ html.short #keepBtn { width: 44px; height: 44px; font-size: 21px; right: 10px; b
 .kp-msg { margin: 0; min-height: 1.35em; font: 800 16px/1.35 var(--font); }
 html.calm .kp-make.pop { animation: none; }
 @media (max-width: 760px) {
-  #keep { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+  #keep, #pick { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
   .kp { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 12px 16px 18px; }
   .kp-head h2 { font-size: 24px; }
   .kp-view { min-height: 140px; padding: 8px; }
@@ -918,6 +918,14 @@ html.calm .tile.cutout.wait .sw::after { animation: none; }
   display: grid; place-items: center; font: 800 18px/1 var(--font); cursor: nwse-resize; touch-action: none;
 }
 #meGrip span { transform: rotate(45deg); pointer-events: none; }
+
+/* 🖼️ the photo picker (a dialog dressed like Keep it) */
+#pkCanvas { max-height: min(58vh, 560px); width: auto; height: auto; }
+.pk-sliders { display: grid; gap: 10px; padding: 12px 14px; border-radius: 18px; border: 3px solid var(--ink); background: #fff; font: 800 15px/1.2 var(--font); }
+.pk-btns { display: flex; gap: 10px; }
+.pk-btns .kp-make { flex: 1; }
+.pk-btns .pk-cancel { background: #fff; }
+#pkBusy { justify-content: center; }
 </style>
 </head>
 <body>
@@ -942,15 +950,17 @@ html.calm .tile.cutout.wait .sw::after { animation: none; }
         <button type="button" class="booth-b" data-mode="me" aria-pressed="false" aria-label="Just me: cut me out and stand me in the scene" title="Just me: cut me out and stand me in the scene"><span aria-hidden="true">✂️</span><span aria-hidden="true">Just me</span></button>
         <button type="button" class="booth-b" data-mode="green" aria-pressed="false" aria-label="Green screen: stand in front of a green or blue cloth" title="Green screen: stand in front of a green or blue cloth"><span aria-hidden="true">🟩</span><span aria-hidden="true">Green<span class="long"> screen</span></span></button>
         <button type="button" class="booth-b" id="boothPick" aria-label="Match the cloth's colour again" title="Match the cloth's colour again" hidden><span aria-hidden="true">🎯</span></button>
-        <button type="button" class="booth-b" id="boothTouch" aria-expanded="false" aria-controls="touchBox" aria-label="Touch up: smooth skin and more light" title="Touch up: smooth skin and more light"><span aria-hidden="true">✨</span></button>
+        <button type="button" class="booth-b" id="boothTouch" aria-expanded="false" aria-controls="touchBox" aria-label="Touch up: smooth skin, more light, sharper" title="Touch up: smooth skin, more light, sharper"><span aria-hidden="true">✨</span></button>
         <div id="touchBox" role="group" aria-label="Touch up" hidden>
-          <label class="touch-l"><span><span aria-hidden="true">✨</span> Smooth skin</span><input type="range" id="touchSmooth" min="0" max="100" step="5"></label>
-          <label class="touch-l"><span><span aria-hidden="true">☀️</span> Brighter</span><input type="range" id="touchLight" min="0" max="100" step="5"></label>
+          <label class="touch-l"><span><span aria-hidden="true">✨</span> Smooth skin</span><input type="range" id="touchSmooth" data-touch="smooth" min="0" max="100" step="5"></label>
+          <label class="touch-l"><span><span aria-hidden="true">☀️</span> Brighter</span><input type="range" id="touchLight" data-touch="light" min="0" max="100" step="5"></label>
+          <label class="touch-l"><span><span aria-hidden="true">🔍</span> Sharper</span><input type="range" id="touchSharp" data-touch="sharp" min="0" max="100" step="5"></label>
         </div>
       </div>
       <div id="camBar" role="group" aria-label="Camera" hidden>
         <button id="camOff" class="cam-b" type="button" aria-label="Close the camera" title="Close the camera"><span aria-hidden="true">✕</span></button>
         <button id="camSnap" type="button" aria-label="Snap a photo: 3, 2, 1!"><span aria-hidden="true">📸</span><span aria-hidden="true">Snap!</span></button>
+        <button id="camPick" class="cam-b" type="button" aria-label="Choose a photo from the device instead" title="Choose a photo"><span aria-hidden="true">🖼️</span></button>
         <button id="camFlip" class="cam-b" type="button" aria-label="Use another camera" title="Use another camera" hidden><span aria-hidden="true">🔄</span></button>
       </div>
       <div id="camCount" aria-hidden="true"></div>
@@ -991,6 +1001,26 @@ html.calm .tile.cutout.wait .sw::after { animation: none; }
     </div>
   </aside>
 </div>
+<dialog id="pick" aria-labelledby="pkTitle">
+  <div class="kp">
+    <div class="kp-head"><h2 id="pkTitle">🖼️ Your photo</h2><button id="pkClose" class="kp-x" type="button" aria-label="Cancel: do not keep it">✕</button></div>
+    <div class="kp-view"><canvas id="pkCanvas" role="img" aria-label="Your photo as it will be kept"></canvas><div id="pkBusy" class="kp-busy" role="status" hidden></div></div>
+    <div class="kp-ctrl">
+      <fieldset class="kp-row"><legend>Keep</legend>
+        <label class="kp-opt"><input type="radio" name="pkMode" value="all"><span class="ki" aria-hidden="true">🖼️</span><span class="kl">All of it</span><span class="ks">SCENE</span></label>
+        <label class="kp-opt"><input type="radio" name="pkMode" value="me"><span class="ki" aria-hidden="true">✂️</span><span class="kl">Just me</span><span class="ks">CUT-OUT</span></label>
+        <label class="kp-opt"><input type="radio" name="pkMode" value="green"><span class="ki" aria-hidden="true">🟩</span><span class="kl">Green screen</span><span class="ks">CUT-OUT</span></label>
+      </fieldset>
+      <div class="pk-sliders" role="group" aria-label="Touch up">
+        <label class="touch-l"><span><span aria-hidden="true">✨</span> Smooth skin</span><input type="range" data-touch="smooth" min="0" max="100" step="5"></label>
+        <label class="touch-l"><span><span aria-hidden="true">☀️</span> Brighter</span><input type="range" data-touch="light" min="0" max="100" step="5"></label>
+        <label class="touch-l"><span><span aria-hidden="true">🔍</span> Sharper</span><input type="range" data-touch="sharp" min="0" max="100" step="5"></label>
+      </div>
+      <p id="pkMsg" class="kp-msg" role="status"></p>
+      <div class="pk-btns"><button id="pkCancel" class="kp-make pk-cancel" type="button">Cancel</button><button id="pkKeep" class="kp-make" type="button">✅ Keep it</button></div>
+    </div>
+  </div>
+</dialog>
 <dialog id="keep" aria-labelledby="kpTitle">
   <div class="kp">
     <div class="kp-head"><h2 id="kpTitle">📸 Keep it!</h2><button id="kpClose" class="kp-x" type="button" aria-label="Close">✕</button></div>
@@ -7292,10 +7322,11 @@ function removePhoto(id) {
   try { next.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
   toast('🗑️ Photo removed');
 }
-async function usePhotoFile(file) {
+async function usePhotoFile(file, direct) {
   if (!file || (file.type && !/^image\//.test(file.type))) { toast('That is not a photo. Try another one!', 3200); return null; }
   hideHint();
-  try { const id = addPhoto(await decodePhoto(file, PHOTO_SIDE)); toast('🖼️ Your photo is the scene!', 2600); if (!state.autoplay) again(); return id; }
+  try { const cv = await decodePhoto(file, PHOTO_SIDE); if (!direct) { openPick(cv); return null; } /* seen and touched up before it is kept */
+    const id = addPhoto(cv); toast('🖼️ Your photo is the scene!', 2600); if (!state.autoplay) again(); return id; }
   catch (e) { toast('That photo didn’t open. Try another one!', 3200); return null; }
 }
 async function restorePhotos() {
@@ -7325,11 +7356,11 @@ document.body.append(photoFile, snapFile);
 for (const inp of [photoFile, snapFile]) inp.addEventListener('change', () => { const f = inp.files && inp.files[0]; inp.value = ''; if (f) usePhotoFile(f); });
 function pickPhoto() { photoFile.value = ''; photoFile.click(); }
 const hasFiles = (e) => { try { return Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') >= 0; } catch (err) { return false; } };
-document.addEventListener('dragover', (e) => { if (!hasFiles(e) || (keepDlg && keepDlg.open)) return; e.preventDefault(); stage.classList.add('drop'); });
+document.addEventListener('dragover', (e) => { if (!hasFiles(e) || (keepDlg && keepDlg.open) || pickDlg.open) return; e.preventDefault(); stage.classList.add('drop'); });
 document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) stage.classList.remove('drop'); });
 document.addEventListener('drop', (e) => {
   stage.classList.remove('drop');
-  if (!hasFiles(e) || (keepDlg && keepDlg.open)) return;
+  if (!hasFiles(e) || (keepDlg && keepDlg.open) || pickDlg.open) return;
   e.preventDefault();
   const f = Array.prototype.filter.call(e.dataTransfer.files || [], (x) => /^image\//.test(x.type))[0];
   if (f) { hideHint(); usePhotoFile(f); } else toast('Drop a photo here!', 2600);
@@ -7915,7 +7946,7 @@ async function setBooth(mode, quiet) {
   }
   camSnap.disabled = cam.counting;
   if (quiet && SEG.state === 'failed' && !SEG.seg) { SEG.wait = null; SEG.state = 'idle'; } /* the camera was just opened: worth another try */
-  if (mode !== 'me' && (touch.smooth > 0 || touch.light > 0) && SEG.state === 'idle') loadSeg(); /* the touch-up wants to know where the skin is */
+  if (mode !== 'me' && touchOn() && SEG.state === 'idle') loadSeg(); /* the touch-up wants to know where the skin is */
   boothOn(mode !== 'all');
   if (!quiet) toast(mode === 'me' ? '✂️ Just you! Now pick a scene' : mode === 'green' ? '🟩 Stand in front of a green or blue cloth' : '🖼️ The whole picture', 2800);
   announceEl.textContent = mode === 'me' ? 'Just you, in the scene.' : mode === 'green' ? 'Green screen on.' : 'The whole camera picture.';
@@ -7976,10 +8007,11 @@ function boothSnap(full) {
    moves towards the colour around it; where it varies a lot (eyes, brows, lips, the outline) it stays as it is. The
    person finder says where skin and hair are; without it (offline) the smoothing is gentler and goes everywhere. */
 const touch = (() => { const t = load('fw.touch', null), ok = (v) => typeof v === 'number' && v >= 0 && v <= 1;
-  return { smooth: t && ok(t.smooth) ? t.smooth : .3, light: t && ok(t.light) ? t.light : .35 }; })();
+  return { smooth: t && ok(t.smooth) ? t.smooth : .3, light: t && ok(t.light) ? t.light : .35, sharp: t && ok(t.sharp) ? t.sharp : .3 }; })();
+const touchOn = () => touch.smooth > 0 || touch.light > 0 || touch.sharp > 0;
 const touchStep = (a, b, v) => { const t = within((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 function touchUp(cv, src) {
-  const ss = touch.smooth, sb = touch.light; if (!(ss > 0) && !(sb > 0)) return;
+  const ss = touch.smooth, sb = touch.light, sh = touch.sharp; if (!(ss > 0) && !(sb > 0) && !(sh > 0)) return;
   const w = cv.width, h = cv.height, n = w * h, c = cx2(cv), im = c.getImageData(0, 0, w, h), d = im.data;
   let skin = null, face = null, hair = null;
   if (SEG.seg) try {
@@ -8036,13 +8068,104 @@ function touchUp(cv, src) {
       d[o] = v0 + k * within(q(A0, B0, v0) - v0, -dmax, dmax); d[o + 1] = v1 + k * within(q(A1, B1, v1) - v1, -dmax, dmax); d[o + 2] = v2 + k * within(q(A2, B2, v2) - v2, -dmax, dmax);
     });
   }
+  if (sh > 0) {
+    /* Sharper: the unsharp mask (as in GIMP and ImageMagick), on brightness only so no colour fringes. The fine detail
+       (the picture minus a slightly blurred copy) is added again, more of it the higher the slider; tiny differences
+       (noise, grain) are left alone, big ones are capped so edges get no glowing rims, and skin is left out so the
+       smoothing stays. */
+    const Y = new Float32Array(n), bl = new Float32Array(n), t2 = new Float32Array(n), r = Math.max(1, Math.round(Math.max(w, h) / 1400)), amt = 1.6 * sh, cap = 18 + 22 * sh;
+    for (let i = 0; i < n; i++) Y[i] = .299 * d[i * 4] + .587 * d[i * 4 + 1] + .114 * d[i * 4 + 2];
+    bl.set(Y); boxBlur(bl, t2, w, h, r); boxBlur(bl, t2, w, h, r);
+    for (let i = 0; i < n; i++) {
+      const det = Y[i] - bl[i], a = Math.abs(det); if (a < 2) continue;
+      const k = amt * touchStep(2, 6, a) * (skin ? 1 - .85 * skin[i] : 1); if (k <= 0) continue;
+      const add = within(det * k, -cap, cap), o = i * 4; d[o] += add; d[o + 1] += add; d[o + 2] += add;
+    }
+  }
   c.putImageData(im, 0, 0);
 }
-const touchBox = $('#touchBox'), touchBtn = $('#boothTouch'), touchS = $('#touchSmooth'), touchL = $('#touchLight');
-touchS.value = Math.round(touch.smooth * 100); touchL.value = Math.round(touch.light * 100);
+const touchBox = $('#touchBox'), touchBtn = $('#boothTouch'), touchIns = [...document.querySelectorAll('input[data-touch]')];
+const touchSync = () => { for (const t of touchIns) t.value = Math.round(touch[t.dataset.touch] * 100); };
+touchSync();
 const touchShow = (on) => { touchBox.hidden = !on; touchBtn.setAttribute('aria-expanded', on ? 'true' : 'false'); };
-touchBox.addEventListener('input', () => { touch.smooth = touchS.value / 100; touch.light = touchL.value / 100; save('fw.touch', touch);
-  if (cam.on && cam.stream && (touch.smooth > 0 || touch.light > 0) && SEG.state === 'idle') loadSeg(); /* raised from nothing: now it wants to know where the skin is */ });
+/* the same three sliders sit in the booth's ✨ panel and in the photo picker: moving one moves its twin */
+document.addEventListener('input', (e) => { const t = e.target; if (!t || !t.dataset || !t.dataset.touch) return;
+  touch[t.dataset.touch] = t.value / 100; save('fw.touch', touch); for (const o of touchIns) if (o !== t && o.dataset.touch === t.dataset.touch) o.value = t.value;
+  if (((cam.on && cam.stream) || pickDlg.open) && touchOn() && SEG.state === 'idle') loadSeg(); /* raised from nothing: now it wants to know where the skin is */
+  if (pickDlg.open) pkLater(); });
+/* 🖼️ A photo from the device, made the way a snap is: the whole picture as the scene, just the kid as a sticker, or the
+   kid in front of a green or blue backdrop; touched up with the same sliders, and seen before it is kept. The preview
+   works on a small copy so the sliders answer quickly; Keep does it again on the whole photo. */
+const pickDlg = $('#pick'), pkCanvas = $('#pkCanvas'), pkBusy = $('#pkBusy'), pkMsg = $('#pkMsg'), pkKeep = $('#pkKeep');
+const pk = { src: null, small: null, mode: 'all', base: {}, seq: 0, timer: 0, back: null };
+const pkFrame = () => new Promise((r) => { requestAnimationFrame(() => setTimeout(r, 0)); setTimeout(r, 120); });
+const copyCv = (cv) => { const o = document.createElement('canvas'); o.width = cv.width; o.height = cv.height; cx2(o).putImageData(cx2(cv).getImageData(0, 0, cv.width, cv.height), 0, 0); o.soft = cv.soft; return o; };
+/* the kid cut out of a still photo, or why not */
+function pickCut(full, mode) {
+  const out = document.createElement('canvas'); out.width = full.width; out.height = full.height;
+  if (mode === 'green') { /* the photo's own backdrop colour: the camera keeps its own */
+    const was = cam.key, at = cam.keyAt; let key = null; cam.key = null;
+    try { greenCut(full, out, false); key = cam.key; } finally { cam.key = was; cam.keyAt = at; }
+    if (!key || key.weak) return '🟩 This photo has no green or blue backdrop. Try ✂️ Just me!';
+  } else { segCut(full, out, null, true); out.soft = true; }
+  const d = cx2(out).getImageData(0, 0, out.width, out.height).data; let on = 0, n = 0;
+  for (let i = 3; i < d.length; i += 28) { n++; if (d[i] > 127) on++; }
+  if (mode === 'green' && on / n > .985) return '🟩 This photo has no green or blue backdrop. Try ✂️ Just me!';
+  if (on / n < .004) return mode === 'green' ? '🟩 I only see the backdrop in this photo.' : '✂️ I can not find anyone in this photo. Try 🖼️ All of it!';
+  return out;
+}
+const pkBusyOn = (text) => { pkBusy.hidden = false; pkBusy.textContent = text; pkKeep.disabled = true; };
+const pkBusyOff = () => { pkBusy.hidden = true; };
+async function pkRender(full) {
+  const seq = ++pk.seq, mode = pk.mode, src = full ? pk.src : pk.small; pkMsg.textContent = '';
+  let base = full ? null : pk.base[mode];
+  if (!base) {
+    if (mode === 'me' && SEG.state !== 'ready') {
+      pkBusyOn('✂️ Getting the scissors… one moment'); if (SEG.state === 'failed') { SEG.wait = null; SEG.state = 'idle'; }
+      const ok = await loadSeg(); if (seq !== pk.seq) return null;
+      if (!ok) { pkBusyOff(); pkMsg.textContent = '✂️ No scissors: they come over the internet. Try 🖼️ All of it!'; return null; }
+    }
+    pkBusyOn(full ? '✨ Making it…' : '✨ One moment…'); await pkFrame(); if (seq !== pk.seq || !src) return null;
+    try { base = mode === 'all' ? src : pickCut(src, mode); } catch (e) { base = '✂️ That did not work. Try again!'; }
+    if (!full) pk.base[mode] = base;
+  }
+  if (typeof base === 'string') { pkBusyOff(); pkMsg.textContent = base; return null; }
+  const cv = copyCv(base); try { touchUp(cv, src); } catch (e) { /* it is kept as it is */ }
+  pkBusyOff(); return seq === pk.seq ? cv : null;
+}
+async function pkShow() {
+  const cv = await pkRender(false); if (!pickDlg.open || !pk.small) return;
+  const show = cv || pk.small; pkCanvas.width = show.width; pkCanvas.height = show.height;
+  const c = pkCanvas.getContext('2d'); c.clearRect(0, 0, show.width, show.height); c.globalAlpha = cv ? 1 : .35; c.drawImage(show, 0, 0); c.globalAlpha = 1;
+  pkKeep.disabled = !cv;
+}
+const pkLater = () => { clearTimeout(pk.timer); pk.timer = setTimeout(pkShow, 160); };
+function openPick(cv) {
+  if (cam.on) stopCamera();
+  pk.src = cv; pk.small = photoCanvas(cv, cv.width, cv.height, false, 720); pk.base = {}; pk.mode = ['all', 'me', 'green'].indexOf(cam.mode) >= 0 ? cam.mode : 'all';
+  for (const r of pickDlg.querySelectorAll('input[name="pkMode"]')) r.checked = r.value === pk.mode;
+  pk.back = document.activeElement; touchSync(); pkMsg.textContent = ''; pkKeep.disabled = true;
+  try { pickDlg.showModal(); } catch (e) { pickDlg.setAttribute('open', ''); }
+  if (touchOn() && SEG.state === 'idle') loadSeg().then((ok) => { if (ok && pickDlg.open) pkShow(); }); /* the touch-up wants to know where the skin is */
+  pkShow();
+}
+function closePick() {
+  pk.seq++; clearTimeout(pk.timer); pkBusyOff();
+  if (pickDlg.open) { try { pickDlg.close(); } catch (e) { pickDlg.removeAttribute('open'); } }
+  pk.src = pk.small = null; pk.base = {};
+  if (pk.back && pk.back.isConnected && pk.back.focus) { try { pk.back.focus(); } catch (e) { /* ignore */ } }
+}
+pickDlg.addEventListener('change', (e) => { if (e.target.name === 'pkMode') { pk.mode = e.target.value; pkShow(); } });
+pickDlg.addEventListener('cancel', (e) => { e.preventDefault(); closePick(); });
+$('#pkClose').addEventListener('click', closePick); $('#pkCancel').addEventListener('click', closePick);
+pkKeep.addEventListener('click', async () => {
+  if (pkKeep.disabled) return; pkKeep.disabled = true;
+  const mode = pk.mode, cv = await pkRender(true); if (!cv || !pickDlg.open) { pkKeep.disabled = !cv; return; }
+  closePick(); sound.pop();
+  if (mode === 'all') { addPhoto(cv); tell('🖼️ Your photo is the scene!', 2600); } else { addCut(cv); tell('✂️ You are in the scene!', 2600); }
+  if (!state.autoplay) again();
+});
+$('#camPick').addEventListener('click', () => { if (!cam.counting) pickPhoto(); });
 boothBar.addEventListener('click', (e) => {
   if (e.target.closest('#boothTouch')) { touchShow(touchBox.hidden); sound.pop(); return; }
   if (cam.counting) return; /* 3, 2, 1 is running: the photo will be the kind that was asked for */
@@ -8174,7 +8297,7 @@ function fsWake() {
 }
 function fsSleep() {
   if (!fs.on) return;
-  let busy = (keepDlg && keepDlg.open) || cam.on;
+  let busy = (keepDlg && keepDlg.open) || pickDlg.open || cam.on;
   try { busy = busy || (hoverable() && fsControls().some((el) => el.matches(':hover'))); } catch (e) { /* no :hover here */ }
   if (busy) { fs.timer = setTimeout(fsSleep, 3000); return; }
   root.classList.add('fs-idle');
@@ -8198,7 +8321,7 @@ const fsTyped = (e) => !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Back
 function fsStir(e) {
   if (!fs.on) return;
   fsWake();
-  if ((keepDlg && keepDlg.open) || cam.on) return;
+  if ((keepDlg && keepDlg.open) || pickDlg.open || cam.on) return;
   if (e.type === 'pointerdown') { if (!(e.target.closest && e.target.closest('#fsBtn, #fsPlay, #keepBtn, #badge, #stars'))) fsField(e.target === input ? 30000 : 3000); } /* a tap in the box means typing is coming */
   else if (e.type === 'keydown' && e.key === 'Tab') setTimeout(() => { if (fs.on && form.contains(document.activeElement)) fsField(3000); }, 0); /* never leave the keyboard's focus on something unseen */
   else if (e.type === 'keydown' && typeof e.key === 'string' && fsTyped(e)) {
@@ -8233,7 +8356,7 @@ for (const ev of ['pointermove', 'pointerdown', 'keydown', 'focusin', 'wheel']) 
 input.addEventListener('input', () => { fsField(30000); });
 /* Esc leaves full screen (before the word box hears it and clears the word); a live camera and the Keep-it dialog keep theirs */
 document.addEventListener('keydown', (e) => {
-  if (!fs.on || e.key !== 'Escape' || (keepDlg && keepDlg.open) || cam.on) return;
+  if (!fs.on || e.key !== 'Escape' || (keepDlg && keepDlg.open) || pickDlg.open || cam.on) return;
   e.preventDefault(); e.stopPropagation(); exitFs();
 }, true);
 new MutationObserver(markFsPlay).observe(playBtn, { attributes: true, attributeFilter: ['aria-pressed'] });
@@ -8268,7 +8391,7 @@ window.FW = {
     canvas: () => (cam.mode === 'green' ? cam.keyCv : cam.cutCv) || null, layer: () => meCv,
     cuts: () => state.cuts.slice(), all: () => photos.filter((p) => p.cut).map((p) => p.id), setCut: (id, on) => setCut(id, !!on), picked: () => sel,
     place: (id) => { const r = cutRec(id); return r ? { x: r.x, y: r.y, h: r.h, box: cutBox(r, stage.clientWidth, stage.clientHeight) } : null; },
-    picture: (id) => { const r = photos.find((q) => q.id === id); return r ? r.cv || r.small : null; }, touchUp: (cv, smooth, light) => { const was = Object.assign({}, touch); touch.smooth = smooth; touch.light = light; try { touchUp(cv, cv); } finally { Object.assign(touch, was); } }, sharpUp: (cv) => sharpUp(cv), sharp: (id) => { const r = cutRec(id); return r ? r.sr || '' : ''; },
+    picture: (id) => { const r = photos.find((q) => q.id === id); return r ? r.cv || r.small : null; }, touchUp: (cv, smooth, light, sharp) => { const was = Object.assign({}, touch); touch.smooth = smooth; touch.light = light; touch.sharp = sharp || 0; try { touchUp(cv, cv); } finally { Object.assign(touch, was); } }, pick: () => ({ open: pickDlg.open, mode: pk.mode, busy: !pkBusy.hidden, msg: pkMsg.textContent, keep: !pkKeep.disabled }), sharpUp: (cv) => sharpUp(cv), sharp: (id) => { const r = cutRec(id); return r ? r.sr || '' : ''; },
     async add(url) { return addCut(await decodePhoto(await (await fetch(url)).blob(), PHOTO_SIDE)); }
   },
   three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv, worlds: () => Object.keys(G3.worlds), memory: () => (G3.r ? Object.assign({}, G3.r.info.memory) : null) },
@@ -8276,7 +8399,7 @@ window.FW = {
   __drawScene: (c, id, w, h, t) => drawScene(c, id, w, h, t),
   photos: {
     list: () => photos.map((p) => ({ id: p.id, full: !!p.cv, w: p.cv ? p.cv.width : 0, h: p.cv ? p.cv.height : 0, sw: p.small.width, sh: p.small.height, saved: !!p.blob, cut: !!p.cut })),
-    async add(url, type) { const b = await (await fetch(url)).blob(); return usePhotoFile(new File([b], 'photo', { type: type || b.type || 'image/png' })); },
+    async add(url, type) { const b = await (await fetch(url)).blob(); return usePhotoFile(new File([b], 'photo', { type: type || b.type || 'image/png' }), true); },
     remove: (id) => removePhoto(id), restore: () => restorePhotos()
   },
   camera: {
