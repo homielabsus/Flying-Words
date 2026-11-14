@@ -6517,12 +6517,14 @@ const KEEP = (() => {
   }
   function withDrop(src, sh, S, col) { const cv = newCanvas(src.width, src.height), c = cv.getContext('2d'); shadowOnly(c, src, sh, S, col); c.drawImage(src, 0, 0); return cv; }
   function paintUnit(R, U, st, S) {
+    S = Math.min(S, Math.sqrt(16e6 / ((U.bw + R.pad * 2) * (U.bh + R.pad * 2)))); /* (only ever lower at 2K/4K) */
     const pad = R.pad, W = Math.ceil((U.bw + pad * 2) * S), H = Math.ceil((U.bh + pad * 2) * S);
+    const drop = (src, sh, col) => { const o = withDrop(src, sh, S, col); src.width = src.height = 0; return o; };
     const layer = () => { const cv = newCanvas(W, H), c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, pad * S, pad * S); c.font = R.font; c.textBaseline = 'alphabetic'; c.textAlign = 'left'; c.direction = 'ltr'; return [cv, c]; };
     if (U.isEmoji) {
       const [g, gc] = layer(); gc.fillStyle = R.dark ? '#fff' : '#000'; gc.fillText(U.u, 0, U.base);
-      let out = withDrop(g, [0, 4, 6, 'rgba(0,0,0,.35)'], S);
-      if (R.lookId === 'neon') out = withDrop(out, [0, 0, 14, R.glow], S);
+      let out = drop(g, [0, 4, 6, 'rgba(0,0,0,.35)']);
+      if (R.lookId === 'neon') out = drop(out, [0, 0, 14, R.glow]);
       return { cv: out, x: -pad, y: -pad, w: W / S, h: H / S };
     }
     const col = colorFx(st.hue, st.bright);
@@ -6537,13 +6539,13 @@ const KEEP = (() => {
     const stroke = () => { if (spec.stroke) { gc.save(); gc.lineJoin = 'round'; gc.miterLimit = 2; gc.lineWidth = spec.stroke[0]; gc.strokeStyle = col(spec.stroke[1]); gc.strokeText(U.u, 0, U.base); gc.restore(); } };
     const fill = () => { gc.save(); gc.setTransform(1, 0, 0, 1, 0, 0); gc.globalAlpha = spec.fillAlpha == null ? 1 : clamp01(spec.fillAlpha); gc.drawImage(f, 0, 0); gc.restore(); };
     if (clipFill) { fill(); stroke(); } else { stroke(); fill(); }
-    let out = g;
+    f.width = f.height = 0; let out = g;
     if (spec.text && spec.text.length) {
       const o = newCanvas(W, H), oc = o.getContext('2d');
       for (let k = spec.text.length - 1; k >= 0; k--) shadowOnly(oc, g, spec.text[k], S, col);
-      oc.drawImage(g, 0, 0); out = o;
+      oc.drawImage(g, 0, 0); g.width = g.height = 0; out = o;
     }
-    for (const d of spec.drops || []) out = withDrop(out, d, S, col);
+    for (const d of spec.drops || []) out = drop(out, d, col);
     return { cv: out, x: -pad, y: -pad, w: W / S, h: H / S };
   }
   /* ctx.filter can re-colour a finished sprite on the fly; where it is missing, colours are re-painted */
@@ -6944,8 +6946,10 @@ const KEEP = (() => {
     const k = long ? Math.max(pw / R.W, ph / R.H) : pw / R.W; /* (rounded, a big size can be a pixel taller than its width says: the frame covers it all) */
     if (fmt === 'png' || fmt === 'jpg') {
       const cv = newCanvas(pw, ph), c = cv.getContext('2d');
-      try { drawFrame(c, long ? Object.assign({}, R, { sprites: new Map() }) : R, R.tStill, k, null); } /* the big letters are let go of afterwards */
-      finally { if (/^__keep-big/.test(R.scene)) delete SCENES[R.scene]; } /* and so is the big photo */
+      /* a big picture keeps one letter at a time: each is drawn once, and a 4K letter is big (its canvas is emptied at once, not when the browser gets round to it) */
+      const one = { size: 0, last: null, get() {}, clear() {}, set(key, sp) { if (this.last) this.last.cv.width = this.last.cv.height = 0; this.last = sp; } };
+      try { drawFrame(c, long ? Object.assign({}, R, { sprites: one }) : R, R.tStill, k, null); }
+      finally { one.set(null, null); if (/^__keep-big/.test(R.scene)) delete SCENES[R.scene]; } /* and the big photo is let go of too */
       const type = fmt === 'png' ? 'image/png' : 'image/jpeg';
       const blob = await new Promise((res) => cv.toBlob(res, type, .92)); onProgress(1);
       if (!blob) throw new Error('no picture');
@@ -7688,7 +7692,6 @@ function sharper(rec, cut, W, H) {
    internet, an old device) the picture is made all the same, stretched, and says so (`plain`). */
 let keepBigN = 0;
 async function keepBigger(R, k, onProgress, abort) {
-  if (SR.off) return Object.assign({}, R, { plain: true }); /* this device proved too slow for it once already */
   const jobs = [], S = SCENES[R.scene], cuts = R.cuts.map((q) => Object.assign({}, q)); let big = null;
   /* up to four times its own size, but no bigger than a phone can hold (`most` pixels); less than half as big again
      is left to the smooth stretch, which does nearly as well and takes no time */
@@ -7704,6 +7707,7 @@ async function keepBigger(R, k, onProgress, abort) {
   }
   for (const q of cuts) { const b = cutBox(q.r, R.W, R.H); want(q.img, Math.max(b[2] * k / q.img.width, b[3] * k / q.img.height), 8e6, (o) => { q.img = o; }); }
   if (!jobs.length) return R;
+  if (SR.off) return Object.assign({}, R, { plain: true }); /* this device proved too slow for it once already */
   let plain = false; const gone = () => abort.stop;
   for (let n = 0; n < jobs.length; n++) {
     const j = jobs[n];
@@ -8296,6 +8300,7 @@ async function pkShow() {
 const pkLater = () => { clearTimeout(pk.timer); pk.timer = setTimeout(pkShow, 160); };
 function openPick(cv) {
   if (cam.on) stopCamera();
+  pk.seq++; clearTimeout(pk.timer); pkBusyOff(); pkLock(false); /* a photo that arrives while another is open takes its place: what was under way for that one stops */
   pk.src = cv; pk.small = photoCanvas(cv, cv.width, cv.height, false, 720); pk.base = {}; pk.mode = ['all', 'me', 'green'].indexOf(cam.mode) >= 0 ? cam.mode : 'all';
   for (const r of pickDlg.querySelectorAll('input[name="pkMode"]')) r.checked = r.value === pk.mode;
   pkMark(); pk.back = document.activeElement; touchSync(); pkMsg.textContent = ''; pkKeep.disabled = true;
