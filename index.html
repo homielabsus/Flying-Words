@@ -7325,9 +7325,9 @@ function removePhoto(id) {
 async function usePhotoFile(file, direct) {
   if (!file || (file.type && !/^image\//.test(file.type))) { toast('That is not a photo. Try another one!', 3200); return null; }
   hideHint();
-  try { const cv = await decodePhoto(file, PHOTO_SIDE); if (!direct) { openPick(cv); return null; } /* seen and touched up before it is kept */
+  try { const cv = await decodeAny(file, PHOTO_SIDE); if (!direct) { openPick(cv); return null; } /* seen and touched up before it is kept */
     const id = addPhoto(cv); toast('🖼️ Your photo is the scene!', 2600); if (!state.autoplay) again(); return id; }
-  catch (e) { toast('That photo didn’t open. Try another one!', 3200); return null; }
+  catch (e) { toast(/^heic/.test(e.message) ? '🖼️ That iPhone photo didn’t open. It needs the internet the first time.' : 'That photo didn’t open. Try another one!', 3800); return null; }
 }
 async function restorePhotos() {
   let recs = [];
@@ -7349,7 +7349,7 @@ async function restorePhotos() {
 }
 
 /* picking a file: a hidden input the Add Photo tile clicks, and the same for a dropped picture */
-const photoFile = document.createElement('input'); photoFile.type = 'file'; photoFile.accept = 'image/*'; photoFile.id = 'photoFile'; photoFile.hidden = true;
+const photoFile = document.createElement('input'); photoFile.type = 'file'; photoFile.accept = 'image/*,.heic,.heif'; photoFile.id = 'photoFile'; photoFile.hidden = true;
 /* a phone's own camera app, for when the live camera is not allowed */
 const snapFile = document.createElement('input'); snapFile.type = 'file'; snapFile.accept = 'image/*'; snapFile.setAttribute('capture', 'user'); snapFile.id = 'snapFile'; snapFile.hidden = true;
 document.body.append(photoFile, snapFile);
@@ -7362,7 +7362,7 @@ document.addEventListener('drop', (e) => {
   stage.classList.remove('drop');
   if (!hasFiles(e) || (keepDlg && keepDlg.open) || pickDlg.open) return;
   e.preventDefault();
-  const f = Array.prototype.filter.call(e.dataTransfer.files || [], (x) => /^image\//.test(x.type))[0];
+  const f = Array.prototype.filter.call(e.dataTransfer.files || [], (x) => /^image\//.test(x.type) || /\.hei[cf]$/i.test(x.name))[0];
   if (f) { hideHint(); usePhotoFile(f); } else toast('Drop a photo here!', 2600);
 });
 
@@ -8093,6 +8093,45 @@ document.addEventListener('input', (e) => { const t = e.target; if (!t || !t.dat
   touch[t.dataset.touch] = t.value / 100; save('fw.touch', touch); for (const o of touchIns) if (o !== t && o.dataset.touch === t.dataset.touch) o.value = t.value;
   if (((cam.on && cam.stream) || pickDlg.open) && touchOn() && SEG.state === 'idle') loadSeg(); /* raised from nothing: now it wants to know where the skin is */
   if (pickDlg.open) pkLater(); });
+/* iPhone photos are often HEIC, which Chrome cannot open (Safari can). Then the page fetches libheif (LGPL-3.0, its
+   own unmodified files from jsDelivr, each checked against a hash written here) and turns the photo into a picture in
+   a worker of its own, which is closed afterwards so its memory goes back. Only when such a photo is picked. */
+const HEIC = { lib: 'https://cdn.jsdelivr.net/npm/libheif-js@1.23.5/libheif-wasm/',
+  sri: { 'libheif.js': 'sha384-VEbrgTthZ3xiJrRrD1QszeA+mvSzQAazOjulZBOV9mXAH+SfRdtQWjzL6E0JYlmP', 'libheif.wasm': 'sha384-ykFVIusV2Vzqq7NMzIk4GpbFlKHmcCbdhLPI50qMGtV14CpMr+A+5ry6npw4e8z7' } };
+const HEIC_WORKER = `onmessage = (e) => { try {
+  const m = libheif({ wasmBinary: new Uint8Array(e.data.wasm) }), dec = new m.HeifDecoder(), imgs = dec.decode(new Uint8Array(e.data.bytes));
+  if (!imgs || !imgs.length) throw new Error('no picture');
+  const img = imgs.find((i) => i.is_primary && i.is_primary()) || imgs[0], w = img.get_width(), h = img.get_height();
+  if (!(w > 0 && h > 0) || w * h > 120e6) throw new Error('size');
+  const out = { data: new Uint8ClampedArray(w * h * 4), width: w, height: h };
+  img.display(out, (r) => { if (!r) postMessage({ error: 'display' }); else postMessage({ data: out.data, width: w, height: h }, [out.data.buffer]); });
+} catch (err) { postMessage({ error: String((err && err.message) || err) }); } };`;
+/* the first bytes of a HEIC file: 'ftyp' and one of HEIF's brands */
+async function isHeic(file) {
+  if (/^image\/hei[cf]/i.test(file.type || '') || /\.hei[cf]$/i.test(file.name || '')) return true;
+  try { const b = new Uint8Array(await file.slice(0, 12).arrayBuffer()), t = String.fromCharCode(...b.subarray(4, 12));
+    return t.slice(0, 4) === 'ftyp' && ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1'].indexOf(t.slice(4)) >= 0; } catch (e) { return false; }
+}
+async function decodeHeic(file, side) {
+  const get = async (f, how) => { const r = await fetch(HEIC.lib + f, { integrity: HEIC.sri[f], mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer' }); if (!r.ok) throw new Error('heic ' + r.status); return r[how](); };
+  const [js, wasm, bytes] = await Promise.all([get('libheif.js', 'text'), get('libheif.wasm', 'arrayBuffer'), file.arrayBuffer()]);
+  const url = URL.createObjectURL(new Blob([js, '\n', HEIC_WORKER], { type: 'text/javascript' })), wk = new Worker(url);
+  try {
+    const img = await new Promise((res, rej) => { const t = setTimeout(() => rej(new Error('heic time')), 90000);
+      wk.onmessage = (e) => { clearTimeout(t); if (e.data.error) rej(new Error(e.data.error)); else res(e.data); };
+      wk.onerror = (e) => { clearTimeout(t); rej(new Error('heic worker')); }; wk.postMessage({ wasm, bytes }, [wasm, bytes]); });
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; cx2(c).putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
+    return photoCanvas(c, c.width, c.height, false, side);
+  } finally { wk.terminate(); URL.revokeObjectURL(url); }
+}
+/* any photo: the browser's own way first (Safari opens HEIC itself), libheif for a HEIC it could not open */
+async function decodeAny(file, side) {
+  try { return await decodePhoto(file, side); } catch (e) {
+    if (!(await isHeic(file))) throw e;
+    tell('🖼️ Opening an iPhone photo… one moment', 4000);
+    try { return await decodeHeic(file, side); } catch (e2) { throw new Error('heic: ' + e2.message); }
+  }
+}
 /* 🖼️ A photo from the device, made the way a snap is: the whole picture as the scene, just the kid as a sticker, or the
    kid in front of a green or blue backdrop; touched up with the same sliders, and seen before it is kept. The preview
    works on a small copy so the sliders answer quickly; Keep does it again on the whole photo. */
