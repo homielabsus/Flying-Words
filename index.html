@@ -926,6 +926,15 @@ html.calm .tile.cutout.wait .sw::after { animation: none; }
 .pk-btns .kp-make { flex: 1; }
 .pk-btns .pk-cancel { background: #fff; }
 #pkBusy { justify-content: center; }
+/* the three modes fill their row; the chosen one shows (.on, as in Keep it) */
+#pick .kp-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { #pkCanvas { max-height: 32dvh; } }
+html.short #pkCanvas { max-height: 30dvh; }
+/* a short stage: the three sliders in one row, each named by its emoji (the words stay for screen readers) */
+html.short #touchBox { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html.short #touchBox .touch-l > span { font-size: 0; }
+html.short #touchBox .touch-l > span > span { font-size: 14px; }
+@media (max-width: 380px) { #camBar { gap: 8px; } }
 </style>
 </head>
 <body>
@@ -1048,6 +1057,11 @@ html.calm .tile.cutout.wait .sw::after { animation: none; }
         <label class="kp-opt"><input type="radio" name="kpShape" value="poster" aria-label="Poster, 4 by 5"><span class="kr" style="--w:4;--h:5" aria-hidden="true"></span><span class="kl" aria-hidden="true">Poster</span><span class="ks" aria-hidden="true">4:5</span></label>
         <label class="kp-opt"><input type="radio" name="kpShape" value="postcard" aria-label="Postcard, 3 by 2"><span class="kr" style="--w:3;--h:2" aria-hidden="true"></span><span class="kl" aria-hidden="true">Postcard</span><span class="ks" aria-hidden="true">3:2</span></label>
         <label class="kp-opt"><input type="radio" name="kpShape" value="movie" aria-label="Movie, 21 by 9"><span class="kr" style="--w:21;--h:9" aria-hidden="true"></span><span class="kl" aria-hidden="true">Movie</span><span class="ks" aria-hidden="true">21:9</span></label>
+      </fieldset>
+      <fieldset class="kp-row" id="kpSizes"><legend>Size</legend>
+        <label class="kp-opt"><input type="radio" name="kpSize" value="hd"><span class="ki" aria-hidden="true">🖼️</span><span class="kl">Normal</span><span class="ks">HD</span></label>
+        <label class="kp-opt"><input type="radio" name="kpSize" value="2k"><span class="ki" aria-hidden="true">✨</span><span class="kl">2K</span><span class="ks">SHARP</span></label>
+        <label class="kp-opt"><input type="radio" name="kpSize" value="4k"><span class="ki" aria-hidden="true">🌟</span><span class="kl">4K</span><span class="ks">SHARPEST</span></label>
       </fieldset>
       <button id="kpMake" class="kp-make" type="button">✨ Make my picture</button>
       <div id="kpDone" class="kp-done" hidden>
@@ -6923,14 +6937,17 @@ const KEEP = (() => {
     for (const q of spec.cuts || []) { const me = cutRec(q.id); if (me) { try { await wakePhoto(me); } catch (e) { /* the small picture will do */ } } }
     return record(spec, W, H);
   }
-  async function make(R, fmt, shape, onProgress, abort) {
-    const [pw, ph] = (PIXELS[fmt] || PIXELS.png)[shape] || PIXELS.png.square, k = pw / R.W;
+  async function make(R, fmt, shape, onProgress, abort, size) {
+    let [pw, ph] = (PIXELS[fmt] || PIXELS.png)[shape] || PIXELS.png.square;
+    const long = { '2k': 2560, '4k': 3840 }[size];
+    if ((fmt === 'png' || fmt === 'jpg') && long) { const f = long / Math.max(pw, ph); pw = Math.round(pw * f); ph = Math.round(ph * f); R = await keepBigger(R, pw / R.W, onProgress, abort || {}); }
+    const k = pw / R.W;
     if (fmt === 'png' || fmt === 'jpg') {
       const cv = newCanvas(pw, ph), c = cv.getContext('2d'); drawFrame(c, R, R.tStill, k, null);
       const type = fmt === 'png' ? 'image/png' : 'image/jpeg';
       const blob = await new Promise((res) => cv.toBlob(res, type, .92)); onProgress(1);
       if (!blob) throw new Error('no picture');
-      return { blob, ext: fmt, w: pw, h: ph };
+      return { blob, ext: fmt, w: pw, h: ph, plain: !!R.plain };
     }
     if (fmt === 'gif') return Object.assign(await encodeGIF(R, pw, ph, k, 15, onProgress, abort), { w: pw, h: ph });
     return Object.assign(await encodeVideo(R, pw, ph, k, onProgress, abort), { w: pw, h: ph });
@@ -7069,8 +7086,8 @@ function stageSpec(text) {
 }
 const radios = (name) => Array.prototype.slice.call(keepDlg.querySelectorAll('input[name="' + name + '"]'));
 function markRadios() {
-  for (const r of radios('kpFmt').concat(radios('kpShape'))) r.closest('.kp-opt').classList.toggle('on', r.checked);
-  kpMake.textContent = '✨ ' + FORMATS[K.fmt].label;
+  for (const r of radios('kpFmt').concat(radios('kpShape'), radios('kpSize'))) r.closest('.kp-opt').classList.toggle('on', r.checked);
+  kpMake.textContent = '✨ ' + FORMATS[K.fmt].label; $('#kpSizes').hidden = !(K.fmt === 'png' || K.fmt === 'jpg'); /* 2K and 4K are for pictures */
 }
 function whatLine() {
   const s = K.spec, L = LOOKS[s.look], M = MOVES[s.move], S = SCENES[s.scene];
@@ -7125,9 +7142,10 @@ function fileName(ext) {
 }
 async function makeIt() {
   if (!K.R || K.job) return;
-  const job = { stop: false }; K.job = job; kpLock(true); setBusy(0); kpMsg.textContent = 'Making your ' + FORMATS[K.fmt].name + '…';
+  const job = { stop: false }; K.job = job; kpLock(true); setBusy(0); const big = (K.fmt === 'png' || K.fmt === 'jpg') && K.size !== 'hd';
+  kpMsg.textContent = 'Making your ' + (big ? K.size.toUpperCase() + ' ' : '') + FORMATS[K.fmt].name + '…' + (big ? ' The AI upscaler takes a little while (on some devices a few minutes).' : '');
   try {
-    const out = await KEEP.make(K.R, K.fmt, K.shape, (p) => { if (!job.stop) setBusy(p); }, job);
+    const out = await KEEP.make(K.R, K.fmt, K.shape, (p) => { if (!job.stop) setBusy(p); }, job, K.size);
     if (job.stop) return;
     K.result = Object.assign(out, { name: fileName(out.ext) });
     K.url = URL.createObjectURL(out.blob);
@@ -7136,7 +7154,7 @@ async function makeIt() {
     else { kpImg.src = K.url; kpImg.alt = 'Your ' + FORMATS[K.fmt].name + ': ' + K.spec.text; kpImg.hidden = false; }
     kpMake.hidden = true; kpDone.hidden = false;
     kpShare.hidden = finePointer() || KEEP.inViewer || !KEEP.canShare(out.blob, K.result.name); /* claude.ai refuses the share sheet */
-    kpMsg.textContent = 'Ta-da! Tap Save to keep it.' + (out.ext === 'webm' ? ' (Your browser made a WebM video.)' : '');
+    kpMsg.textContent = 'Ta-da! Tap Save to keep it.' + (out.ext === 'webm' ? ' (Your browser made a WebM video.)' : '') + (out.plain ? ' (It is big, but the AI upscaler could not help this time, so it is only stretched.)' : '');
     sound.tada();
     try { kpSave.focus(); } catch (e) { /* ignore */ }
   } catch (e) {
@@ -7162,6 +7180,8 @@ function openKeep() {
   K.spec = stageSpec(); K.open = true; refreshScene();
   K.fmt = FORMATS[load('fw.kfmt', 'png')] ? load('fw.kfmt', 'png') : 'png';
   K.shape = KEEP.SHAPES[load('fw.kshape', 'square')] ? load('fw.kshape', 'square') : 'square';
+  K.size = ['hd', '2k', '4k'].indexOf(load('fw.ksize', 'hd')) >= 0 ? load('fw.ksize', 'hd') : 'hd';
+  for (const r of radios('kpSize')) r.checked = r.value === K.size;
   for (const r of radios('kpFmt')) r.checked = r.value === K.fmt;
   for (const r of radios('kpShape')) r.checked = r.value === K.shape;
   kpTxt.value = K.spec.text; whatLine(); markRadios(); clearResult(); kpMsg.textContent = '';
@@ -7185,6 +7205,7 @@ keepDlg.addEventListener('change', (e) => {
   const r = e.target; if (!r || r.type !== 'radio') return;
   if (r.name === 'kpFmt') { K.fmt = r.value; save('fw.kfmt', K.fmt); clearResult(); if (!K.raf && K.R) K.raf = requestAnimationFrame(previewTick); }
   if (r.name === 'kpShape') { K.shape = r.value; save('fw.kshape', K.shape); clearResult(); prepPreview(); }
+  if (r.name === 'kpSize') { K.size = r.value; save('fw.ksize', K.size); clearResult(); }
   markRadios();
 });
 let kpTyping = 0;
@@ -7498,14 +7519,20 @@ function saveCut(rec, cv) {
 const SR = {
   lib: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/',
   /* the model lies beside the page when it is served as a website; from a file, or anywhere else, the same file comes from the repository's copy on jsDelivr */
-  model: (/^https?:$/.test(location.protocol) ? ['models/realesr-general-x4v3.onnx'] : []).concat('https://cdn.jsdelivr.net/gh/homielabsus/Flying-Words@16fdf641bb690626f4e070b6b0e2ea21f540e905/models/realesr-general-x4v3.onnx'),
+  model: (/^https?:$/.test(location.protocol) ? ['models/realesr-general-x4v3.onnx'] : []).concat('https://cdn.jsdelivr.net/gh/homielabsus/Flying-Words@12c66d4c0e6a4866fafc5942da8c8d7abe661e85/models/realesr-general-x4v3.onnx'),
   sri: {
     'ort.wasm.min.js': 'sha384-6hgW9I+eQKl5CrHLstudPd4L3E2eTYHm+qNKvf4pI+RZnfBJILOHAiaalHV+trgG',
     'ort-wasm-simd-threaded.mjs': 'sha384-SyfqCcawqO3udRV2twBwYuuR4Wh7Nj/yfAxyfN6UltDOh5VTrJH4aT9HfEvthS02',
     'ort-wasm-simd-threaded.wasm': 'sha384-t24pimTffN4djMKJaYLDupLzilNBHTgwqbjacQNJObCC4RrMH4UjfZgDkwHEU04k',
-    model: 'sha384-fynWnNZB1PjUlaYpM80JmLBwm9DHuhg08A6J7fMDUbtoVca46168enKecK9sGs2J'
+    model: 'sha384-efH4PHaVU+2ypKAw1wZyE4bt5Xu5ymdpYmwEUaBUzNj9CpDRrdS1EoXaVxU/Xfyc'
   },
-  files: null, worker: null, queue: Promise.resolve(), waiting: 0, off: false,
+  /* the same engine for the graphics chip (WebGPU): many times faster where the browser offers one */
+  gpuSri: {
+    'ort.webgpu.min.js': 'sha384-kLVmxu3ZkURUzln+3FiMoTAFDFOD8PoImWtQkQG9BudtlZyzyFAfNErJUTSB7at7',
+    'ort-wasm-simd-threaded.jsep.mjs': 'sha384-0/XPujAiZkK1p7UIXXIviPlKBD7a993Lp28ecwmjJLnuQ7nsYagTD4UU0q+fvMsx',
+    'ort-wasm-simd-threaded.jsep.wasm': 'sha384-HPJ3YfucD9OlwN1TI/3IKakCsWeFCwPQPmbi7TtPkJyZujXCF3TPid7iNbXPz3zU'
+  },
+  files: null, gpuFiles: null, gpu: null, onGpu: false, worker: null, queue: Promise.resolve(), waiting: 0, off: false,
 };
 /* the worker (ONNX Runtime's own code is put in front of this): it takes a piece of picture (RGBA bytes) and gives
    back the same piece four times as big. It is handed the files themselves, not addresses: a page opened from a
@@ -7516,7 +7543,13 @@ onmessage = async (e) => {
   try {
     if (m.init) {
       ort.env.wasm.numThreads = 1; ort.env.wasm.wasmPaths = { mjs: URL.createObjectURL(m.init.mjs), wasm: URL.createObjectURL(m.init.wasm) };
-      sess = await ort.InferenceSession.create(new Uint8Array(await m.init.model.arrayBuffer()), { executionProviders: ['wasm'] }); postMessage({ ready: true }); return;
+      sess = await ort.InferenceSession.create(new Uint8Array(await m.init.model.arrayBuffer()), { executionProviders: [m.init.gpu ? 'webgpu' : 'wasm'] });
+      if (m.init.gpu) { /* a first small piece: the graphics chip must give real numbers before it is trusted */
+        const t = new Float32Array(3 * 16 * 16); for (let i = 0; i < t.length; i++) t[i] = (i % 7) / 7;
+        const y = (await sess.run({ x: new ort.Tensor('float32', t, [1, 3, 16, 16]) })).y.data; let s = 0; for (let i = 0; i < y.length; i++) s += y[i];
+        if (!isFinite(s) || s <= 0) throw new Error('gpu numbers');
+      }
+      postMessage({ ready: true }); return;
     }
     const w = m.w, h = m.h, d = m.rgba, n = w * h, x = new Float32Array(3 * n);
     for (let i = 0; i < n; i++) { x[i] = d[i * 4] / 255; x[n + i] = d[i * 4 + 1] / 255; x[2 * n + i] = d[i * 4 + 2] / 255; }
@@ -7526,19 +7559,50 @@ onmessage = async (e) => {
   } catch (err) { postMessage({ fail: String(err) }); }
 };`;
 /* the four files, fetched once and kept: each from the first place that has it with the right hash */
-function srFiles() {
-  if (SR.files) return SR.files;
-  const TYPE = { js: 'text/javascript', mjs: 'text/javascript', wasm: 'application/wasm' };
+function srFiles(gpu) {
+  const key = gpu ? 'gpuFiles' : 'files'; if (SR[key]) return SR[key];
+  const TYPE = { js: 'text/javascript', mjs: 'text/javascript', wasm: 'application/wasm' }, sri = Object.assign({}, SR.sri, SR.gpuSri);
+  const names = (gpu ? Object.keys(SR.gpuSri) : ['ort.wasm.min.js', 'ort-wasm-simd-threaded.mjs', 'ort-wasm-simd-threaded.wasm']).concat('model');
   const get = async (f) => {
     for (const url of f === 'model' ? SR.model : [SR.lib + f]) {
       try {
-        const r = await fetch(url, { integrity: SR.sri[f], mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout ? AbortSignal.timeout(180000) : undefined });
+        const r = await fetch(url, { integrity: sri[f], mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout ? AbortSignal.timeout(180000) : undefined });
         if (r.ok) return new Blob([await r.arrayBuffer()], { type: TYPE[f.split('.').pop()] || 'application/octet-stream' });
       } catch (e) { /* the next place, if there is one */ }
     }
     throw new Error('missing');
   };
-  return (SR.files = Promise.all(Object.keys(SR.sri).map(get)).then((got) => ({ js: got[0], mjs: got[1], wasm: got[2], model: got[3] }), (e) => { SR.files = null; throw e; })); /* another cut-out, another try */
+  return (SR[key] = Promise.all(names.map(get)).then((got) => ({ js: got[0], mjs: got[1], wasm: got[2], model: got[3] }), (e) => { SR[key] = null; throw e; })); /* another time, another try */
+}
+/* the worker: on the graphics chip if the browser offers one and it answers right, else on the processor */
+async function srWorker() {
+  if (SR.worker) return SR.worker;
+  if (SR.gpu === null) { /* a graphics chip that is really the processor pretending (a "fallback" adapter) is slower than the processor itself */
+    try { const a = navigator.gpu && (await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })); SR.gpu = !!a && (SR.gpuAny || !((a.info && a.info.isFallbackAdapter) || a.isFallbackAdapter)); } catch (e) { SR.gpu = false; } }
+  for (const gpu of SR.gpu ? [true, false] : [false]) {
+    let worker = null;
+    try {
+      const files = await srFiles(gpu), code = URL.createObjectURL(new Blob([files.js, '\n', SR_WORKER], { type: 'text/javascript' })); worker = new Worker(code); URL.revokeObjectURL(code);
+      await srAsk(worker, { init: { mjs: files.mjs, wasm: files.wasm, model: files.model, gpu } }, gpu ? 120000 : 60000);
+      SR.worker = worker; SR.onGpu = gpu; return worker;
+    } catch (e) { if (worker) worker.terminate(); if (!gpu) throw e; SR.gpu = false; } /* the graphics chip let us down: the processor it is */
+  }
+  throw new Error('no worker');
+}
+/* one job at a time on the one worker; when nothing waits any more the worker goes, and its memory with it */
+function srUse(fn) {
+  SR.waiting++;
+  const go = async () => {
+    await srWorker();
+    try { return await fn(); } catch (e) {
+      if (!SR.onGpu || (e && e.message === 'stopped')) throw e;
+      SR.gpu = false; if (SR.worker) { SR.worker.terminate(); SR.worker = null; } /* the graphics chip let us down halfway: the processor does it again */
+      await srWorker(); return fn();
+    }
+  };
+  const run = SR.queue.then(go);
+  SR.queue = run.catch(() => { if (SR.worker) { SR.worker.terminate(); SR.worker = null; } }).then(() => { if (!--SR.waiting && SR.worker) { SR.worker.terminate(); SR.worker = null; } });
+  return run;
 }
 /* one question to the worker, and its answer. Too long without one is 'slow'; time the page spent out of sight does
    not count, for a phone freezes a page and its worker together. */
@@ -7563,40 +7627,45 @@ function bleed(d, w, h, low) {
   }
 }
 /* `cut` is the cut-out as the camera gave it; W by H is the size its picture on the stage has */
-async function srRun(rec, cut, W, H) {
-  if (photos.indexOf(rec) < 0) return;
-  if (!SR.worker) {
-    const files = await srFiles(), code = URL.createObjectURL(new Blob([files.js, '\n', SR_WORKER], { type: 'text/javascript' })), worker = new Worker(code);
-    URL.revokeObjectURL(code);
-    try { await srAsk(worker, { init: { mjs: files.mjs, wasm: files.wasm, model: files.model } }, 60000); } catch (e) { worker.terminate(); throw e; }
-    SR.worker = worker;
-  }
-  const w = cut.width, h = cut.height, d = cx2(cut).getImageData(0, 0, w, h).data, solid = new Uint8Array(w * h); let full = -1;
-  const low = cut.soft ? 63 : 24; /* far down a soft slope the colours are too coarse to show the model */
-  for (let i = 0; i < w * h; i++) { solid[i] = d[i * 4 + 3] > low ? 1 : 0; if (full < 0 && d[i * 4 + 3] === 255) full = i; }
-  bleed(d, w, h, low);
+/* `src` drawn again by Real-ESRGAN at W by H, piece by piece (each with a rim of its neighbours, cut off again: no
+   seams). A see-through picture (a cut-out) keeps its own outline. `onPiece(done, all)` tells how far it is; `gone()`
+   says to stop (null comes back). */
+async function srDraw(src, W, H, onPiece, gone) {
+  const w = src.width, h = src.height, d = cx2(src).getImageData(0, 0, w, h).data, solid = new Uint8Array(w * h); let full = -1, see = false;
+  const low = src.soft ? 63 : 24; /* far down a soft slope the colours are too coarse to show the model */
+  for (let i = 0; i < w * h; i++) { const a = d[i * 4 + 3]; solid[i] = a > low ? 1 : 0; if (full < 0 && a === 255) full = i; if (a < 255) see = true; }
+  if (see) bleed(d, w, h, low);
   const out = document.createElement('canvas'); out.width = W; out.height = H;
-  const oc = cx2(out), piece = document.createElement('canvas'), T = 192, P = 8, fx = W / w, fy = H / h; oc.imageSmoothingQuality = 'high';
+  const oc = cx2(out), piece = document.createElement('canvas'), T = SR.onGpu ? 256 : 192, P = 8, fx = W / w, fy = H / h; oc.imageSmoothingQuality = 'high';
+  const all = Math.ceil(w / T) * Math.ceil(h / T); let done = 0;
   for (let ty = 0; ty < h; ty += T) for (let tx = 0; tx < w; tx += T) {
-    if (photos.indexOf(rec) < 0) return; /* it was thrown away meanwhile */
-    const tw = Math.min(T, w - tx), th = Math.min(T, h - ty); let any = false;
+    if (gone && gone()) return null;
+    const tw = Math.min(T, w - tx), th = Math.min(T, h - ty); let any = false; done++;
     /* (looked at one pixel beyond the piece too: the soft edge of the outline reaches that far) */
     for (let y = Math.max(0, ty - 1); y < Math.min(h, ty + th + 1) && !any; y++) for (let x = Math.max(0, tx - 1); x < Math.min(w, tx + tw + 1); x++) if (solid[y * w + x]) { any = true; break; }
-    if (!any) continue; /* nothing of the kid in this piece */
-    /* each piece is given a rim of its neighbours, which is cut off again: no seams */
+    if (!any) { if (onPiece) onPiece(done, all); continue; } /* nothing of the kid in this piece */
     const x0 = Math.max(0, tx - P), y0 = Math.max(0, ty - P), pw = Math.min(w, tx + tw + P) - x0, ph = Math.min(h, ty + th + P) - y0, rgba = new Uint8ClampedArray(pw * ph * 4);
     for (let y = 0; y < ph; y++) rgba.set(d.subarray(((y0 + y) * w + x0) * 4, ((y0 + y) * w + x0 + pw) * 4), y * pw * 4);
-    const got = await srAsk(SR.worker, { w: pw, h: ph, rgba }, 120000);
+    const got = await srAsk(SR.worker, { w: pw, h: ph, rgba }, SR.onGpu ? 20000 : 120000); /* a piece takes a graphics chip well under a second */
     piece.width = pw * 4; piece.height = ph * 4; cx2(piece).putImageData(new ImageData(got.out, pw * 4, ph * 4), 0, 0);
     const dx = Math.round(tx * fx), dy = Math.round(ty * fy);
     oc.drawImage(piece, (tx - x0) * 4, (ty - y0) * 4, tw * 4, th * 4, dx, dy, Math.round((tx + tw) * fx) - dx, Math.round((ty + th) * fy) - dy);
+    if (onPiece) onPiece(done, all);
   }
-  if (photos.indexOf(rec) < 0) return;
-  const shape = sized(cut, W, H); shape.c.putImageData(shape.im, 0, 0);
-  oc.globalCompositeOperation = 'destination-in'; oc.drawImage(shape.out, 0, 0); /* the outline is the same as the quick picture's */
-  if (cut.soft) { const om = oc.getImageData(0, 0, W, H); bleed(om.data, W, H, 254); oc.globalCompositeOperation = 'copy'; oc.putImageData(om, 0, 0); } /* and so is the rim's colour: from inside */
-  /* a browser short of memory may have drawn nothing: where the kid was solid there must be something now, or the quick picture stays */
+  if (gone && gone()) return null;
+  if (see) {
+    const shape = sized(src, W, H); shape.c.putImageData(shape.im, 0, 0);
+    oc.globalCompositeOperation = 'destination-in'; oc.drawImage(shape.out, 0, 0); /* the outline is the same as the quick picture's */
+    if (src.soft) { const om = oc.getImageData(0, 0, W, H); bleed(om.data, W, H, 254); oc.globalCompositeOperation = 'copy'; oc.putImageData(om, 0, 0); } /* and so is the rim's colour: from inside */
+    oc.globalCompositeOperation = 'source-over';
+  }
+  /* a browser short of memory may have drawn nothing: where the picture was solid there must be something now */
   if (full < 0 || !oc.getImageData(Math.min(W - 1, Math.round((full % w + .5) * fx)), Math.min(H - 1, Math.round((Math.floor(full / w) + .5) * fy)), 1, 1).data[3]) throw new Error('empty');
+  return out;
+}
+async function srRun(rec, cut, W, H) {
+  if (photos.indexOf(rec) < 0) return;
+  const out = await srDraw(cut, W, H, null, () => photos.indexOf(rec) < 0); if (!out) return; /* it was thrown away meanwhile */
   /* the new picture counts as not yet stored, so nothing lets go of it, and a decode of the old one that is under way does not take its place */
   rec.sr = 'done'; rec.blob = null; rec.cv = out;
   rec.saved = (rec.saved || Promise.resolve()).then(() => saveCut(rec, out));
@@ -7608,9 +7677,28 @@ async function srRun(rec, cut, W, H) {
 function sharper(rec, cut, W, H) {
   if (SR.off || Math.max(cut.width, cut.height) > 800 || (navigator.connection && navigator.connection.saveData)) return;
   const mark = () => { const t = scenesEl.querySelector('.tile[data-cut="' + rec.id + '"]'); if (t) t.classList.toggle('wait', rec.sr === 'wait'); };
-  rec.sr = 'wait'; mark(); SR.waiting++;
-  SR.queue = SR.queue.then(() => srRun(rec, cut, W, H)).catch((e) => { if (e && e.message === 'slow') SR.off = true; if (SR.worker) { SR.worker.terminate(); SR.worker = null; } })
-    .then(() => { if (rec.sr !== 'done') rec.sr = 'no'; mark(); if (!--SR.waiting && SR.worker) { SR.worker.terminate(); SR.worker = null; } });
+  rec.sr = 'wait'; mark();
+  srUse(() => srRun(rec, cut, W, H)).catch((e) => { if (e && e.message === 'slow') SR.off = true; }).then(() => { if (rec.sr !== 'done') rec.sr = 'no'; mark(); });
+}
+/* 📸 Keep it at 2K or 4K: the photo scene and every cut-out are drawn again by Real-ESRGAN at the size they will have in
+   the picture (up to four times their own), so the big picture is sharp and not just stretched. If it cannot be done (no
+   internet, an old device) the picture is made all the same, stretched, and says so (`plain`). */
+async function keepBigger(R, k, onProgress, abort) {
+  const jobs = [], S = SCENES[R.scene], cuts = R.cuts.map((q) => Object.assign({}, q)); let big = null;
+  const want = (img, wantW, wantH, put) => { const f = Math.min(4, Math.max(wantW / img.width, wantH / img.height)); if (f > 1.1) jobs.push({ img, W: Math.round(img.width * f), H: Math.round(img.height * f), put }); };
+  if (S && S.photo) { const rec = photos.find((q) => q.id === R.scene), img = rec && (rec.cv || rec.small); if (img) want(img, R.W * k, R.H * k, (o) => { big = o; }); }
+  for (const q of cuts) { const b = cutBox(q.r, R.W, R.H); want(q.img, b[2] * k, b[3] * k, (o) => { q.img = o; }); }
+  if (!jobs.length) return R;
+  let plain = false;
+  try {
+    for (let n = 0; n < jobs.length; n++) {
+      const j = jobs[n], out = await srUse(() => srDraw(j.img, j.W, j.H, (d, a) => onProgress(.95 * (n + d / a) / jobs.length), () => abort.stop));
+      if (abort.stop) throw new Error('stopped'); if (out) j.put(out);
+    }
+  } catch (e) { if (abort.stop) throw e; plain = true; SR.why = String((e && e.message) || e); }
+  const R2 = Object.assign({}, R, { cuts, plain });
+  if (big) { const id = '__keep-big'; SCENES[id] = Object.assign({}, S, { id, draw: (c, w, h) => coverDraw(c, big, w, h) }); R2.scene = id; }
+  return R2;
 }
 
 /* --- moving and resizing. A finger or the mouse on the solid part of a cut-out picks it up (the front one, if
@@ -8007,7 +8095,7 @@ function boothSnap(full) {
    moves towards the colour around it; where it varies a lot (eyes, brows, lips, the outline) it stays as it is. The
    person finder says where skin and hair are; without it (offline) the smoothing is gentler and goes everywhere. */
 const touch = (() => { const t = load('fw.touch', null), ok = (v) => typeof v === 'number' && v >= 0 && v <= 1;
-  return { smooth: t && ok(t.smooth) ? t.smooth : .3, light: t && ok(t.light) ? t.light : .35, sharp: t && ok(t.sharp) ? t.sharp : .3 }; })();
+  return { smooth: t && ok(t.smooth) ? t.smooth : .3, light: t && ok(t.light) ? t.light : .35, sharp: t && ok(t.sharp) ? t.sharp : (t && t.smooth === 0 && t.light === 0 ? 0 : .3) }; })(); /* touch-up switched off before Sharper came: it stays off */
 const touchOn = () => touch.smooth > 0 || touch.light > 0 || touch.sharp > 0;
 const touchStep = (a, b, v) => { const t = within((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 function touchUp(cv, src) {
@@ -8076,9 +8164,13 @@ function touchUp(cv, src) {
     const Y = new Float32Array(n), bl = new Float32Array(n), t2 = new Float32Array(n), r = Math.max(1, Math.round(Math.max(w, h) / 1400)), amt = 1.6 * sh, cap = 18 + 22 * sh;
     for (let i = 0; i < n; i++) Y[i] = .299 * d[i * 4] + .587 * d[i * 4 + 1] + .114 * d[i * 4 + 2];
     bl.set(Y); boxBlur(bl, t2, w, h, r); boxBlur(bl, t2, w, h, r);
+    /* how grainy the picture is (the middle size of its finest differences): only what stands well above the grain counts
+       as detail, so a dark noisy snap gets no grain added, and the small preview and the big photo come out alike */
+    const sample = []; for (let i = 0; i < n; i += 7) sample.push(Math.abs(Y[i] - bl[i])); sample.sort((a, b) => a - b);
+    const grain = (sample[sample.length >> 1] || 0) / .6745, lo = Math.max(2, 2.5 * grain), hi = Math.max(6, 3 * lo);
     for (let i = 0; i < n; i++) {
-      const det = Y[i] - bl[i], a = Math.abs(det); if (a < 2) continue;
-      const k = amt * touchStep(2, 6, a) * (skin ? 1 - .85 * skin[i] : 1); if (k <= 0) continue;
+      const det = Y[i] - bl[i], a = Math.abs(det); if (a < lo) continue;
+      const k = amt * touchStep(lo, hi, a) * (skin ? 1 - .85 * skin[i] : ss > 0 ? 0 : 1); if (k <= 0) continue; /* not knowing where the skin is, it is not sharpened over the smoothing */
       const add = within(det * k, -cap, cap), o = i * 4; d[o] += add; d[o + 1] += add; d[o + 2] += add;
     }
   }
@@ -8165,15 +8257,18 @@ async function pkRender(full) {
       if (!ok) { pkBusyOff(); pkMsg.textContent = '✂️ No scissors: they come over the internet. Try 🖼️ All of it!'; return null; }
     }
     pkBusyOn(full ? '✨ Making it…' : '✨ One moment…'); await pkFrame(); if (seq !== pk.seq || !src) return null;
-    try { base = mode === 'all' ? src : pickCut(src, mode); } catch (e) { base = '✂️ That did not work. Try again!'; }
-    if (!full) pk.base[mode] = base;
+    let failed = false;
+    try { base = mode === 'all' ? src : pickCut(src, mode); } catch (e) { base = '✂️ That did not work. Try again!'; failed = true; }
+    if (!full && !failed) pk.base[mode] = base; /* a failure is tried again next time */
   }
   if (typeof base === 'string') { pkBusyOff(); pkMsg.textContent = base; return null; }
   const cv = copyCv(base); try { touchUp(cv, src); } catch (e) { /* it is kept as it is */ }
-  pkBusyOff(); return seq === pk.seq ? cv : null;
+  if (seq !== pk.seq) return null; /* a newer one is on its way: this one changes nothing */
+  pkBusyOff(); return cv;
 }
 async function pkShow() {
-  const cv = await pkRender(false); if (!pickDlg.open || !pk.small) return;
+  if (pk.keeping) return; /* Keep is making the big one */
+  const seq = pk.seq + 1, cv = await pkRender(false); if (seq !== pk.seq || !pickDlg.open || !pk.small) return; /* overtaken, or closed */
   const show = cv || pk.small; pkCanvas.width = show.width; pkCanvas.height = show.height;
   const c = pkCanvas.getContext('2d'); c.clearRect(0, 0, show.width, show.height); c.globalAlpha = cv ? 1 : .35; c.drawImage(show, 0, 0); c.globalAlpha = 1;
   pkKeep.disabled = !cv;
@@ -8183,23 +8278,27 @@ function openPick(cv) {
   if (cam.on) stopCamera();
   pk.src = cv; pk.small = photoCanvas(cv, cv.width, cv.height, false, 720); pk.base = {}; pk.mode = ['all', 'me', 'green'].indexOf(cam.mode) >= 0 ? cam.mode : 'all';
   for (const r of pickDlg.querySelectorAll('input[name="pkMode"]')) r.checked = r.value === pk.mode;
-  pk.back = document.activeElement; touchSync(); pkMsg.textContent = ''; pkKeep.disabled = true;
+  pkMark(); pk.back = document.activeElement; touchSync(); pkMsg.textContent = ''; pkKeep.disabled = true;
   try { pickDlg.showModal(); } catch (e) { pickDlg.setAttribute('open', ''); }
   if (touchOn() && SEG.state === 'idle') loadSeg().then((ok) => { if (ok && pickDlg.open) pkShow(); }); /* the touch-up wants to know where the skin is */
   pkShow();
 }
 function closePick() {
-  pk.seq++; clearTimeout(pk.timer); pkBusyOff();
+  pk.seq++; clearTimeout(pk.timer); pkBusyOff(); pkLock(false);
   if (pickDlg.open) { try { pickDlg.close(); } catch (e) { pickDlg.removeAttribute('open'); } }
   pk.src = pk.small = null; pk.base = {};
   if (pk.back && pk.back.isConnected && pk.back.focus) { try { pk.back.focus(); } catch (e) { /* ignore */ } }
 }
-pickDlg.addEventListener('change', (e) => { if (e.target.name === 'pkMode') { pk.mode = e.target.value; pkShow(); } });
+const pkMark = () => { for (const r of pickDlg.querySelectorAll('input[name="pkMode"]')) r.closest('.kp-opt').classList.toggle('on', r.checked); };
+pickDlg.addEventListener('change', (e) => { if (e.target.name === 'pkMode') { pk.mode = e.target.value; pkMark(); pkShow(); } });
 pickDlg.addEventListener('cancel', (e) => { e.preventDefault(); closePick(); });
 $('#pkClose').addEventListener('click', closePick); $('#pkCancel').addEventListener('click', closePick);
+const pkLock = (on) => { pk.keeping = on; for (const el of pickDlg.querySelectorAll('input')) el.disabled = on; };
 pkKeep.addEventListener('click', async () => {
-  if (pkKeep.disabled) return; pkKeep.disabled = true;
-  const mode = pk.mode, cv = await pkRender(true); if (!cv || !pickDlg.open) { pkKeep.disabled = !cv; return; }
+  if (pkKeep.disabled || pk.keeping) return; pkKeep.disabled = true; pkLock(true);
+  if (touchOn() && SEG.state === 'loading') { pkBusyOn('✨ One moment…'); await loadSeg(); } /* the touch-up wants to know where the skin is */
+  const mode = pk.mode, seq = pk.seq + 1, cv = pickDlg.open ? await pkRender(true) : null; pkLock(false);
+  if (seq !== pk.seq || !cv || !pickDlg.open) { if (pickDlg.open && seq === pk.seq) pkKeep.disabled = false; return; }
   closePick(); sound.pop();
   if (mode === 'all') { addPhoto(cv); tell('🖼️ Your photo is the scene!', 2600); } else { addCut(cv); tell('✂️ You are in the scene!', 2600); }
   if (!state.autoplay) again();
@@ -8430,7 +8529,7 @@ window.FW = {
     canvas: () => (cam.mode === 'green' ? cam.keyCv : cam.cutCv) || null, layer: () => meCv,
     cuts: () => state.cuts.slice(), all: () => photos.filter((p) => p.cut).map((p) => p.id), setCut: (id, on) => setCut(id, !!on), picked: () => sel,
     place: (id) => { const r = cutRec(id); return r ? { x: r.x, y: r.y, h: r.h, box: cutBox(r, stage.clientWidth, stage.clientHeight) } : null; },
-    picture: (id) => { const r = photos.find((q) => q.id === id); return r ? r.cv || r.small : null; }, touchUp: (cv, smooth, light, sharp) => { const was = Object.assign({}, touch); touch.smooth = smooth; touch.light = light; touch.sharp = sharp || 0; try { touchUp(cv, cv); } finally { Object.assign(touch, was); } }, pick: () => ({ open: pickDlg.open, mode: pk.mode, busy: !pkBusy.hidden, msg: pkMsg.textContent, keep: !pkKeep.disabled }), sharpUp: (cv) => sharpUp(cv), sharp: (id) => { const r = cutRec(id); return r ? r.sr || '' : ''; },
+    picture: (id) => { const r = photos.find((q) => q.id === id); return r ? r.cv || r.small : null; }, touchUp: (cv, smooth, light, sharp) => { const was = Object.assign({}, touch); touch.smooth = smooth; touch.light = light; touch.sharp = sharp || 0; try { touchUp(cv, cv); } finally { Object.assign(touch, was); } }, pick: () => ({ open: pickDlg.open, mode: pk.mode, busy: !pkBusy.hidden, msg: pkMsg.textContent, keep: !pkKeep.disabled }), sr: () => ({ gpu: SR.gpu, onGpu: SR.onGpu, off: SR.off, why: SR.why || '' }), srGpuAny: () => { SR.gpuAny = true; SR.gpu = null; }, sharpUp: (cv) => sharpUp(cv), sharp: (id) => { const r = cutRec(id); return r ? r.sr || '' : ''; },
     async add(url) { return addCut(await decodePhoto(await (await fetch(url)).blob(), PHOTO_SIDE)); }
   },
   three: { state: () => G3.state, why: () => G3.why, load: () => want3D(false), size: () => [G3.w, G3.h], canvas: () => G3.cv, worlds: () => Object.keys(G3.worlds), memory: () => (G3.r ? Object.assign({}, G3.r.info.memory) : null) },
