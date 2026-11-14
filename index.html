@@ -934,7 +934,7 @@ html.short #pkCanvas { max-height: 30dvh; }
 html.short #touchBox { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 html.short #touchBox .touch-l > span { font-size: 0; }
 html.short #touchBox .touch-l > span > span { font-size: 14px; }
-@media (max-width: 380px) { #camBar { gap: 8px; } }
+@media (max-width: 380px) { #camBar { gap: 8px; } #camSnap { height: 46px; font-size: 18px; padding: 0 16px 0 12px; } .cam-b { width: 42px; height: 42px; font-size: 17px; } } /* four buttons (with 🔄) fit a 320 px phone */
 </style>
 </head>
 <body>
@@ -6636,7 +6636,7 @@ const KEEP = (() => {
       const x1 = box.x + box.w - (clip[1].px + clip[1].pc / 100 * box.w), y1 = box.y + box.h - (clip[2].px + clip[2].pc / 100 * box.h);
       c.beginPath(); c.rect(x0, y0, Math.max(0, x1 - x0), Math.max(0, y1 - y0)); c.clip();
     }
-    const S = Math.min(4, k * 1.25), tF = classAt(R, 'filled', t), goldOn = R.lookId === 'metal' && ((R.h >= 30 && R.h <= 60) || classAt(R, 'gold', t) >= 0);
+    const S = Math.max(k, Math.min(4, k * 1.25)), tF = classAt(R, 'filled', t), goldOn = R.lookId === 'metal' && ((R.h >= 30 && R.h <= 60) || classAt(R, 'gold', t) >= 0);
     const mid = (R.n - 1) / 2;
     for (const U of R.U) {
       if (U.isSpace) continue;
@@ -6940,10 +6940,12 @@ const KEEP = (() => {
   async function make(R, fmt, shape, onProgress, abort, size) {
     let [pw, ph] = (PIXELS[fmt] || PIXELS.png)[shape] || PIXELS.png.square;
     const long = { '2k': 2560, '4k': 3840 }[size];
-    if ((fmt === 'png' || fmt === 'jpg') && long) { const f = long / Math.max(pw, ph); pw = Math.round(pw * f); ph = Math.round(ph * f); R = await keepBigger(R, pw / R.W, onProgress, abort || {}); }
-    const k = pw / R.W;
+    if ((fmt === 'png' || fmt === 'jpg') && long) { const f = long / Math.max(pw, ph); pw = Math.round(pw * f); ph = Math.round(ph * f); R = await keepBigger(R, Math.max(pw / R.W, ph / R.H), onProgress, abort || {}); }
+    const k = long ? Math.max(pw / R.W, ph / R.H) : pw / R.W; /* (rounded, a big size can be a pixel taller than its width says: the frame covers it all) */
     if (fmt === 'png' || fmt === 'jpg') {
-      const cv = newCanvas(pw, ph), c = cv.getContext('2d'); drawFrame(c, R, R.tStill, k, null);
+      const cv = newCanvas(pw, ph), c = cv.getContext('2d');
+      try { drawFrame(c, long ? Object.assign({}, R, { sprites: new Map() }) : R, R.tStill, k, null); } /* the big letters are let go of afterwards */
+      finally { if (/^__keep-big/.test(R.scene)) delete SCENES[R.scene]; } /* and so is the big photo */
       const type = fmt === 'png' ? 'image/png' : 'image/jpeg';
       const blob = await new Promise((res) => cv.toBlob(res, type, .92)); onProgress(1);
       if (!blob) throw new Error('no picture');
@@ -7160,8 +7162,7 @@ async function makeIt() {
   } catch (e) {
     if (!job.stop) kpMsg.textContent = K.fmt === 'mp4' ? 'This browser can’t make videos. Try a GIF!' : 'Oops, that didn’t work. Try again?';
   } finally {
-    if (K.job === job) K.job = null;
-    setBusy(null); kpLock(false); if (!kpDone.hidden) kpMake.disabled = false;
+    if (K.job === job) { K.job = null; setBusy(null); kpLock(false); if (!kpDone.hidden) kpMake.disabled = false; } /* a job let go of by Close leaves a newer one alone */
   }
 }
 async function saveIt(viaShare) {
@@ -7190,7 +7191,7 @@ function openKeep() {
 }
 function closeKeep() {
   if (!K.open) return;
-  K.open = false; K.prepSeq++; stopPreview(); if (K.job) K.job.stop = true;
+  K.open = false; K.prepSeq++; stopPreview(); if (K.job) { K.job.stop = true; K.job = null; setBusy(null); kpLock(false); } /* a big picture may take a while to notice: the dialog is free at once */
   refreshScene();
   clearResult();
   if (keepDlg.open) { try { keepDlg.close(); } catch (e) { keepDlg.removeAttribute('open'); } }
@@ -7585,18 +7586,19 @@ async function srWorker() {
       const files = await srFiles(gpu), code = URL.createObjectURL(new Blob([files.js, '\n', SR_WORKER], { type: 'text/javascript' })); worker = new Worker(code); URL.revokeObjectURL(code);
       await srAsk(worker, { init: { mjs: files.mjs, wasm: files.wasm, model: files.model, gpu } }, gpu ? 120000 : 60000);
       SR.worker = worker; SR.onGpu = gpu; return worker;
-    } catch (e) { if (worker) worker.terminate(); if (!gpu) throw e; SR.gpu = false; } /* the graphics chip let us down: the processor it is */
+    } catch (e) { if (worker) worker.terminate(); if (!gpu) throw e; SR.gpu = false; SR.gpuFiles = null; } /* the graphics chip let us down: the processor it is */
   }
   throw new Error('no worker');
 }
 /* one job at a time on the one worker; when nothing waits any more the worker goes, and its memory with it */
-function srUse(fn) {
+function srUse(fn, gone) {
   SR.waiting++;
   const go = async () => {
+    if (gone && gone()) return null; /* not wanted any more: no worker is started for it */
     await srWorker();
     try { return await fn(); } catch (e) {
-      if (!SR.onGpu || (e && e.message === 'stopped')) throw e;
-      SR.gpu = false; if (SR.worker) { SR.worker.terminate(); SR.worker = null; } /* the graphics chip let us down halfway: the processor does it again */
+      if (!SR.onGpu || !(e && e.fromWorker) || (gone && gone())) throw e; /* (a canvas the page could not make is no fault of the graphics chip) */
+      SR.gpu = false; SR.gpuFiles = null; if (SR.worker) { SR.worker.terminate(); SR.worker = null; } /* the graphics chip let us down halfway: the processor does it again */
       await srWorker(); return fn();
     }
   };
@@ -7609,9 +7611,10 @@ function srUse(fn) {
 const srAsk = (worker, msg, ms) => new Promise((res, rej) => {
   let hid = document.hidden, timer = 0;
   const seen = () => { hid = true; }, done = (f, v) => { clearTimeout(timer); document.removeEventListener('visibilitychange', seen); f(v); };
-  const late = () => { if (hid) { hid = document.hidden; timer = setTimeout(late, ms); } else done(rej, new Error('slow')); };
+  const fail = (m) => Object.assign(new Error(m), { fromWorker: true });
+  const late = () => { if (hid) { hid = document.hidden; timer = setTimeout(late, ms); } else done(rej, fail('slow')); };
   document.addEventListener('visibilitychange', seen); timer = setTimeout(late, ms);
-  worker.onmessage = (e) => (e.data.fail ? done(rej, new Error(e.data.fail)) : done(res, e.data)); worker.onerror = () => done(rej, new Error('worker'));
+  worker.onmessage = (e) => (e.data.fail ? done(rej, fail(e.data.fail)) : done(res, e.data)); worker.onerror = () => done(rej, fail('worker'));
   worker.postMessage(msg);
 });
 /* colours are spread a few pixels into the see-through part, so the model sees no black rim around the kid */
@@ -7683,21 +7686,38 @@ function sharper(rec, cut, W, H) {
 /* 📸 Keep it at 2K or 4K: the photo scene and every cut-out are drawn again by Real-ESRGAN at the size they will have in
    the picture (up to four times their own), so the big picture is sharp and not just stretched. If it cannot be done (no
    internet, an old device) the picture is made all the same, stretched, and says so (`plain`). */
+let keepBigN = 0;
 async function keepBigger(R, k, onProgress, abort) {
+  if (SR.off) return Object.assign({}, R, { plain: true }); /* this device proved too slow for it once already */
   const jobs = [], S = SCENES[R.scene], cuts = R.cuts.map((q) => Object.assign({}, q)); let big = null;
-  const want = (img, wantW, wantH, put) => { const f = Math.min(4, Math.max(wantW / img.width, wantH / img.height)); if (f > 1.1) jobs.push({ img, W: Math.round(img.width * f), H: Math.round(img.height * f), put }); };
-  if (S && S.photo) { const rec = photos.find((q) => q.id === R.scene), img = rec && (rec.cv || rec.small); if (img) want(img, R.W * k, R.H * k, (o) => { big = o; }); }
-  for (const q of cuts) { const b = cutBox(q.r, R.W, R.H); want(q.img, b[2] * k, b[3] * k, (o) => { q.img = o; }); }
-  if (!jobs.length) return R;
-  let plain = false;
-  try {
-    for (let n = 0; n < jobs.length; n++) {
-      const j = jobs[n], out = await srUse(() => srDraw(j.img, j.W, j.H, (d, a) => onProgress(.95 * (n + d / a) / jobs.length), () => abort.stop));
-      if (abort.stop) throw new Error('stopped'); if (out) j.put(out);
+  /* up to four times its own size, but no bigger than a phone can hold (`most` pixels); less than half as big again
+     is left to the smooth stretch, which does nearly as well and takes no time */
+  const want = (img, f, most, put) => { f = Math.min(4, f, Math.sqrt(most / (img.width * img.height))); if (f >= 1.5) jobs.push({ img, W: Math.round(img.width * f), H: Math.round(img.height * f), put }); };
+  if (S && S.photo) {
+    const rec = photos.find((q) => q.id === R.scene), img = rec && (rec.cv || rec.small);
+    if (img) { /* only the part of the photo the picture shows (as coverDraw cuts it) */
+      const w = R.W * k, h = R.H * k, s = Math.max(w / img.width, h / img.height), sw = Math.min(img.width, Math.round(w / s)), sh = Math.min(img.height, Math.round(h / s));
+      const crop = document.createElement('canvas'); crop.width = sw; crop.height = sh;
+      cx2(crop).drawImage(img, Math.round((img.width - sw) / 2), Math.round((img.height - sh) * .42), sw, sh, 0, 0, sw, sh);
+      want(crop, s, 16e6, (o) => { big = o; });
     }
-  } catch (e) { if (abort.stop) throw e; plain = true; SR.why = String((e && e.message) || e); }
+  }
+  for (const q of cuts) { const b = cutBox(q.r, R.W, R.H); want(q.img, Math.max(b[2] * k / q.img.width, b[3] * k / q.img.height), 8e6, (o) => { q.img = o; }); }
+  if (!jobs.length) return R;
+  let plain = false; const gone = () => abort.stop;
+  for (let n = 0; n < jobs.length; n++) {
+    const j = jobs[n];
+    try {
+      const out = await srUse(() => srDraw(j.img, j.W, j.H, (d, a) => onProgress(.95 * (n + d / a) / jobs.length), gone), gone);
+      if (abort.stop) throw new Error('stopped'); if (out) j.put(out);
+    } catch (e) {
+      if (abort.stop) throw e; plain = true; SR.why = String((e && e.message) || e);
+      if (e && e.message === 'slow') SR.off = true;
+      if (!(e && e.message === 'empty')) break; /* no worker, or too slow: the rest would go the same way. (Out of memory for one: the next may fit.) */
+    }
+  }
   const R2 = Object.assign({}, R, { cuts, plain });
-  if (big) { const id = '__keep-big'; SCENES[id] = Object.assign({}, S, { id, draw: (c, w, h) => coverDraw(c, big, w, h) }); R2.scene = id; }
+  if (big) { const id = '__keep-big' + ++keepBigN; SCENES[id] = Object.assign({}, S, { id, draw: (c, w, h) => coverDraw(c, big, w, h) }); R2.scene = id; } /* make() lets go of it */
   return R2;
 }
 
@@ -8166,8 +8186,8 @@ function touchUp(cv, src) {
     bl.set(Y); boxBlur(bl, t2, w, h, r); boxBlur(bl, t2, w, h, r);
     /* how grainy the picture is (the middle size of its finest differences): only what stands well above the grain counts
        as detail, so a dark noisy snap gets no grain added, and the small preview and the big photo come out alike */
-    const sample = []; for (let i = 0; i < n; i += 7) sample.push(Math.abs(Y[i] - bl[i])); sample.sort((a, b) => a - b);
-    const grain = (sample[sample.length >> 1] || 0) / .6745, lo = Math.max(2, 2.5 * grain), hi = Math.max(6, 3 * lo);
+    const gAll = new Float32Array(Math.ceil(n / 7)); let gN = 0; for (let i = 0; i < n; i += 7) if (d[i * 4 + 3] >= 250) gAll[gN++] = Math.abs(Y[i] - bl[i]); /* (a cut-out's see-through part is no grain) */
+    const grain = (gAll.subarray(0, gN).sort()[gN >> 1] || 0) / .6745, lo = Math.max(2, 2.5 * grain), hi = Math.max(6, 3 * lo);
     for (let i = 0; i < n; i++) {
       const det = Y[i] - bl[i], a = Math.abs(det); if (a < lo) continue;
       const k = amt * touchStep(lo, hi, a) * (skin ? 1 - .85 * skin[i] : ss > 0 ? 0 : 1); if (k <= 0) continue; /* not knowing where the skin is, it is not sharpened over the smoothing */
@@ -8183,7 +8203,7 @@ const touchShow = (on) => { touchBox.hidden = !on; touchBtn.setAttribute('aria-e
 /* the same three sliders sit in the booth's ✨ panel and in the photo picker: moving one moves its twin */
 document.addEventListener('input', (e) => { const t = e.target; if (!t || !t.dataset || !t.dataset.touch) return;
   touch[t.dataset.touch] = t.value / 100; save('fw.touch', touch); for (const o of touchIns) if (o !== t && o.dataset.touch === t.dataset.touch) o.value = t.value;
-  if (((cam.on && cam.stream) || pickDlg.open) && touchOn() && SEG.state === 'idle') loadSeg(); /* raised from nothing: now it wants to know where the skin is */
+  if (((cam.on && cam.stream) || pickDlg.open) && touchOn() && SEG.state === 'idle') loadSeg().then((ok) => { if (ok && pickDlg.open) pkLater(); }); /* raised from nothing: now it wants to know where the skin is */
   if (pickDlg.open) pkLater(); });
 /* iPhone photos are often HEIC, which Chrome cannot open (Safari can). Then the page fetches libheif (LGPL-3.0, its
    own unmodified files from jsDelivr, each checked against a hash written here) and turns the photo into a picture in
@@ -8280,7 +8300,7 @@ function openPick(cv) {
   for (const r of pickDlg.querySelectorAll('input[name="pkMode"]')) r.checked = r.value === pk.mode;
   pkMark(); pk.back = document.activeElement; touchSync(); pkMsg.textContent = ''; pkKeep.disabled = true;
   try { pickDlg.showModal(); } catch (e) { pickDlg.setAttribute('open', ''); }
-  if (touchOn() && SEG.state === 'idle') loadSeg().then((ok) => { if (ok && pickDlg.open) pkShow(); }); /* the touch-up wants to know where the skin is */
+  if (touchOn() && SEG.state !== 'ready' && SEG.state !== 'failed') { const at = pk.src; loadSeg().then((ok) => { if (ok && pickDlg.open && pk.src === at) pkLater(); }); } /* the touch-up wants to know where the skin is */
   pkShow();
 }
 function closePick() {
@@ -8296,8 +8316,10 @@ $('#pkClose').addEventListener('click', closePick); $('#pkCancel').addEventListe
 const pkLock = (on) => { pk.keeping = on; for (const el of pickDlg.querySelectorAll('input')) el.disabled = on; };
 pkKeep.addEventListener('click', async () => {
   if (pkKeep.disabled || pk.keeping) return; pkKeep.disabled = true; pkLock(true);
-  if (touchOn() && SEG.state === 'loading') { pkBusyOn('✨ One moment…'); await loadSeg(); } /* the touch-up wants to know where the skin is */
-  const mode = pk.mode, seq = pk.seq + 1, cv = pickDlg.open ? await pkRender(true) : null; pkLock(false);
+  const at = pk.seq;
+  if (touchOn() && SEG.state === 'loading') { pkBusyOn('✨ One moment…'); await loadSeg(); if (pk.seq !== at || !pickDlg.open) return; } /* the touch-up wants to know where the skin is; closed meanwhile: nothing more */
+  const mode = pk.mode, seq = pk.seq + 1; let cv = null;
+  try { cv = pickDlg.open ? await pkRender(true) : null; } catch (e) { if (seq === pk.seq) { pkBusyOff(); pkMsg.textContent = '✂️ That did not work. Try again!'; } } finally { if (seq === pk.seq) pkLock(false); }
   if (seq !== pk.seq || !cv || !pickDlg.open) { if (pickDlg.open && seq === pk.seq) pkKeep.disabled = false; return; }
   closePick(); sound.pop();
   if (mode === 'all') { addPhoto(cv); tell('🖼️ Your photo is the scene!', 2600); } else { addCut(cv); tell('✂️ You are in the scene!', 2600); }
