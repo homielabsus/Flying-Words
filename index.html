@@ -6947,9 +6947,9 @@ const KEEP = (() => {
     if (fmt === 'png' || fmt === 'jpg') {
       const cv = newCanvas(pw, ph), c = cv.getContext('2d');
       /* a big picture keeps one letter at a time: each is drawn once, and a 4K letter is big (its canvas is emptied at once, not when the browser gets round to it) */
-      const one = { size: 0, last: null, get() {}, clear() {}, set(key, sp) { if (this.last) this.last.cv.width = this.last.cv.height = 0; this.last = sp; } };
+      const one = { size: 0, last: null, get() { if (this.last) { this.last.cv.width = this.last.cv.height = 0; this.last = null; } }, clear() {}, set(key, sp) { this.last = sp; } }; /* (asked for the next letter, the last one is drawn already) */
       try { drawFrame(c, long ? Object.assign({}, R, { sprites: one }) : R, R.tStill, k, null); }
-      finally { one.set(null, null); if (/^__keep-big/.test(R.scene)) delete SCENES[R.scene]; } /* and the big photo is let go of too */
+      finally { one.get(); if (/^__keep-big/.test(R.scene)) delete SCENES[R.scene]; } /* and the big photo is let go of too */
       const type = fmt === 'png' ? 'image/png' : 'image/jpeg';
       const blob = await new Promise((res) => cv.toBlob(res, type, .92)); onProgress(1);
       if (!blob) throw new Error('no picture');
