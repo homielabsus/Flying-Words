@@ -937,10 +937,10 @@ html.short #touchBox .touch-l > span > span { font-size: 14px; }
 .em-mode:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; }
 .em-find { flex: 1 1 90px; min-width: 40px; max-width: 220px; display: flex; align-items: center; gap: 4px; padding: 0 8px; }
 .em-find .em-fi { font-size: 13px; flex: none; }
-.em-find input { flex: 1; min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; font: 700 14px/1 var(--font); color: var(--ink); padding: 0; }
+.em-find input { flex: 1; min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; font: 700 16px/1 var(--font); /* (16px: an iPhone zooms in on anything smaller) */ color: var(--ink); padding: 0; }
 .em-find input::placeholder { color: #6f6d90; }
 .em-find:focus-within { outline: 3px solid var(--ink); outline-offset: 1px; }
-.em-cats { flex: 0 1 auto; min-width: 0; display: flex; gap: 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior: contain; }
+.em-cats { flex: 0 1 auto; min-width: 0; display: flex; gap: 2px; position: relative; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior: contain; }
 .em-cats::-webkit-scrollbar { display: none; }
 .em-cat { flex: none; width: 30px; height: 28px; padding: 0; border: 0; border-radius: 9px; background: transparent; font: 17px/1 "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; cursor: pointer; opacity: .55; }
 .em-cat.on { background: var(--sun); opacity: 1; box-shadow: inset 0 0 0 2px var(--ink); }
@@ -951,6 +951,7 @@ html.short #touchBox .touch-l > span > span { font-size: 14px; }
 }
 #emGrid .tile.em { width: var(--es); height: var(--es); box-shadow: 0 2px 0 var(--ink); border-width: 2px; border-radius: 11px; }
 #emGrid .tile.em .emo { font-size: calc(var(--es) * .55); }
+#emGrid .tile.em:focus-visible { outline: 3px solid var(--ink); outline-offset: -7px; } /* inside the key: the grid's edge would cut it off */
 .et { width: var(--es); height: var(--es); padding: 0; border: 0; border-radius: 10px; background: transparent; display: grid; place-items: center; cursor: pointer; font: calc(var(--es) * .7)/1 "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; color: var(--ink); }
 @media (hover: hover) { .et:hover { background: #f1eefb; } }
 .et:active { background: #e6e0f7; transform: scale(.9); }
@@ -986,7 +987,7 @@ html.short .em-mode .em-ml { display: none; }
   .em-cat { flex: 1 1 0; width: auto; height: 34px; font-size: 20px; }
   .em-grid {
     grid-auto-flow: row; grid-template-rows: none; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); grid-auto-rows: 42px;
-    grid-auto-columns: auto; overflow-x: hidden; overflow-y: auto; padding: 0 4px 6px; gap: 2px;
+    grid-auto-columns: auto; overflow-x: hidden; overflow-y: auto; padding: 0 4px 6px; gap: 2px; scroll-padding-top: 44px; /* (under the stuck heading) */
   }
   .et { width: auto; height: auto; font-size: 29px; }
   #emGrid .tile.em { width: auto; height: auto; }
@@ -4769,7 +4770,7 @@ const EMOJI_GROUPS = [['😀', 'Smileys'], ['👋', 'People'], ['🐻', 'Animals
   ['🚗', 'Travel & Places'], ['💡', 'Objects'], ['🔣', 'Symbols'], ['🏳️', 'Flags']];
 const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
 const emGrid = $('#emGrid'), emFind = $('#emFind'), emMode = $('#emMode'), emCats = $('#emCats'), emNone = $('#emNone');
-const EM = { built: false, sticker: load('fw.emMode', 'word') === 'sticker', at: null, raf: 0 };
+const EM = { built: false, g: 0, can: null, sticker: load('fw.emMode', 'word') === 'sticker', at: null, raf: 0, jumped: -1 };
 /* the newest emoji this device can draw. One of each kind is drawn: it has to come out in colour, as one picture (a
    device that does not know it draws an empty box, or the parts side by side). */
 function emojiReach() {
@@ -4797,28 +4798,33 @@ function buildEmojiPicker() {
     b.setAttribute('aria-label', name); b.title = name; emCats.append(b);
   });
   emMark();
-  const later = window.requestIdleCallback || ((f) => setTimeout(f, 600));
-  later(() => emojiBuild()); /* every emoji: once the page is up, or when the tab opens, whichever is first */
+  if (window.requestIdleCallback) requestIdleCallback(emojiBuild); else setTimeout(emojiBuild, 600); /* every emoji: a group at a time while the page is idle, or all at once when the tab opens */
 }
 function emShow() { emojiBuild(); requestAnimationFrame(() => emCat()); } /* the tab opens */
-function emojiBuild() {
-  if (EM.built) return; EM.built = true;
-  const can = emojiReach(), flag = /[\u{1F1E6}-\u{1F1FF}\u{E0020}-\u{E007F}]/u, frag = document.createDocumentFragment();
-  EMOJI_DATA.forEach((list, g) => {
-    const h = document.createElement('h3'); h.className = 'em-h'; h.dataset.sec = g; h.textContent = EMOJI_GROUPS[g][1]; frag.append(h);
-    let first = true;
-    for (const line of list.split('\n')) {
-      const [e, name, more, ver] = line.split('|');
-      if ((ver && +ver > can.v) || (!can.flags && flag.test(e))) continue; /* this device would show an empty box */
-      const b = document.createElement('button'); b.type = 'button'; b.className = 'et'; b.tabIndex = -1; b.dataset.emoji = e; b.textContent = e;
-      b.setAttribute('aria-label', name); b.title = name; b.words = ' ' + name.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ') + ' ' + more + ' ';
-      if (first) { b.dataset.first = g; first = false; }
-      frag.append(b);
-    }
-  });
-  emGrid.insertBefore(frag, emNone);
+function emojiBuild(idle) {
+  if (EM.built) return;
+  if (!EM.can) EM.can = emojiReach();
+  while (EM.g < EMOJI_DATA.length) {
+    emGroup(EM.g++);
+    if (idle && idle.timeRemaining && idle.timeRemaining() < 8 && EM.g < EMOJI_DATA.length) { requestIdleCallback(emojiBuild); return; } /* the rest next time */
+  }
+  EM.built = true;
   const b0 = emGrid.querySelector('.et'); if (b0) { b0.tabIndex = 0; EM.at = b0; }
   emCat(); requestAnimationFrame(() => stripEdges.forEach((f) => f()));
+}
+function emGroup(g) {
+  const can = EM.can, list = EMOJI_DATA[g], flag = /[\u{1F1E6}-\u{1F1FF}\u{E0020}-\u{E007F}]/u, frag = document.createDocumentFragment();
+  const h = document.createElement('h3'); h.className = 'em-h'; h.dataset.sec = g; h.textContent = EMOJI_GROUPS[g][1]; frag.append(h);
+  let first = true;
+  for (const line of list.split('\n')) {
+    const [e, name, more, ver] = line.split('|');
+    if ((ver && +ver > can.v) || (!can.flags && flag.test(e))) continue; /* this device would show an empty box */
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'et'; b.tabIndex = -1; b.dataset.emoji = e; b.textContent = e;
+    b.setAttribute('aria-label', name); b.title = name; b.words = ' ' + emFold(name).replace(/[^a-z0-9 ]+/g, ' ') + ' ' + more + ' ';
+    if (first) { b.dataset.first = g; first = false; }
+    frag.append(b);
+  }
+  emGrid.insertBefore(frag, emNone);
 }
 /* the word or the stage: the bar's first button says which, and so do the ⌫ and 🧹 keys */
 function emMark() {
@@ -4836,24 +4842,32 @@ function emStart(g) { const el = emGrid.querySelector((emDown() ? '.em-h' : '.et
 function emJump(g) {
   if (emFind.value) { emFind.value = ''; emSearch(); }
   emojiBuild(); const el = emStart(g); if (!el) return;
-  if (emDown()) emGrid.scrollTo({ top: el.offsetTop - 2 }); else emGrid.scrollTo({ left: el.offsetLeft - 8 });
-  emCat(g);
+  if (!g) emGrid.scrollTo({ top: 0, left: 0 });
+  else if (emDown()) { const f = emGrid.querySelector('.et[data-first="' + g + '"]'); emGrid.scrollTo({ top: (f ? f.offsetTop - el.offsetHeight - 2 : el.offsetTop) - 2 }); }
+  else emGrid.scrollTo({ left: el.offsetLeft - 40 });
+  EM.jumped = g; emCat(g);
 }
 /* the group in view is lit in the bar */
 function emCat(g) {
   if (!emGrid.clientWidth) return; /* (out of sight: nothing has a place yet) */
   if (g == null) {
-    g = 0; const down = emDown(), at = (down ? emGrid.scrollTop : emGrid.scrollLeft) + 12;
+    g = 0; const down = emDown(), at = down ? emGrid.scrollTop + 12 : emGrid.scrollLeft + 48; /* (a jump sideways stops short of the faded edge) */
     for (let k = 0; k < EMOJI_GROUPS.length; k++) { const el = emStart(k); if (el && (down ? el.offsetTop : el.offsetLeft) <= at) g = k; }
+    const end = down ? emGrid.scrollTop + emGrid.clientHeight >= emGrid.scrollHeight - 2 : emGrid.scrollLeft + emGrid.clientWidth >= emGrid.scrollWidth - 2;
+    if (end && EM.jumped > g) g = EM.jumped; /* a short last group never reaches the start */
   }
   const finding = !!emFind.value.trim();
-  for (const b of emCats.children) { const on = !finding && +b.dataset.sec === g; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); }
+  for (const b of emCats.children) {
+    const on = !finding && +b.dataset.sec === g; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+    if (on && (b.offsetLeft < emCats.scrollLeft || b.offsetLeft + b.offsetWidth > emCats.scrollLeft + emCats.clientWidth)) emCats.scrollLeft = b.offsetLeft - (emCats.clientWidth - b.offsetWidth) / 2; /* in sight in the bar */
+  }
 }
 emGrid.addEventListener('scroll', () => { if (!EM.raf) EM.raf = requestAnimationFrame(() => { EM.raf = 0; emCat(); }); }, { passive: true });
-/* the search: every word typed is the start of a word of the emoji's name or of its other words */
+/* the search: every word typed is the start of a word of the emoji's name or of its other words (curacao finds Curaçao) */
+const emFold = (t) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 function emSearch() {
   emojiBuild();
-  const q = emFind.value.toLowerCase().split(/[^a-z0-9']+/).filter(Boolean); let n = 0;
+  const q = emFold(emFind.value).split(/[^a-z0-9]+/).filter(Boolean); let n = 0;
   emGrid.classList.toggle('finding', q.length > 0); emFind.parentNode.classList.toggle('has', !!emFind.value);
   for (const b of emGrid.querySelectorAll('.et')) { const on = !q.length || q.every((w) => b.words.indexOf(' ' + w) >= 0); b.hidden = !on; if (on) n++; }
   emNone.hidden = n > 0 || !q.length;
@@ -4863,7 +4877,8 @@ function emSearch() {
 }
 emFind.addEventListener('input', emSearch);
 emFind.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); const b = emGrid.querySelector('.et:not([hidden])'); if (b) b.click(); } /* the first one found */
+  if (e.isComposing || e.keyCode === 229) return; /* a word still being put together (Japanese, Chinese…) */
+  if (e.key === 'Enter') { e.preventDefault(); const b = emGrid.classList.contains('finding') && emGrid.querySelector('.et:not([hidden])'); if (b) b.click(); } /* the first one found */
   else if (e.key === 'Escape' && emFind.value) { e.preventDefault(); emFind.value = ''; emSearch(); }
 });
 /* one emoji of the grid takes the Tab key; the arrows move from there */
@@ -4949,7 +4964,7 @@ function restoreStickers() {
     if (!Array.isArray(q) || typeof q[0] !== 'string' || typeof q[1] !== 'string' || stickers.length >= STICKER_MAX || stickers.some((s) => s.id === q[0])) continue;
     const cv = stickerCanvas(q[1]); if (cv) stickers.push(stickerRec(q[0], q[1], cv));
   }
-  for (const q of [].concat(load('fw.cuts', []))) {
+  for (const q of cutsAtStart) {
     const r = Array.isArray(q) && q.length > 3 && q.slice(1, 4).every(Number.isFinite) ? stickers.find((s) => s.id === q[0]) : null;
     if (r && !cutOn(r.id)) { r.x = q[1]; r.y = q[2]; r.h = q[3]; state.cuts.push(r.id); }
   }
@@ -9537,8 +9552,16 @@ async function restorePhotos() {
   renderPhotoTiles();
   const want = load('fw.scene', 'mix');
   if (!sceneTouched && SCENES[want] && state.scene !== want) setScene(want, true);
-  /* the cut-outs that were on the stage step back in, each to its place */
-  if (!cutTouched) { for (const q of [].concat(load('fw.cuts', []))) { const r = Array.isArray(q) && q.slice(1, 4).every(Number.isFinite) && q.length > 3 ? cutRec(q[0]) : null; if (r && !cutOn(r.id)) { r.x = q[1]; r.y = q[2]; r.h = q[3]; state.cuts.push(r.id); } } focusPhotos(); markScene(); drawCut(); }
+  /* the cut-outs that were on the stage step back in, each to its place and in its order (in front of or behind the stickers, as
+     they were); one taken off meanwhile stays off */
+  { const ids = cutsAtStart.map((q) => (Array.isArray(q) ? q[0] : null)); let back = 0;
+    for (const q of cutsAtStart) {
+      const r = Array.isArray(q) && q.slice(1, 4).every(Number.isFinite) && q.length > 3 ? cutRec(q[0]) : null; if (!r || cutOn(r.id) || cutGone.has(r.id)) continue;
+      r.x = q[1]; r.y = q[2]; r.h = q[3]; const k = ids.indexOf(r.id), at = state.cuts.findIndex((id) => { const j = ids.indexOf(id); return j < 0 || j > k; });
+      state.cuts.splice(at < 0 ? state.cuts.length : at, 0, r.id); back++;
+    }
+    if (back && cutTouched) saveCuts(); /* (fw.cuts was written meanwhile, without these) */
+    focusPhotos(); markScene(); drawCut(); }
 }
 
 /* picking a file: a hidden input the Add Photo tile clicks, and the same for a dropped picture */
@@ -9575,6 +9598,7 @@ const tell = (text, ms) => { toast(text, ms); announceEl.textContent = text; }; 
    knows its place as parts of the stage (x, y: its middle; h: its height), so it sits the same in any size of stage
    and in every shape of kept picture. */
 let cutTouched = false, sel = '', selT = 0;
+const cutsAtStart = [].concat(load('fw.cuts', [])), cutGone = new Set(); /* what was on the stage last time; what has been taken off since */
 const cutRec = (id) => photos.find((p) => p.cut && p.id === id) || stickers.find((p) => p.id === id) || null; /* (an emoji sticker counts as a cut-out) */
 const cutOn = (id) => state.cuts.indexOf(id) >= 0;
 /* where a cut-out lies on a stage of w by h: [left, top, width, height] */
@@ -9597,6 +9621,7 @@ function saveCuts() { cutTouched = true; save('fw.cuts', state.cuts.map((id) => 
 /* on: into the picture, in front of the others. off: out of it (it remembers its place for this visit) */
 function setCut(id, on) {
   state.cuts = state.cuts.filter((k) => k !== id); if (on && cutRec(id)) state.cuts.push(id);
+  if (on) cutGone.delete(id); else cutGone.add(id);
   saveCuts(); focusPhotos(); markScene(); drawCut();
 }
 /* six places for photos and cut-outs together. The oldest goes first: one that is not on the stage if there is one,
@@ -9909,7 +9934,11 @@ function placeBox() {
   const w = stage.clientWidth, h = stage.clientHeight, b = cutBox(r, w, h), rows = Math.min(92, h / 2); /* the top and bottom rows belong to the stage's own buttons */
   meBox.style.cssText = 'left:' + b[0] + 'px;top:' + b[1] + 'px;width:' + b[2] + 'px;height:' + b[3] + 'px';
   meGrip.style.cssText = 'left:' + (within(b[0] + b[2], 26, w - 26) - 22) + 'px;top:' + (within(b[1] + b[3], rows, h - rows) - 22) + 'px';
-  if (r.emo) meDel.style.cssText = 'left:' + (within(b[0] + b[2], 26, w - 26) - 20) + 'px;top:' + (within(b[1], rows, h - rows) - 20) + 'px'; /* a sticker's ✕, at the top corner */
+  if (r.emo) { /* a sticker's ✕: at its other top corner, and never on top of the grip */
+    const gx = within(b[0] + b[2], 26, w - 26), gy = within(b[1] + b[3], rows, h - rows); let dx = within(b[0], 22, w - 22); const dy = within(b[1], rows, h - rows);
+    if (Math.abs(dx - gx) < 50 && Math.abs(dy - gy) < 50) dx = gx - 50 >= 22 ? gx - 50 : gx + 50;
+    meDel.style.cssText = 'left:' + (dx - 20) + 'px;top:' + (dy - 20) + 'px';
+  }
 }
 /* the frame shows for three seconds after the last touch, then gets out of the way */
 function pick(id) {
