@@ -166,11 +166,6 @@ button:focus-visible { outline: 4px solid var(--ink); outline-offset: 3px; }
 
 .pane { display: none; }
 #toybox[data-tab="styles"] #pane-styles, #toybox[data-tab="moves"] #chips, #toybox[data-tab="scenes"] #pane-scenes, #toybox[data-tab="show"] #show { display: flex; }
-/* emoji are small: two rows of them, flowing sideways */
-#toybox[data-tab="emoji"] #pane-emoji {
-  display: grid; grid-template-rows: repeat(2, 46px); grid-auto-flow: column; grid-auto-columns: 46px; gap: 6px 8px; align-content: center;
-  padding-block: 8px;
-}
 .tiles {
   gap: 10px; overflow-x: auto; overflow-y: hidden; padding: 11px 8px 9px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; scroll-snap-type: x proximity; scroll-padding-inline: 8px; flex: none;
@@ -372,7 +367,6 @@ html.calm #playBtn.on .dot { animation: none; opacity: 1; }
   #toybox[data-tab="styles"] #pane-styles, #toybox[data-tab="moves"] #chips, #toybox[data-tab="scenes"] #pane-scenes {
     display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, 94px); grid-auto-columns: 88px; align-content: center; gap: 12px 10px;
   }
-  #toybox[data-tab="emoji"] #pane-emoji { grid-template-rows: repeat(3, 50px); grid-auto-columns: 50px; gap: 10px; }
   .tile.em { width: 50px; height: 50px; }
 }
 /* short visible screens (a phone with its keyboard open): keep the stage, shrink the box. html.short
@@ -380,7 +374,6 @@ html.calm #playBtn.on .dot { animation: none; opacity: 1; }
    layout viewport alone, so a max-height media query would never notice. */
 html.short #toybox { --paneH: 88px; }
 html.short #toybox[data-tab="styles"] #pane-styles, html.short #toybox[data-tab="moves"] #chips, html.short #toybox[data-tab="scenes"] #pane-scenes { display: flex; }
-html.short #toybox[data-tab="emoji"] #pane-emoji { grid-template-rows: 54px; grid-auto-columns: 54px; padding-block: 9px 7px; }
 html.short #show { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding-block: 8px 6px; }
 html.short .tile { width: 70px; height: 70px; padding: 4px; }
 html.short .tile .nm { display: none; }
@@ -405,12 +398,11 @@ html.short #hint { display: none; }
   #toybox #show { display: flex; flex-wrap: wrap; overflow: visible; padding: 10px 0 0; border-top: 3px dashed #e3dcef; order: 9; height: auto; }
   #toybox .pane.tiles { display: none; }
   #toybox[data-tab="styles"] #pane-styles, #toybox[data-tab="show"] #pane-styles,
-  #toybox[data-tab="moves"] #chips, #toybox[data-tab="scenes"] #pane-scenes, #toybox[data-tab="emoji"] #pane-emoji {
+  #toybox[data-tab="moves"] #chips, #toybox[data-tab="scenes"] #pane-scenes {
     display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: max-content; align-content: start;
     gap: 12px; flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
     scroll-snap-type: none; padding: 12px 8px 10px; height: auto; grid-auto-flow: row; grid-template-rows: none; grid-auto-columns: auto;
   }
-  #toybox[data-tab="emoji"] #pane-emoji { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .tile { width: auto; height: auto; aspect-ratio: 1 / 1.02; min-height: 0; font-size: 13.5px; }
   .tile .emo { font-size: 38px; }
   .tile.em { width: auto; height: auto; aspect-ratio: 1; border-radius: 16px; }
@@ -935,6 +927,78 @@ html.short #touchBox { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 html.short #touchBox .touch-l > span { font-size: 0; }
 html.short #touchBox .touch-l > span > span { font-size: 14px; }
 @media (max-width: 380px) { #camBar { gap: 8px; } #camSnap { height: 46px; font-size: 18px; padding: 0 16px 0 12px; } .cam-b { width: 42px; height: 42px; font-size: 17px; } } /* four buttons (with 🔄) fit a 320 px phone */
+/* ---------- the Emoji tab: a bar (word or sticker, the search, the groups) over every emoji ---------- */
+#toybox[data-tab="emoji"] #pane-emoji { display: flex; flex-direction: column; gap: 4px; height: var(--paneH); flex: none; min-height: 0; padding: 4px 0 1px; box-sizing: border-box; }
+.em-bar { display: flex; align-items: center; gap: 6px; flex: none; height: 28px; padding: 0 8px; min-width: 0; }
+.em-mode, .em-find { height: 28px; border-radius: 999px; border: 2px solid var(--ink); background: #fff; box-sizing: border-box; }
+.em-mode { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 0 9px; font: 800 12.5px/1 var(--font); color: var(--ink); cursor: pointer; }
+.em-mode[aria-pressed="true"] { background: var(--accent); }
+.em-mode .em-mi { font-size: 15px; }
+.em-mode:focus-visible { outline: 3px solid var(--ink); outline-offset: 1px; }
+.em-find { flex: 1 1 90px; min-width: 40px; max-width: 220px; display: flex; align-items: center; gap: 4px; padding: 0 8px; }
+.em-find .em-fi { font-size: 13px; flex: none; }
+.em-find input { flex: 1; min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; font: 700 14px/1 var(--font); color: var(--ink); padding: 0; }
+.em-find input::placeholder { color: #6f6d90; }
+.em-find:focus-within { outline: 3px solid var(--ink); outline-offset: 1px; }
+.em-cats { flex: 0 1 auto; min-width: 0; display: flex; gap: 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior: contain; }
+.em-cats::-webkit-scrollbar { display: none; }
+.em-cat { flex: none; width: 30px; height: 28px; padding: 0; border: 0; border-radius: 9px; background: transparent; font: 17px/1 "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; cursor: pointer; opacity: .55; }
+.em-cat.on { background: var(--sun); opacity: 1; box-shadow: inset 0 0 0 2px var(--ink); }
+.em-cat:focus-visible { outline: 3px solid var(--ink); outline-offset: -3px; opacity: 1; }
+.em-grid {
+  --es: 35px; display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, var(--es)); grid-auto-columns: var(--es); gap: 4px 3px;
+  align-content: start; align-items: stretch; flex: 1 1 auto; height: auto; min-height: 0; padding: 0 8px 3px; position: relative; scroll-snap-type: none; /* (room for the keys' shadow) */
+}
+#emGrid .tile.em { width: var(--es); height: var(--es); box-shadow: 0 2px 0 var(--ink); border-width: 2px; border-radius: 11px; }
+#emGrid .tile.em .emo { font-size: calc(var(--es) * .55); }
+.et { width: var(--es); height: var(--es); padding: 0; border: 0; border-radius: 10px; background: transparent; display: grid; place-items: center; cursor: pointer; font: calc(var(--es) * .7)/1 "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; color: var(--ink); }
+@media (hover: hover) { .et:hover { background: #f1eefb; } }
+.et:active { background: #e6e0f7; transform: scale(.9); }
+.et:focus-visible { outline: 3px solid var(--ink); outline-offset: -3px; }
+.em-h { display: none; margin: 0; font: 800 12.5px/1.2 var(--font); color: #6f6d90; }
+.em-none { margin: 0; grid-row: 1 / -1; grid-column: span 8; align-self: center; white-space: nowrap; font: 800 15px/1.2 var(--font); color: #6f6d90; }
+.em-grid.finding .em-h { display: none; }
+@media (max-width: 480px) {
+  .em-mode .em-ml { display: none; } .em-mode { padding: 0 6px; }
+  /* the search is a 🔍 until it is tapped: then it takes the room, and the groups slide along */
+  .em-find { flex: 0 0 34px; min-width: 34px; padding: 0 0 0 8px; transition: flex-basis .2s; }
+  .em-find input::placeholder { color: transparent; }
+  .em-find:focus-within, .em-find.has { flex: 1 0 58%; padding-right: 8px; }
+  .em-find:focus-within input::placeholder { color: #6f6d90; }
+}
+@media (min-width: 600px) and (max-width: 899px) and (min-height: 800px) {
+  #toybox[data-tab="emoji"] #pane-emoji { padding: 6px 0; gap: 6px; }
+  .em-bar { height: 36px; }
+  .em-mode, .em-find { height: 36px; }
+  .em-cat { width: 38px; height: 34px; font-size: 21px; }
+  .em-grid { --es: 52px; gap: 6px 5px; grid-template-rows: repeat(3, var(--es)); }
+}
+html.short .em-grid { --es: 46px; grid-template-rows: var(--es); padding-block: 0 3px; }
+html.short .em-mode .em-ml { display: none; }
+/* the side panel: the search on top, the groups under it, the emoji going down in rows, each group with its name */
+@media (min-width: 900px) and (min-height: 540px) {
+  #toybox[data-tab="emoji"] #pane-emoji { height: auto; flex: 1 1 auto; padding: 8px 0 2px; gap: 6px; }
+  .em-bar { flex-wrap: wrap; height: auto; row-gap: 8px; padding: 0 4px; }
+  .em-mode, .em-find { height: 36px; }
+  .em-mode { font-size: 13.5px; }
+  .em-find { flex: 1 1 0; max-width: none; }
+  .em-cats { flex: 1 0 100%; overflow: visible; }
+  .em-cat { flex: 1 1 0; width: auto; height: 34px; font-size: 20px; }
+  .em-grid {
+    grid-auto-flow: row; grid-template-rows: none; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); grid-auto-rows: 42px;
+    grid-auto-columns: auto; overflow-x: hidden; overflow-y: auto; padding: 0 4px 6px; gap: 2px;
+  }
+  .et { width: auto; height: auto; font-size: 29px; }
+  #emGrid .tile.em { width: auto; height: auto; }
+  #emGrid .tile.em .emo { font-size: 22px; }
+  .em-h { display: block; grid-column: 1 / -1; position: sticky; top: 0; z-index: 1; align-self: stretch; padding: 16px 4px 4px; background: #fff; }
+  .em-none { grid-row: auto; grid-column: 1 / -1; }
+}
+/* a sticker that is picked shows a ✕ too */
+#meDel {
+  position: absolute; z-index: 6; width: 40px; height: 40px; padding: 0; border-radius: 50%; background: #ff5d73; color: #fff; border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink);
+  display: grid; place-items: center; font: 800 17px/1 var(--font); cursor: pointer; touch-action: none;
+}
 </style>
 </head>
 <body>
@@ -954,6 +1018,7 @@ html.short #touchBox .touch-l > span > span { font-size: 14px; }
       <button id="keepBtn" type="button" aria-label="Keep it! Save a picture or a video" title="Keep it!"><span aria-hidden="true">📸</span></button>
       <div id="meBox" aria-hidden="true" hidden></div>
       <button id="meGrip" type="button" tabindex="-1" aria-hidden="true" title="Pull to make it bigger or smaller" hidden><span>↔️</span></button>
+      <button id="meDel" type="button" tabindex="-1" aria-hidden="true" title="Take this sticker away" hidden>✕</button>
       <div id="boothBar" role="group" aria-label="What the camera keeps" hidden>
         <button type="button" class="booth-b" data-mode="all" aria-pressed="true" aria-label="The whole picture" title="Keep the whole picture"><span aria-hidden="true">🖼️</span><span aria-hidden="true">All</span></button>
         <button type="button" class="booth-b" data-mode="me" aria-pressed="false" aria-label="Just me: cut me out and stand me in the scene" title="Just me: cut me out and stand me in the scene"><span aria-hidden="true">✂️</span><span aria-hidden="true">Just me</span></button>
@@ -996,7 +1061,14 @@ html.short #touchBox .touch-l > span > span { font-size: 14px; }
     <div id="pane-styles" class="pane tiles" role="tabpanel" aria-labelledby="tab-styles"></div>
     <div id="chips" class="pane tiles" role="tabpanel" aria-labelledby="tab-moves"></div>
     <div id="pane-scenes" class="pane tiles" role="tabpanel" aria-labelledby="tab-scenes"></div>
-    <div id="pane-emoji" class="pane tiles" role="tabpanel" aria-labelledby="tab-emoji"></div>
+    <div id="pane-emoji" class="pane" role="tabpanel" aria-labelledby="tab-emoji">
+      <div class="em-bar">
+        <button id="emMode" class="em-mode" type="button" aria-pressed="false" aria-label="Make stickers"><span class="em-mi" aria-hidden="true">✍️</span><span class="em-ml" aria-hidden="true">Word</span></button>
+        <label class="em-find"><span class="em-fi" aria-hidden="true">🔍</span><input id="emFind" type="search" placeholder="Search emoji" aria-label="Search emoji" autocomplete="off" spellcheck="false" enterkeyhint="search"></label>
+        <div id="emCats" class="em-cats" role="group" aria-label="Emoji groups"></div>
+      </div>
+      <div id="emGrid" class="tiles em-grid" role="group" aria-label="Emoji"><p id="emNone" class="em-none" hidden>No emoji found 🙈</p></div>
+    </div>
     <div id="show" class="pane" role="group" aria-label="Style show">
       <button id="playBtn" class="pill" type="button" aria-pressed="false" aria-label="Auto Play: keep showing the next style">
         <span class="ico" aria-hidden="true">▶️</span><span class="lbl">Auto Play</span><span class="dot" aria-hidden="true"></span>
@@ -2773,12 +2845,2116 @@ function buildChips() {
   MOVE_ORDER.forEach((id, k) => chipsEl.append(mk(id, MOVES[id].emoji, MOVES[id].name, MOVES[id].name, k + 1)));
   markChip('surprise');
 }
-const EMOJI = ['🦖', '🦄', '🐶', '🐱', '🐼', '🦊', '🐸', '🐙', '🦋', '🐝', '🌈', '⭐', '☀️', '🌙', '❤️', '💖', '🎉', '🎈', '🎂',
-  '🍕', '🍦', '🍩', '🍓', '🍉', '🚀', '⚽', '🏀', '🎸', '👑', '😂', '😎', '🥳', '👻', '🤖', '💩'];
-function buildEmojiTiles() {
-  const key = (sym, label, act) => { const b = mkTile('em key', label); b.dataset.act = act; b.append(tileEmoji(sym)); return b; };
-  emojiEl.append(key('⌫', 'Delete the last letter', 'back'), key('🧹', 'Clear the word', 'clear'));
-  EMOJI.forEach((e, k) => { const b = mkTile('em', 'Add ' + e); b.dataset.emoji = e; b.style.setProperty('--c', tint(k)); b.append(tileEmoji(e)); emojiEl.append(b); });
+/* ---------- the Emoji tab: every emoji, in the groups a phone keyboard has, with a search ----------
+   The names and search words are from emoji-picker-element-data 1.8.0 (Apache-2.0,
+   https://github.com/nolanlawson/emoji-picker-element), which is made from Emojibase (MIT, https://emojibase.dev).
+   One line per emoji: emoji|name|more words|the Emoji version (only when newer than 11). The pictures are the
+   device's own emoji font. */
+const EMOJI_DATA = [
+`😀|grinning face|cheerful cheery grin happy laugh nice smile smiling teeth
+😃|grinning face with big eyes|awesome grin happy mouth open smile smiling teeth yay
+😄|grinning face with smiling eyes|eye grin happy laugh lol mouth open smile
+😁|beaming face with smiling eyes|eye grin grinning happy nice smile teeth
+😆|grinning squinting face|closed eyes haha hahaha happy laugh lol mouth open rofl smile smiling
+😅|grinning face with sweat|cold dejected excited mouth nervous open smile smiling stress stressed
+🤣|rolling on the floor laughing|crying face funny haha happy hehe hilarious joy laugh lmao lol rofl roflmao tear
+😂|face with tears of joy|crying feels funny haha happy hehe hilarious laugh lmao lol rofl roflmao tear
+🙂|slightly smiling face|happy smile
+🙃|upside-down face|hehe smile
+🫠|melting face|disappear dissolve embarrassed haha heat hot liquid lol melt sarcasm sarcastic|14
+😉|winking face|flirt heartbreaker sexy slide tease wink winks
+😊|smiling face with smiling eyes|blush eye glad satisfied smile
+😇|smiling face with halo|angel angelic angels blessed fairy fairytale fantasy happy innocent peaceful smile spirit tale
+🥰|smiling face with hearts|3 adore crush heart ily love romance smile you
+😍|smiling face with heart-eyes|143 bae eye feels hearts ily kisses love romance romantic smile xoxo
+🤩|star-struck|excited eyes face grinning smile starry eyed wow
+😘|face blowing a kiss|adorbs bae flirt heart ily love lover miss muah romantic smooch xoxo you
+😗|kissing face|143 date dating flirt ily kiss love smooch smooches xoxo you
+☺️|smiling face|happy outlined relaxed smile
+😚|kissing face with closed eyes|143 bae blush date dating eye flirt ily kisses smooches xoxo
+😙|kissing face with smiling eyes|143 closed date dating eye flirt ily kiss kisses love night smile
+🥲|smiling face with tear|glad grateful happy joy pain proud relieved smile smiley touched|13
+😋|face savoring food|delicious eat full hungry savor smile smiling tasty um yum yummy
+😛|face with tongue|awesome cool nice party stuck out sweet
+😜|winking face with tongue|crazy epic eye funny joke loopy nutty party stuck out wacky weirdo wink yolo
+🤪|zany face|crazy eye eyes goofy large small
+😝|squinting face with tongue|closed eye eyes gross horrible omg stuck out taste whatever yolo
+🤑|money-mouth face|paid
+🤗|smiling face with open hands|hug hugging
+🤭|face with hand over mouth|giggle giggling oops realization secret shock sudden surprise whoops
+🫢|face with open eyes and hand over mouth|amazement awe disbelief embarrass gasp omg quiet scared shock surprise|14
+🫣|face with peeking eye|captivated embarrass hide hiding peek peep scared shy stare|14
+🤫|shushing face|quiet shh shush
+🤔|thinking face|chin consider hmm ponder pondering wondering
+🫡|saluting face|good luck ma am ok respect salute sir troops yes|14
+🤐|zipper-mouth face|keep quiet secret shut zip
+🤨|face with raised eyebrow|disapproval disbelief distrust emoji hmm mild skeptic skeptical skepticism surprise what
+😐️|neutral face|awkward blank deadpan expressionless fine jealous meh oh shade straight unamused unhappy unimpressed whatever
+😑|expressionless face|awkward dead fine inexpressive jealous meh not oh omg straight uh unhappy unimpressed whatever
+😶|face without mouth|awkward blank expressionless mouthless mute quiet secret silence silent speechless
+🫥|dotted line face|depressed disappear hidden hide introvert invisible meh whatever wtv|14
+😶‍🌫️|face in clouds|absentminded fog head|13.1
+😏|smirking face|boss dapper flirt homie kidding leer shade slick sly smirk smug snicker suave suspicious swag
+😒|unamused face|bored fine jealous jel jelly pissed smh ugh uhh unhappy weird whatever
+🙄|face with rolling eyes|eyeroll shade ugh whatever
+😬|grimacing face|awk awkward dentist grimace grinning smile smiling
+😮‍💨|face exhaling|blow blowing exhale exhausted gasp groan relief sigh smiley smoke whisper whistle|13.1
+🤥|lying face|liar lie pinocchio
+🫨|shaking face|crazy daze earthquake omg panic shock surprise vibrate whoa wow|15
+🙂‍↔️|head shaking horizontally|no shake|15.1
+🙂‍↕️|head shaking vertically|nod yes|15.1
+😌|relieved face|calm peace relief zen
+😔|pensive face|awful bored dejected died disappointed losing lost sad sucks
+😪|sleepy face|crying good night sad sleep sleeping tired
+🤤|drooling face|
+😴|sleeping face|bed bedtime good goodnight nap night sleep tired whatever yawn zzz
+🫩|face with bags under eyes|bored exhausted fatigued late sleepy tired weary|16
+😷|face with medical mask|cold dentist dermatologist doctor dr germs medicine sick
+🤒|face with thermometer|ill sick
+🤕|face with head-bandage|hurt injury ouch
+🤢|nauseated face|gross nasty sick vomit
+🤮|face vomiting|barf ew gross puke sick spew throw up vomit
+🤧|sneezing face|fever flu gesundheit sick sneeze
+🥵|hot face|dying feverish heat panting red faced stroke sweating tongue
+🥶|cold face|blue faced freezing frostbite icicles subzero teeth
+🥴|woozy face|dizzy drunk eyes intoxicated mouth tipsy uneven wavy
+😵|face with crossed-out eyes|dead dizzy feels knocked sick tired
+😵‍💫|face with spiral eyes|confused dizzy hypnotized omg smiley trouble whoa woah woozy|13.1
+🤯|exploding head|blown explode mind mindblown no shocked way
+🤠|cowboy hat face|cowgirl
+🥳|partying face|bday birthday celebrate celebration excited happy hat hooray horn party
+🥸|disguised face|disguise eyebrow glasses incognito moustache mustache nose person spy tache tash|13
+😎|smiling face with sunglasses|awesome beach bright bro chilling cool rad relaxed shades slay smile style swag win
+🤓|nerd face|brainy clever expert geek gifted glasses intelligent smart
+🧐|face with monocle|classy fancy rich stuffy wealthy
+😕|confused face|befuddled confusing dunno frown hm meh not sad sorry sure
+🫤|face with diagonal mouth|confused confusion disappointed doubt doubtful frustrated frustration meh skeptical unsure whatever wtv|14
+😟|worried face|anxious butterflies nerves nervous sad stress stressed surprised worry
+🙁|slightly frowning face|frown sad
+☹️|frowning face|frown sad
+😮|face with open mouth|believe forgot omg shocked surprised sympathy unbelievable unreal whoa wow you
+😯|hushed face|epic omg stunned surprised whoa woah
+😲|astonished face|cost no omg shocked totally way
+😳|flushed face|amazed awkward crazy dazed dead disbelief embarrassed geez heat hot impressed jeez what wow
+🫪|distorted face|anxiety bloated panic shocked surprised vulnerable|17
+🥺|pleading face|begging big eyes mercy not please pretty puppy sad why
+🥹|face holding back tears|admiration aww cry embarrassed feelings grateful gratitude joy please proud resist sad|14
+😦|frowning face with open mouth|caught frown guard scared scary surprise what wow
+😧|anguished face|forgot scared scary stressed surprise unhappy what wow
+😨|fearful face|afraid anxious blame fear scared worried
+😰|anxious face with sweat|blue cold eek mouth nervous open rushed scared yikes
+😥|sad but relieved face|anxious call close complicated disappointed not sweat time whew
+😢|crying face|awful cry feels miss sad tear triste unhappy
+😭|loudly crying face|bawling cry sad sob tear tears unhappy
+😱|face screaming in fear|epic fearful munch scared scream screamer shocked surprised woah
+😖|confounded face|annoyed confused cringe distraught feels frustrated mad sad
+😣|persevering face|concentrate concentration focus headache persevere
+😞|disappointed face|awful blame dejected fail losing sad unhappy
+😓|downcast face with sweat|close cold feels headache nervous sad scared yikes
+😩|weary face|crying fail feels hungry mad nooo sad sleepy tired unhappy
+😫|tired face|cost feels nap sad sneeze
+🥱|yawning face|bedtime bored goodnight nap night sleep sleepy tired whatever yawn zzz|12
+😤|face with steam from nose|anger angry feels fume fuming furious fury mad triumph unhappy won
+😡|enraged face|anger angry feels mad maddening pouting rage red shade unhappy upset
+😠|angry face|anger blame feels frustrated mad maddening rage shade unhappy upset
+🤬|face with symbols on mouth|censor cursing cussing mad pissed swearing
+😈|smiling face with horns|demon devil evil fairy fairytale fantasy purple shade smile tale
+👿|angry face with horns|demon devil evil fairy fairytale fantasy imp mischievous purple shade tale
+💀|skull|body dead death face fairy fairytale i m lmao monster tale yolo
+☠️|skull and crossbones|bone dead death face monster
+💩|pile of poo|bs comic doo dung face fml monster poop smelly smh stink stinks stinky turd
+🤡|clown face|
+👹|ogre|creature devil face fairy fairytale fantasy mask monster scary tale
+👺|goblin|angry creature face fairy fairytale fantasy mask mean monster tale
+👻|ghost|boo creature excited face fairy fairytale fantasy halloween haunting monster scary silly tale
+👽️|alien|creature extraterrestrial face fairy fairytale fantasy monster space tale ufo
+👾|alien monster|creature extraterrestrial face fairy fairytale fantasy game gamer games pixelated space tale ufo
+🤖|robot|face monster
+😺|grinning cat|animal face mouth open smile smiling
+😸|grinning cat with smiling eyes|animal eye face grin smile
+😹|cat with tears of joy|animal face laugh laughing lol tear
+😻|smiling cat with heart-eyes|animal eye face love smile
+😼|cat with wry smile|animal face ironic
+😽|kissing cat|animal closed eye eyes face kiss
+🙀|weary cat|animal face oh surprised
+😿|crying cat|animal cry face sad tear
+😾|pouting cat|animal face
+🙈|see-no-evil monkey|embarrassed face forbidden forgot gesture hide omg prohibited scared secret smh watch
+🙉|hear-no-evil monkey|animal ears face forbidden gesture listen not prohibited secret shh tmi
+🙊|speak-no-evil monkey|animal face forbidden gesture not oops prohibited quiet secret stealth
+💌|love letter|heart mail romance valentine
+💘|heart with arrow|143 adorbs cupid date emotion ily love romance valentine
+💝|heart with ribbon|143 anniversary emotion ily kisses valentine xoxo
+💖|sparkling heart|143 emotion excited good ily kisses morning night sparkle xoxo
+💗|growing heart|143 emotion excited heartpulse ily kisses muah nervous pulse xoxo
+💓|beating heart|143 cardio emotion heartbeat ily love pulsating pulse
+💞|revolving hearts|143 adorbs anniversary emotion heart
+💕|two hearts|143 anniversary date dating emotion heart ily kisses love loving xoxo
+💟|heart decoration|143 emotion hearth purple white
+❣️|heart exclamation|heavy mark punctuation
+💔|broken heart|break crushed emotion heartbroken lonely sad
+❤️‍🔥|heart on fire|burn love lust sacred|13.1
+❤️‍🩹|mending heart|healthier improving recovering recuperating well|13.1
+❤️|red heart|emotion love
+🩷|pink heart|143 adorable cute emotion ily like love special sweet|15
+🧡|orange heart|143
+💛|yellow heart|143 cardiac emotion ily love
+💚|green heart|143 emotion ily love romantic
+💙|blue heart|143 emotion ily love romance
+🩵|light blue heart|143 cute cyan emotion ily like love sky special teal|15
+💜|purple heart|143 bestest emotion ily love
+🤎|brown heart|143|12
+🖤|black heart|evil wicked
+🩶|grey heart|143 emotion gray ily love silver slate special|15
+🤍|white heart|143|12
+💋|kiss mark|dating emotion heart kissing lips romance sexy
+💯|hundred points|100 a agree clearly definitely faithful fleek full keep perfect point score true truth yup
+💢|anger symbol|angry comic mad upset
+🫯|fight cloud|argument brawl debate disagreement ruckus wrestle|17
+💥|collision|bomb boom collide comic explode
+💫|dizzy|comic shining shooting star stars
+💦|sweat droplets|comic drip droplet drops splashing squirt water wet work workout
+💨|dashing away|cloud comic dash fart fast go gone gotta running smoke
+🕳️|hole|
+💬|speech balloon|bubble comic dialog message sms talk text typing
+👁️‍🗨️|eye in speech bubble|balloon witness
+🗨️|left speech bubble|balloon dialog
+🗯️|right anger bubble|angry balloon mad
+💭|thought balloon|bubble cartoon cloud comic daydream decisions dream idea invent invention realize think thoughts wonder
+💤|ZZZ|comic good goodnight night sleep sleeping sleepy tired`,
+`👋|waving hand|bye cya g2g greetings gtg hello hey hi later outtie ttfn ttyl wave yo you
+🤚|raised back of hand|backhand
+🖐️|hand with fingers splayed|finger raised stop
+✋️|raised hand|5 five high stop
+🖖|vulcan salute|finger hand hands
+🫱|rightwards hand|handshake hold reach right rightward shake|14
+🫲|leftwards hand|handshake hold left leftward reach shake|14
+🫳|palm down hand|dismiss drop dropped pick shoo up|14
+🫴|palm up hand|beckon catch come hold know lift me offer tell|14
+🫷|leftwards pushing hand|block five halt high hold leftward pause push refuse slap stop wait|15
+🫸|rightwards pushing hand|block five halt high hold pause push refuse rightward slap stop wait|15
+👌|OK hand|awesome bet dope fleek fosho got gotcha legit okay pinch rad sure sweet three
+🤌|pinched fingers|gesture hand hold huh interrogation patience relax sarcastic ugh what zip|13
+🤏|pinching hand|amount bit fingers little small sort|12
+✌️|victory hand|peace v
+🤞|crossed fingers|cross finger hand luck
+🫰|hand with index finger and thumb crossed|3 expensive heart love money snap|14
+🤟|love-you gesture|fingers hand ily three
+🤘|sign of the horns|finger hand rock on
+🤙|call me hand|hang loose shaka
+👈️|backhand index pointing left|finger hand point
+👉️|backhand index pointing right|finger hand point
+👆️|backhand index pointing up|finger hand point
+🖕|middle finger|hand
+👇️|backhand index pointing down|finger hand point
+☝️|index pointing up|finger hand point this
+🫵|index pointing at the viewer|finger hand poke you|14
+👍️|thumbs up|1 good hand like thumb yes
+👎️|thumbs down|1 bad dislike good hand no nope thumb
+✊️|raised fist|clenched hand punch solidarity
+👊|oncoming fist|absolutely agree boom bro bruh bump clenched correct hand knuckle pound punch rock ttyl
+🤛|left-facing fist|leftwards
+🤜|right-facing fist|rightwards
+👏|clapping hands|applause approval awesome clap congrats congratulations excited good great hand homie job nice prayed well yay
+🙌|raising hands|celebration gesture hand hooray praise raised
+🫶|heart hands|3 love you|14
+👐|open hands|hand hug jazz swerve
+🤲|palms up together|cupped dua hands pray prayer wish
+🤝|handshake|agreement deal hand meeting shake
+🙏|folded hands|appreciate ask beg blessed bow cmon five gesture hand high please pray thanks thx
+✍️|writing hand|write
+💅|nail polish|bored care cosmetics done makeup manicure whatever
+🤳|selfie|camera phone
+💪|flexed biceps|arm beast bench bodybuilder bro curls flex gains gym jacked muscle press ripped strong weightlift
+🦾|mechanical arm|accessibility prosthetic|12
+🦿|mechanical leg|accessibility prosthetic|12
+🦵|leg|bent foot kick knee limb
+🦶|foot|ankle feet kick stomp
+👂️|ear|body ears hear hearing listen listening sound
+🦻|ear with hearing aid|accessibility hard|12
+👃|nose|body noses nosey odor smell smells
+🧠|brain|intelligent smart
+🫀|anatomical heart|beat cardiology heartbeat organ pulse real red|13
+🫁|lungs|breath breathe exhalation inhalation lung organ respiration|13
+🦷|tooth|dentist pearly teeth white
+🦴|bone|bones dog skeleton wishbone
+👀|eyes|body eye face googly look looking omg peep see seeing
+👁️|eye|1 body one
+👅|tongue|body lick slurp
+👄|mouth|beauty body kiss kissing lips lipstick
+🫦|biting lip|anxious bite fear flirt flirting kiss lipstick nervous sexy uncomfortable worried worry|14
+👶|baby|babies children goo infant newborn pregnant young
+🧒|child|bright eyed grandchild kid young younger
+👦|boy|bright eyed child grandson kid son young younger
+👧|girl|bright eyed child daughter granddaughter kid virgo young younger zodiac
+🧑|person|adult
+👱|person: blond hair|haired human
+👨|man|adult bro
+🧔|person: beard|bearded whiskers
+🧔‍♂️|man: beard|bearded whiskers|13.1
+🧔‍♀️|woman: beard|bearded whiskers|13.1
+👨‍🦰|man: red hair|adult bro
+👨‍🦱|man: curly hair|adult bro
+👨‍🦳|man: white hair|adult bro
+👨‍🦲|man: bald|adult bro
+👩|woman|adult lady
+👩‍🦰|woman: red hair|adult lady
+🧑‍🦰|person: red hair|adult|12.1
+👩‍🦱|woman: curly hair|adult lady
+🧑‍🦱|person: curly hair|adult|12.1
+👩‍🦳|woman: white hair|adult lady
+🧑‍🦳|person: white hair|adult|12.1
+👩‍🦲|woman: bald|adult lady
+🧑‍🦲|person: bald|adult|12.1
+👱‍♀️|woman: blond hair|haired blonde
+👱‍♂️|man: blond hair|haired
+🧓|older person|adult elderly grandparent old wise
+👴|old man|adult bald elderly gramps grandfather grandpa wise
+👵|old woman|adult elderly grandma grandmother granny lady wise
+🙍|person frowning|annoyed disappointed disgruntled disturbed frown frustrated gesture irritated upset
+🙍‍♂️|man frowning|annoyed disappointed disgruntled disturbed frown frustrated gesture irritated upset
+🙍‍♀️|woman frowning|annoyed disappointed disgruntled disturbed frown frustrated gesture irritated upset
+🙎|person pouting|disappointed downtrodden frown grimace scowl sulk upset whine
+🙎‍♂️|man pouting|disappointed downtrodden frown grimace scowl sulk upset whine
+🙎‍♀️|woman pouting|disappointed downtrodden frown grimace scowl sulk upset whine
+🙅|person gesturing NO|forbidden gesture hand not prohibit
+🙅‍♂️|man gesturing NO|forbidden gesture hand not prohibit
+🙅‍♀️|woman gesturing NO|forbidden gesture hand not prohibit
+🙆|person gesturing OK|exercise gesture hand omg
+🙆‍♂️|man gesturing OK|exercise gesture hand omg
+🙆‍♀️|woman gesturing OK|exercise gesture hand omg
+💁|person tipping hand|fetch flick flip gossip sarcasm sarcastic sassy seriously whatever
+💁‍♂️|man tipping hand|fetch flick flip gossip sarcasm sarcastic sassy seriously whatever
+💁‍♀️|woman tipping hand|fetch flick flip gossip sarcasm sarcastic sassy seriously whatever
+🙋|person raising hand|gesture here know me pick question raise
+🙋‍♂️|man raising hand|gesture here know me pick question raise
+🙋‍♀️|woman raising hand|gesture here know me pick question raise
+🧏|deaf person|accessibility ear gesture hear|12
+🧏‍♂️|deaf man|accessibility ear gesture hear|12
+🧏‍♀️|deaf woman|accessibility ear gesture hear|12
+🙇|person bowing|apology ask beg bow favor forgive gesture meditate meditation pity regret sorry
+🙇‍♂️|man bowing|apology ask beg bow favor forgive gesture meditate meditation pity regret sorry
+🙇‍♀️|woman bowing|apology ask beg bow favor forgive gesture meditate meditation pity regret sorry
+🤦|person facepalming|again bewilder disbelief exasperation facepalm no not oh omg shock smh
+🤦‍♂️|man facepalming|again bewilder disbelief exasperation facepalm no not oh omg shock smh
+🤦‍♀️|woman facepalming|again bewilder disbelief exasperation facepalm no not oh omg shock smh
+🤷|person shrugging|doubt dunno guess idk ignorance indifference knows maybe shrug whatever who
+🤷‍♂️|man shrugging|doubt dunno guess idk ignorance indifference knows maybe shrug whatever who
+🤷‍♀️|woman shrugging|doubt dunno guess idk ignorance indifference knows maybe shrug whatever who
+🧑‍⚕️|health worker|doctor healthcare nurse therapist|12.1
+👨‍⚕️|man health worker|doctor healthcare nurse therapist
+👩‍⚕️|woman health worker|doctor healthcare nurse therapist
+🧑‍🎓|student|graduate|12.1
+👨‍🎓|man student|graduate
+👩‍🎓|woman student|graduate
+🧑‍🏫|teacher|instructor lecturer professor|12.1
+👨‍🏫|man teacher|instructor lecturer professor
+👩‍🏫|woman teacher|instructor lecturer professor
+🧑‍⚖️|judge|justice law scales|12.1
+👨‍⚖️|man judge|justice law scales
+👩‍⚖️|woman judge|justice law scales
+🧑‍🌾|farmer|gardener rancher|12.1
+👨‍🌾|man farmer|gardener rancher
+👩‍🌾|woman farmer|gardener rancher
+🧑‍🍳|cook|chef|12.1
+👨‍🍳|man cook|chef
+👩‍🍳|woman cook|chef
+🧑‍🔧|mechanic|electrician plumber tradesperson|12.1
+👨‍🔧|man mechanic|electrician plumber tradesperson
+👩‍🔧|woman mechanic|electrician plumber tradesperson
+🧑‍🏭|factory worker|assembly industrial|12.1
+👨‍🏭|man factory worker|assembly industrial
+👩‍🏭|woman factory worker|assembly industrial
+🧑‍💼|office worker|architect business manager white collar|12.1
+👨‍💼|man office worker|architect business manager white collar
+👩‍💼|woman office worker|architect business manager white collar
+🧑‍🔬|scientist|biologist chemist engineer mathematician physicist|12.1
+👨‍🔬|man scientist|biologist chemist engineer mathematician physicist
+👩‍🔬|woman scientist|biologist chemist engineer mathematician physicist
+🧑‍💻|technologist|coder computer developer inventor software|12.1
+👨‍💻|man technologist|coder computer developer inventor software
+👩‍💻|woman technologist|coder computer developer inventor software
+🧑‍🎤|singer|actor entertainer rock rockstar star|12.1
+👨‍🎤|man singer|actor entertainer rock rockstar star
+👩‍🎤|woman singer|actor entertainer rock rockstar star
+🧑‍🎨|artist|palette|12.1
+👨‍🎨|man artist|palette
+👩‍🎨|woman artist|palette
+🧑‍✈️|pilot|plane|12.1
+👨‍✈️|man pilot|plane
+👩‍✈️|woman pilot|plane
+🧑‍🚀|astronaut|rocket space|12.1
+👨‍🚀|man astronaut|rocket space
+👩‍🚀|woman astronaut|rocket space
+🧑‍🚒|firefighter|fire firetruck|12.1
+👨‍🚒|man firefighter|fire firetruck
+👩‍🚒|woman firefighter|fire firetruck
+👮|police officer|apprehend arrest citation cop law over pulled undercover
+👮‍♂️|man police officer|apprehend arrest citation cop law over pulled undercover
+👮‍♀️|woman police officer|apprehend arrest citation cop law over pulled undercover
+🕵️|detective|sleuth spy
+🕵️‍♂️|man detective|sleuth spy
+🕵️‍♀️|woman detective|sleuth spy
+💂|guard|buckingham helmet london palace
+💂‍♂️|man guard|buckingham helmet london palace
+💂‍♀️|woman guard|buckingham helmet london palace
+🥷|ninja|assassin fight fighter hidden person secret skills sly soldier stealth war|13
+👷|construction worker|build fix hardhat hat man person rebuild remodel repair work
+👷‍♂️|man construction worker|build fix hardhat hat rebuild remodel repair work
+👷‍♀️|woman construction worker|build fix hardhat hat man rebuild remodel repair work
+🫅|person with crown|monarch noble regal royal royalty|14
+🤴|prince|crown fairy fairytale fantasy king royal royalty tale
+👸|princess|crown fairy fairytale fantasy queen royal royalty tale
+👳|person wearing turban|
+👳‍♂️|man wearing turban|
+👳‍♀️|woman wearing turban|
+👲|person with skullcap|cap chinese gua guapi hat mao pi
+🧕|woman with headscarf|bandana head hijab kerchief mantilla tichel
+🤵|person in tuxedo|formal wedding
+🤵‍♂️|man in tuxedo|formal groom wedding|13
+🤵‍♀️|woman in tuxedo|formal wedding|13
+👰|person with veil|wedding
+👰‍♂️|man with veil|wedding|13
+👰‍♀️|woman with veil|bride wedding|13
+🤰|pregnant woman|
+🫃|pregnant man|belly bloated full overeat|14
+🫄|pregnant person|belly bloated full overeat stuffed|14
+🤱|breast-feeding|baby mom mother nursing woman
+👩‍🍼|woman feeding baby|feed mom mother nanny newborn nursing|13
+👨‍🍼|man feeding baby|dad father feed nanny newborn nursing|13
+🧑‍🍼|person feeding baby|feed nanny newborn nursing parent|13
+👼|baby angel|church face fairy fairytale fantasy tale
+🎅|Santa Claus|celebration christmas fairy fantasy father holiday merry tale xmas
+🤶|Mrs. Claus|celebration christmas fairy fantasy holiday merry mother santa tale xmas
+🧑‍🎄|Mx Claus|celebration christmas fairy fantasy holiday merry santa tale xmas|13
+🦸|superhero|good hero superpower
+🦸‍♂️|man superhero|good hero superpower
+🦸‍♀️|woman superhero|good hero heroine superpower
+🦹|supervillain|bad criminal evil superpower villain
+🦹‍♂️|man supervillain|bad criminal evil superpower villain
+🦹‍♀️|woman supervillain|bad criminal evil superpower villain
+🧙|mage|fantasy magic play sorcerer sorceress sorcery spell summon witch wizard
+🧙‍♂️|man mage|fantasy magic play sorcerer sorceress sorcery spell summon witch wizard
+🧙‍♀️|woman mage|fantasy magic play sorcerer sorceress sorcery spell summon witch wizard
+🧚|fairy|fairytale fantasy myth person pixie tale wings
+🧚‍♂️|man fairy|fairytale fantasy myth oberon person pixie puck tale wings
+🧚‍♀️|woman fairy|fairytale fantasy myth person pixie tale titania wings
+🧛|vampire|blood dracula fangs halloween scary supernatural teeth undead
+🧛‍♂️|man vampire|blood fangs halloween scary supernatural teeth undead
+🧛‍♀️|woman vampire|blood fangs halloween scary supernatural teeth undead
+🧜|merperson|creature fairytale folklore ocean sea siren trident
+🧜‍♂️|merman|creature fairytale folklore neptune ocean poseidon sea siren trident triton
+🧜‍♀️|mermaid|creature fairytale folklore merwoman ocean sea siren trident
+🧝|elf|elves enchantment fantasy folklore magic magical myth
+🧝‍♂️|man elf|elves enchantment fantasy folklore magic magical myth
+🧝‍♀️|woman elf|elves enchantment fantasy folklore magic magical myth
+🧞|genie|djinn fantasy jinn lamp myth rub wishes
+🧞‍♂️|man genie|djinn fantasy jinn lamp myth rub wishes
+🧞‍♀️|woman genie|djinn fantasy jinn lamp myth rub wishes
+🧟|zombie|apocalypse dead halloween horror scary undead walking
+🧟‍♂️|man zombie|apocalypse dead halloween horror scary undead walking
+🧟‍♀️|woman zombie|apocalypse dead halloween horror scary undead walking
+🧌|troll|fairy fantasy monster tale trolling|14
+🫈|hairy creature|bigfoot cryptid forest giant sasquatch woodwose yeti|17
+💆|person getting massage|face headache relax relaxing salon soothe spa tension therapy treatment
+💆‍♂️|man getting massage|face headache relax relaxing salon soothe spa tension therapy treatment
+💆‍♀️|woman getting massage|face headache relax relaxing salon soothe spa tension therapy treatment
+💇|person getting haircut|barber beauty chop cosmetology cut groom hair parlor shears style
+💇‍♂️|man getting haircut|barber beauty chop cosmetology cut groom hair parlor person shears style
+💇‍♀️|woman getting haircut|barber beauty chop cosmetology cut groom hair parlor person shears style
+🚶|person walking|amble gait hike man pace pedestrian stride stroll walk
+🚶‍♂️|man walking|amble gait hike pace pedestrian stride stroll walk
+🚶‍♀️|woman walking|amble gait hike man pace pedestrian stride stroll walk
+🚶‍➡️|person walking: facing right|amble gait hike man pace pedestrian stride stroll walk|15.1
+🚶‍♀️‍➡️|woman walking: facing right|amble gait hike man pace pedestrian stride stroll walk|15.1
+🚶‍♂️‍➡️|man walking: facing right|amble gait hike pace pedestrian stride stroll walk|15.1
+🧍|person standing|stand|12
+🧍‍♂️|man standing|stand|12
+🧍‍♀️|woman standing|stand|12
+🧎|person kneeling|kneel knees|12
+🧎‍♂️|man kneeling|kneel knees|12
+🧎‍♀️|woman kneeling|kneel knees|12
+🧎‍➡️|person kneeling: facing right|kneel knees|15.1
+🧎‍♀️‍➡️|woman kneeling: facing right|kneel knees|15.1
+🧎‍♂️‍➡️|man kneeling: facing right|kneel knees|15.1
+🧑‍🦯|person with white cane|accessibility blind probing|12.1
+🧑‍🦯‍➡️|person with white cane: facing right|accessibility blind probing|15.1
+👨‍🦯|man with white cane|accessibility blind probing|12
+👨‍🦯‍➡️|man with white cane: facing right|accessibility blind probing|15.1
+👩‍🦯|woman with white cane|accessibility blind probing|12
+👩‍🦯‍➡️|woman with white cane: facing right|accessibility blind probing|15.1
+🧑‍🦼|person in motorized wheelchair|accessibility|12.1
+🧑‍🦼‍➡️|person in motorized wheelchair: facing right|accessibility|15.1
+👨‍🦼|man in motorized wheelchair|accessibility|12
+👨‍🦼‍➡️|man in motorized wheelchair: facing right|accessibility|15.1
+👩‍🦼|woman in motorized wheelchair|accessibility|12
+👩‍🦼‍➡️|woman in motorized wheelchair: facing right|accessibility|15.1
+🧑‍🦽|person in manual wheelchair|accessibility|12.1
+🧑‍🦽‍➡️|person in manual wheelchair: facing right|accessibility|15.1
+👨‍🦽|man in manual wheelchair|accessibility|12
+👨‍🦽‍➡️|man in manual wheelchair: facing right|accessibility|15.1
+👩‍🦽|woman in manual wheelchair|accessibility|12
+👩‍🦽‍➡️|woman in manual wheelchair: facing right|accessibility|15.1
+🏃|person running|fast hurry marathon move quick race racing run rush speed
+🏃‍♂️|man running|fast hurry marathon move quick race racing run rush speed
+🏃‍♀️|woman running|fast hurry marathon move quick race racing run rush speed
+🏃‍➡️|person running: facing right|fast hurry marathon move quick race racing run rush speed|15.1
+🏃‍♀️‍➡️|woman running: facing right|fast hurry marathon move quick race racing run rush speed|15.1
+🏃‍♂️‍➡️|man running: facing right|fast hurry marathon move quick race racing run rush speed|15.1
+🧑‍🩰|ballet dancer||17
+💃|woman dancing|dance dancer elegant festive flair flamenco groove let s salsa tango
+🕺|man dancing|dance dancer elegant festive flair flamenco groove let s salsa tango
+🕴️|person in suit levitating|business
+👯|people with bunny ears|bestie bff counterpart dancer double ear identical pair party partying soulmate twin twinsies
+👯‍♂️|men with bunny ears|bestie bff counterpart dancer double ear identical pair party partying people soulmate twin twinsies
+👯‍♀️|women with bunny ears|bestie bff counterpart dancer double ear identical pair party partying people soulmate twin twinsies
+🧖|person in steamy room|day luxurious pamper relax sauna spa steam steambath unwind
+🧖‍♂️|man in steamy room|day luxurious pamper relax sauna spa steam steambath unwind
+🧖‍♀️|woman in steamy room|day luxurious pamper relax sauna spa steam steambath unwind
+🧗|person climbing|climb climber mountain rock scale up
+🧗‍♂️|man climbing|climb climber mountain rock scale up
+🧗‍♀️|woman climbing|climb climber mountain rock scale up
+🤺|person fencing|fencer sword
+🏇|horse racing|jockey racehorse riding sport
+⛷️|skier|ski snow
+🏂️|snowboarder|ski snow snowboard sport
+🏌️|person golfing|ball birdie caddy driving golf green pga putt range tee
+🏌️‍♂️|man golfing|ball birdie caddy driving golf green pga putt range tee
+🏌️‍♀️|woman golfing|ball birdie caddy driving golf green pga putt range tee
+🏄️|person surfing|beach ocean sport surf surfer swell waves
+🏄‍♂️|man surfing|beach ocean sport surf surfer swell waves
+🏄‍♀️|woman surfing|beach ocean person sport surf surfer swell waves
+🚣|person rowing boat|canoe cruise fishing lake oar paddle raft river row rowboat
+🚣‍♂️|man rowing boat|canoe cruise fishing lake oar paddle raft river row rowboat
+🚣‍♀️|woman rowing boat|canoe cruise fishing lake oar paddle raft river row rowboat
+🏊️|person swimming|freestyle sport swim swimmer triathlon
+🏊‍♂️|man swimming|freestyle sport swim swimmer triathlon
+🏊‍♀️|woman swimming|freestyle man sport swim swimmer triathlon
+⛹️|person bouncing ball|athletic basketball championship dribble net player throw
+⛹️‍♂️|man bouncing ball|athletic basketball championship dribble net player throw
+⛹️‍♀️|woman bouncing ball|athletic basketball championship dribble net player throw
+🏋️|person lifting weights|barbell bodybuilder deadlift lifter powerlifting weight weightlifter workout
+🏋️‍♂️|man lifting weights|barbell bodybuilder deadlift lifter powerlifting weight weightlifter workout
+🏋️‍♀️|woman lifting weights|barbell bodybuilder deadlift lifter powerlifting weight weightlifter workout
+🚴|person biking|bicycle bicyclist bike cycle cyclist riding sport
+🚴‍♂️|man biking|bicycle bicyclist bike cycle cyclist riding sport
+🚴‍♀️|woman biking|bicycle bicyclist bike cycle cyclist riding sport
+🚵|person mountain biking|bicycle bicyclist bike cycle cyclist riding sport
+🚵‍♂️|man mountain biking|bicycle bicyclist bike cycle cyclist riding sport
+🚵‍♀️|woman mountain biking|bicycle bicyclist bike cycle cyclist riding sport
+🤸|person cartwheeling|active cartwheel excited flip gymnastics happy somersault
+🤸‍♂️|man cartwheeling|active cartwheel excited flip gymnastics happy somersault
+🤸‍♀️|woman cartwheeling|active cartwheel excited flip gymnastics happy somersault
+🤼|people wrestling|combat duel grapple ring tournament wrestle
+🤼‍♂️|men wrestling|combat duel grapple ring tournament wrestle
+🤼‍♀️|women wrestling|combat duel grapple ring tournament wrestle
+🤽|person playing water polo|sport swimming waterpolo
+🤽‍♂️|man playing water polo|sport swimming waterpolo
+🤽‍♀️|woman playing water polo|sport swimming waterpolo
+🤾|person playing handball|athletics ball catch chuck hurl lob pitch sport throw toss
+🤾‍♂️|man playing handball|athletics ball catch chuck hurl lob pitch sport throw toss
+🤾‍♀️|woman playing handball|athletics ball catch chuck hurl lob pitch sport throw toss
+🤹|person juggling|act balance balancing handle juggle manage multitask skill
+🤹‍♂️|man juggling|act balance balancing handle juggle manage multitask skill
+🤹‍♀️|woman juggling|act balance balancing handle juggle manage multitask skill
+🧘|person in lotus position|cross legged legs meditation peace relax serenity yoga yogi zen
+🧘‍♂️|man in lotus position|cross legged legs meditation peace relax serenity yoga yogi zen
+🧘‍♀️|woman in lotus position|cross legged legs meditation peace relax serenity yoga yogi zen
+🛀|person taking bath|bathtub tub
+🛌|person in bed|bedtime good goodnight hotel nap night sleep tired zzz
+🧑‍🤝‍🧑|people holding hands|bae bestie bff couple dating flirt friends hand hold twins|12
+👭|women holding hands|bae bestie bff couple dating flirt friends girls hand hold sisters twins
+👫|woman and man holding hands|bae bestie bff couple dating flirt friends hand hold twins
+👬|men holding hands|bae bestie bff boys brothers couple dating flirt friends hand hold twins
+💏|kiss|anniversary babe bae couple date dating heart love mwah person romance together xoxo
+👩‍❤️‍💋‍👨|kiss: woman, man|anniversary babe bae couple date dating heart love mwah person romance together xoxo
+👨‍❤️‍💋‍👨|kiss: man, man|anniversary babe bae couple date dating heart love mwah person romance together xoxo
+👩‍❤️‍💋‍👩|kiss: woman, woman|anniversary babe bae couple date dating heart love mwah person romance together xoxo
+💑|couple with heart|anniversary babe bae dating kiss love person relationship romance together you
+👩‍❤️‍👨|couple with heart: woman, man|anniversary babe bae dating kiss love person relationship romance together you
+👨‍❤️‍👨|couple with heart: man, man|anniversary babe bae dating kiss love person relationship romance together you
+👩‍❤️‍👩|couple with heart: woman, woman|anniversary babe bae dating kiss love person relationship romance together you
+👨‍👩‍👦|family: man, woman, boy|child
+👨‍👩‍👧|family: man, woman, girl|child
+👨‍👩‍👧‍👦|family: man, woman, girl, boy|child
+👨‍👩‍👦‍👦|family: man, woman, boy, boy|child
+👨‍👩‍👧‍👧|family: man, woman, girl, girl|child
+👨‍👨‍👦|family: man, man, boy|child
+👨‍👨‍👧|family: man, man, girl|child
+👨‍👨‍👧‍👦|family: man, man, girl, boy|child
+👨‍👨‍👦‍👦|family: man, man, boy, boy|child
+👨‍👨‍👧‍👧|family: man, man, girl, girl|child
+👩‍👩‍👦|family: woman, woman, boy|child
+👩‍👩‍👧|family: woman, woman, girl|child
+👩‍👩‍👧‍👦|family: woman, woman, girl, boy|child
+👩‍👩‍👦‍👦|family: woman, woman, boy, boy|child
+👩‍👩‍👧‍👧|family: woman, woman, girl, girl|child
+👨‍👦|family: man, boy|child
+👨‍👦‍👦|family: man, boy, boy|child
+👨‍👧|family: man, girl|child
+👨‍👧‍👦|family: man, girl, boy|child
+👨‍👧‍👧|family: man, girl, girl|child
+👩‍👦|family: woman, boy|child
+👩‍👦‍👦|family: woman, boy, boy|child
+👩‍👧|family: woman, girl|child
+👩‍👧‍👦|family: woman, girl, boy|child
+👩‍👧‍👧|family: woman, girl, girl|child
+🗣️|speaking head|face silhouette speak
+👤|bust in silhouette|mysterious shadow
+👥|busts in silhouette|bff bust everyone friend friends people
+🫂|people hugging|comfort embrace farewell friendship goodbye hello hug love thanks|13
+👪️|family|child
+🧑‍🧑‍🧒|family: adult, adult, child||15.1
+🧑‍🧑‍🧒‍🧒|family: adult, adult, child, child||15.1
+🧑‍🧒|family: adult, child||15.1
+🧑‍🧒‍🧒|family: adult, child, child||15.1
+👣|footprints|barefoot clothing footprint omw print walk
+🫆|fingerprint|clue crime detective forensics identity mystery print safety trace|16`,
+`🐵|monkey face|animal banana
+🐒|monkey|animal banana
+🦍|gorilla|animal
+🦧|orangutan|animal ape monkey|12
+🐶|dog face|adorbs animal pet puppies puppy
+🐕️|dog|animal animals dogs pet
+🦮|guide dog|accessibility animal blind|12
+🐕‍🦺|service dog|accessibility animal assistance|12
+🐩|poodle|animal dog fluffy
+🐺|wolf|animal face
+🦊|fox|animal face
+🦝|raccoon|animal curious sly
+🐱|cat face|animal kitten kitty pet
+🐈️|cat|animal animals cats kitten pet
+🐈‍⬛|black cat|animal feline halloween meow unlucky|13
+🦁|lion|alpha animal face leo mane order rawr roar safari strong zodiac
+🐯|tiger face|animal big cat predator
+🐅|tiger|animal big cat predator zoo
+🐆|leopard|animal big cat predator zoo
+🐴|horse face|animal dressage equine farm horses
+🫎|moose|alces animal antlers elk mammal|15
+🫏|donkey|animal ass burro hinny mammal mule stubborn|15
+🐎|horse|animal equestrian farm racehorse racing
+🦄|unicorn|face
+🦓|zebra|animal stripe
+🦌|deer|animal
+🦬|bison|animal buffalo herd wisent|13
+🐮|cow face|animal farm milk moo
+🐂|ox|animal animals bull farm taurus zodiac
+🐃|water buffalo|animal zoo
+🐄|cow|animal animals farm milk moo
+🐷|pig face|animal bacon farm pork
+🐖|pig|animal bacon farm pork sow
+🐗|boar|animal pig
+🐽|pig nose|animal face farm smell snout
+🐏|ram|animal aries horns male sheep zodiac zoo
+🐑|ewe|animal baa farm female fluffy lamb sheep wool
+🐐|goat|animal capricorn farm milk zodiac
+🐪|camel|animal desert dromedary hump one
+🐫|two-hump camel|animal bactrian desert
+🦙|llama|alpaca animal guanaco vicu a wool
+🦒|giraffe|animal spots
+🐘|elephant|animal
+🦣|mammoth|animal extinction large tusk wooly|13
+🦏|rhinoceros|animal
+🦛|hippopotamus|animal hippo
+🐭|mouse face|animal
+🐁|mouse|animal animals
+🐀|rat|animal
+🐹|hamster|animal face pet
+🐰|rabbit face|animal bunny pet
+🐇|rabbit|animal bunny pet
+🐿️|chipmunk|animal squirrel
+🦫|beaver|animal dam teeth|13
+🦔|hedgehog|animal spiny
+🦇|bat|animal vampire
+🐻|bear|animal face grizzly growl honey
+🐻‍❄️|polar bear|animal arctic white|13
+🐨|koala|animal australia bear down face marsupial under
+🐼|panda|animal bamboo face
+🦥|sloth|lazy slow|12
+🦦|otter|animal fishing playful|12
+🦨|skunk|animal stink|12
+🦘|kangaroo|animal joey jump marsupial
+🦡|badger|animal honey pester
+🐾|paw prints|feet paws print
+🦃|turkey|bird gobble thanksgiving
+🐔|chicken|animal bird ornithology
+🐓|rooster|animal bird ornithology
+🐣|hatching chick|animal baby bird egg
+🐤|baby chick|animal bird ornithology
+🐥|front-facing baby chick|animal bird newborn ornithology
+🐦️|bird|animal ornithology
+🐧|penguin|animal antarctica bird ornithology
+🕊️|dove|bird fly ornithology peace
+🦅|eagle|animal bird ornithology
+🦆|duck|animal bird ornithology
+🦢|swan|animal bird cygnet duckling ornithology ugly
+🦉|owl|animal bird ornithology wise
+🦤|dodo|animal bird extinction large ornithology|13
+🪶|feather|bird flight light plumage|13
+🦩|flamingo|animal bird flamboyant ornithology tropical|12
+🦚|peacock|animal bird colorful ornithology ostentatious peahen pretty proud
+🦜|parrot|animal bird ornithology pirate talk
+🪽|wing|angelic ascend aviation bird fly flying heavenly mythology soar|15
+🐦‍⬛|black bird|animal beak caw corvid crow ornithology raven rook|15
+🪿|goose|animal bird duck flock fowl gaggle gander geese honk ornithology silly|15
+🐦‍🔥|phoenix|ascend ascension emerge fantasy firebird glory immortal rebirth reincarnation reinvent renewal revival revive rise transform|15.1
+🐸|frog|animal face
+🐊|crocodile|animal zoo
+🐢|turtle|animal terrapin tortoise
+🦎|lizard|animal reptile
+🐍|snake|animal bearer ophiuchus serpent zodiac
+🐲|dragon face|animal fairy fairytale tale
+🐉|dragon|animal fairy fairytale knights tale
+🦕|sauropod|brachiosaurus brontosaurus dinosaur diplodocus
+🦖|T-Rex|dinosaur tyrannosaurus
+🐳|spouting whale|animal beach face ocean
+🐋|whale|animal beach ocean
+🐬|dolphin|animal beach flipper ocean
+🫍|orca|marine ocean whale|17
+🦭|seal|animal lion ocean sea|13
+🐟️|fish|animal dinner fishes fishing pisces zodiac
+🐠|tropical fish|animal fishes
+🐡|blowfish|animal fish
+🦈|shark|animal fish
+🐙|octopus|animal creature ocean
+🐚|spiral shell|animal beach conch sea
+🪸|coral|change climate ocean reef sea|14
+🪼|jellyfish|animal aquarium burn invertebrate jelly life marine ocean ouch plankton sea sting stinger tentacles|15
+🦀|crab|cancer zodiac
+🦞|lobster|animal bisque claws seafood
+🦐|shrimp|food shellfish small
+🦑|squid|animal food mollusk
+🦪|oyster|diving pearl|12
+🐌|snail|animal escargot garden nature slug
+🦋|butterfly|insect pretty
+🐛|bug|animal garden insect
+🐜|ant|animal garden insect
+🐝|honeybee|animal bee bumblebee honey insect nature spring
+🪲|beetle|animal bug insect|13
+🐞|lady beetle|animal garden insect ladybird ladybug nature
+🦗|cricket|animal bug grasshopper insect orthoptera
+🪳|cockroach|animal insect pest roach|13
+🕷️|spider|animal insect
+🕸️|spider web|
+🦂|scorpion|scorpio scorpius zodiac
+🦟|mosquito|bite disease fever insect malaria pest virus
+🪰|fly|animal disease insect maggot pest rotting|13
+🪱|worm|animal annelid earthworm parasite|13
+🦠|microbe|amoeba bacteria science virus
+💐|bouquet|anniversary birthday date flower love plant romance
+🌸|cherry blossom|flower plant spring springtime
+💮|white flower|
+🪷|lotus|beauty buddhism calm flower hinduism peace purity serenity|14
+🏵️|rosette|plant
+🌹|rose|beauty elegant flower love plant red valentine
+🥀|wilted flower|dying
+🌺|hibiscus|flower plant
+🌻|sunflower|flower outdoors plant sun
+🌼|blossom|buttercup dandelion flower plant
+🌷|tulip|blossom flower growth plant
+🪻|hyacinth|bloom bluebonnet flower indigo lavender lilac lupine plant purple shrub snapdragon spring violet|15
+🌱|seedling|plant sapling sprout young
+🪴|potted plant|decor grow house nurturing pot|13
+🌲|evergreen tree|christmas forest pine
+🌳|deciduous tree|forest green habitat shedding
+🌴|palm tree|beach plant tropical
+🌵|cactus|desert drought nature plant
+🌾|sheaf of rice|ear grain grains plant
+🌿|herb|leaf plant
+☘️|shamrock|irish plant
+🍀|four leaf clover|4 irish lucky plant
+🍁|maple leaf|falling
+🍂|fallen leaf|autumn fall falling
+🍃|leaf fluttering in wind|blow flutter
+🪹|empty nest|branch home nesting|14
+🪺|nest with eggs|bird branch egg nesting|14
+🍄|mushroom|fungus toadstool
+🪾|leafless tree|bare barren branches dead drought trunk winter wood|16`,
+`🍇|grapes|dionysus fruit grape
+🍈|melon|cantaloupe fruit
+🍉|watermelon|fruit
+🍊|tangerine|c citrus fruit nectarine orange vitamin
+🍋|lemon|citrus fruit sour
+🍋‍🟩|lime|acidity citrus cocktail fruit garnish key margarita mojito refreshing salsa sour tangy tequila tropical zest|15.1
+🍌|banana|fruit potassium
+🍍|pineapple|colada fruit pina tropical
+🥭|mango|food fruit tropical
+🍎|red apple|diet food fruit health ripe
+🍏|green apple|fruit
+🍐|pear|fruit
+🍑|peach|fruit
+🍒|cherries|berries cherry fruit red
+🍓|strawberry|berry fruit
+🫐|blueberries|berries berry bilberry blue blueberry food fruit|13
+🥝|kiwi fruit|food
+🍅|tomato|food fruit vegetable
+🫒|olive|food|13
+🥥|coconut|colada palm pi a
+🥑|avocado|food fruit
+🍆|eggplant|aubergine vegetable
+🥔|potato|food vegetable
+🥕|carrot|food vegetable
+🌽|ear of corn|crops farm maize maze
+🌶️|hot pepper|
+🫑|bell pepper|capsicum food vegetable|13
+🥒|cucumber|food pickle vegetable
+🥬|leafy green|bok burgers cabbage choy kale lettuce salad
+🥦|broccoli|cabbage wild
+🧄|garlic|flavoring|12
+🧅|onion|flavoring|12
+🥜|peanuts|food nut peanut vegetable
+🫘|beans|food kidney legume small|14
+🌰|chestnut|almond plant
+🫚|ginger root|beer health herb natural spice|15
+🫛|pea pod|beans beanstalk edamame legume soybean vegetable veggie|15
+🍄‍🟫|brown mushroom|food fungi fungus nature pizza portobello shiitake shroom spore sprout toppings truffle vegetable vegetarian veggie|15.1
+🫜|root vegetable|beet food garden radish salad turnip vegetarian|16
+🍞|bread|carbs food grain loaf restaurant toast wheat
+🥐|croissant|bread breakfast crescent food french roll
+🥖|baguette bread|food french
+🫓|flatbread|arepa bread food gordita lavash naan pita|13
+🥨|pretzel|convoluted twisted
+🥯|bagel|bakery bread breakfast schmear
+🥞|pancakes|breakfast cr pe food hotcake pancake
+🧇|waffle|breakfast indecisive iron|12
+🧀|cheese wedge|
+🍖|meat on bone|
+🍗|poultry leg|bone chicken drumstick hungry turkey
+🥩|cut of meat|chop lambchop porkchop red steak
+🥓|bacon|breakfast food meat
+🍔|hamburger|burger eat fast food hungry
+🍟|french fries|fast food
+🍕|pizza|cheese food hungry pepperoni slice
+🌭|hot dog|frankfurter hotdog sausage
+🥪|sandwich|bread
+🌮|taco|mexican
+🌯|burrito|mexican wrap
+🫔|tamale|food mexican pamonha wrapped|13
+🥙|stuffed flatbread|falafel food gyro kebab
+🧆|falafel|chickpea meatball|12
+🥚|egg|breakfast food
+🍳|cooking|breakfast easy egg fry frying over pan restaurant side sunny up
+🥘|shallow pan of food|casserole paella
+🍲|pot of food|soup stew
+🫕|fondue|cheese chocolate food melted pot ski|13
+🥣|bowl with spoon|breakfast cereal congee oatmeal porridge
+🥗|green salad|food
+🍿|popcorn|corn movie pop
+🧈|butter|dairy|12
+🧂|salt|condiment flavor mad salty shaker taste upset
+🥫|canned food|can
+🍱|bento box|food
+🍘|rice cracker|food
+🍙|rice ball|food japanese
+🍚|cooked rice|food
+🍛|curry rice|food
+🍜|steaming bowl|chopsticks food noodle pho ramen soup
+🍝|spaghetti|food meatballs pasta restaurant
+🍠|roasted sweet potato|food
+🍢|oden|food kebab restaurant seafood skewer stick
+🍣|sushi|food
+🍤|fried shrimp|prawn tempura
+🍥|fish cake with swirl|food pastry restaurant
+🥮|moon cake|autumn festival yu b ng
+🍡|dango|dessert japanese skewer stick sweet
+🥟|dumpling|empanada gy za jiaozi pierogi potsticker
+🥠|fortune cookie|prophecy
+🥡|takeout box|chopsticks delivery food oyster pail
+🍦|soft ice cream|dessert food icecream restaurant serve sweet
+🍧|shaved ice|dessert restaurant sweet
+🍨|ice cream|dessert food restaurant sweet
+🍩|doughnut|breakfast dessert donut food sweet
+🍪|cookie|chip chocolate dessert sweet
+🎂|birthday cake|bday celebration dessert happy pastry sweet
+🍰|shortcake|cake dessert pastry slice sweet
+🧁|cupcake|bakery dessert sprinkles sugar sweet treat
+🥧|pie|apple filling fruit meat pastry pumpkin slice
+🍫|chocolate bar|candy dessert halloween sweet tooth
+🍬|candy|cavities dessert halloween restaurant sweet tooth wrapper
+🍭|lollipop|candy dessert food restaurant sweet
+🍮|custard|dessert pudding sweet
+🍯|honey pot|barrel bear food honeypot jar sweet
+🍼|baby bottle|babies birth born drink infant milk newborn
+🥛|glass of milk|drink
+☕️|hot beverage|cafe caffeine chai coffee drink morning steaming tea
+🫖|teapot|brew drink food pot tea|13
+🍵|teacup without handle|beverage cup drink oolong tea
+🍶|sake|bar beverage bottle cup drink restaurant
+🍾|bottle with popping cork|bar drink
+🍷|wine glass|alcohol bar beverage booze club drink drinking drinks restaurant
+🍸️|cocktail glass|alcohol bar booze club drink drinking drinks mad martini men
+🍹|tropical drink|alcohol bar booze club cocktail drinking drinks drunk mai party tai tropics
+🍺|beer mug|alcohol ale bar booze drink drinking drinks octoberfest oktoberfest pint stein summer
+🍻|clinking beer mugs|alcohol bar booze bottoms cheers clink drinking drinks
+🥂|clinking glasses|celebrate clink drink glass
+🥃|tumbler glass|liquor scotch shot whiskey whisky
+🫗|pouring liquid|accident drink empty glass oops pour spill water|14
+🥤|cup with straw|drink juice malt soda soft water
+🧋|bubble tea|boba food milk pearl|13
+🧃|beverage box|juice straw sweet|12
+🧉|mate|drink|12
+🧊|ice|cold cube iceberg|12
+🥢|chopsticks|hashi jeotgarak kuaizi
+🍽️|fork and knife with plate|cooking dinner eat
+🍴|fork and knife|breakfast breaky cooking cutlery delicious dinner eat feed food hungry lunch restaurant yum yummy
+🥄|spoon|eat tableware
+🔪|kitchen knife|chef cooking hocho tool weapon
+🫙|jar|condiment container empty nothing sauce store|14
+🏺|amphora|aquarius cooking drink jug tool weapon zodiac`,
+`🎃|jack-o-lantern|celebration halloween pumpkin
+🎄|Christmas tree|celebration
+🎆|fireworks|boom celebration entertainment yolo
+🎇|sparkler|boom celebration fireworks sparkle
+🧨|firecracker|dynamite explosive fire fireworks light pop popping spark
+✨️|sparkles|magic sparkle star
+🎈|balloon|birthday celebrate celebration
+🎉|party popper|awesome birthday celebrate celebration excited hooray tada woohoo
+🎊|confetti ball|celebrate celebration party woohoo
+🎋|tanabata tree|banner celebration japanese
+🎍|pine decoration|bamboo celebration japanese plant
+🎎|Japanese dolls|celebration doll festival
+🎏|carp streamer|celebration
+🎐|wind chime|bell celebration
+🎑|moon viewing ceremony|celebration
+🧧|red envelope|gift good h ngb o lai luck money see
+🎀|ribbon|celebration
+🎁|wrapped gift|birthday bow box celebration christmas present surprise
+🎗️|reminder ribbon|celebration
+🎟️|admission tickets|ticket
+🎫|ticket|admission stub
+🎖️|military medal|award celebration
+🏆️|trophy|champion champs prize slay sport victory win winning
+🏅|sports medal|award gold winner
+🥇|1st place medal|first gold
+🥈|2nd place medal|second silver
+🥉|3rd place medal|bronze third
+⚽️|soccer ball|football futbol sport
+⚾️|baseball|ball sport
+🥎|softball|ball glove sports underarm
+🏀|basketball|ball hoop sport
+🏐|volleyball|ball game
+🏈|american football|ball bowl sport super
+🏉|rugby football|ball sport
+🎾|tennis|ball racquet sport
+🥏|flying disc|ultimate
+🎳|bowling|ball game sport strike
+🏏|cricket game|ball bat
+🏑|field hockey|ball game stick
+🏒|ice hockey|game puck stick
+🥍|lacrosse|ball goal sports stick
+🏓|ping pong|ball bat game paddle pingpong table tennis
+🏸|badminton|birdie game racquet shuttlecock
+🥊|boxing glove|
+🥋|martial arts uniform|judo karate taekwondo
+🥅|goal net|
+⛳️|flag in hole|golf sport
+⛸️|ice skate|skating
+🎣|fishing pole|entertainment fish sport
+🤿|diving mask|scuba snorkeling|12
+🎽|running shirt|athletics sash
+🎿|skis|ski snow sport
+🛷|sled|luge sledge sleigh snow toboggan
+🥌|curling stone|game rock
+🎯|bullseye|bull dart direct entertainment game hit target
+🪀|yo-yo|fluctuate toy|12
+🪁|kite|fly soar|12
+🔫|water pistol|gun handgun revolver tool weapon
+🎱|pool 8 ball|8ball billiard eight game
+🔮|crystal ball|fairy fairytale fantasy fortune future magic tale tool
+🪄|magic wand|magician witch wizard|13
+🎮️|video game|controller entertainment
+🕹️|joystick|game video videogame
+🎰|slot machine|casino gamble gambling game slots
+🎲|game die|dice entertainment
+🧩|puzzle piece|clue interlocking jigsaw
+🧸|teddy bear|plaything plush stuffed toy
+🪅|piñata|candy celebrate celebration cinco de festive mayo party pinada pinata|13
+🪩|mirror ball|dance disco glitter party|14
+🪆|nesting dolls|babooshka baboushka babushka doll matryoshka russia|13
+♠️|spade suit|card game
+♥️|heart suit|card emotion game hearts
+♦️|diamond suit|card game
+♣️|club suit|card clubs game
+♟️|chess pawn|dupe expendable
+🃏|joker|card game wildcard
+🀄️|mahjong red dragon|game
+🎴|flower playing cards|card game japanese
+🎭️|performing arts|actor actress art entertainment mask theater theatre thespian
+🖼️|framed picture|art frame museum painting
+🎨|artist palette|art artsy arty colorful creative entertainment museum painter painting
+🧵|thread|needle sewing spool string
+🪡|sewing needle|embroidery sew stitches sutures tailoring thread|13
+🧶|yarn|ball crochet knit
+🪢|knot|cord rope tangled tie twine twist|13`,
+`🌍️|globe showing Europe-Africa|earth world
+🌎️|globe showing Americas|earth world
+🌏️|globe showing Asia-Australia|earth world
+🌐|globe with meridians|earth internet web world worldwide
+🗺️|world map|
+🗾|map of Japan|
+🧭|compass|direction magnetic navigation orienteering
+🏔️|snow-capped mountain|cold
+⛰️|mountain|
+🛘|landslide|avalanche danger disaster earthquake mountain mudslide rocks|17
+🌋|volcano|eruption mountain nature
+🗻|mount fuji|mountain nature
+🏕️|camping|
+🏖️|beach with umbrella|
+🏜️|desert|
+🏝️|desert island|
+🏞️|national park|
+🏟️|stadium|
+🏛️|classical building|
+🏗️|building construction|crane
+🧱|brick|bricks clay mortar wall
+🪨|rock|boulder heavy solid stone tough|13
+🪵|wood|log lumber timber|13
+🛖|hut|home house roundhouse shelter yurt|13
+🏘️|houses|house
+🏚️|derelict house|home
+🏠️|house|building country heart home ranch settle simple suburban suburbia where
+🏡|house with garden|building country heart home ranch settle simple suburban suburbia where
+🏢|office building|city cubical job
+🏣|Japanese post office|building
+🏤|post office|building european
+🏥|hospital|building doctor medicine
+🏦|bank|building
+🏨|hotel|building
+🏩|love hotel|building
+🏪|convenience store|24 building hours
+🏫|school|building
+🏬|department store|building
+🏭️|factory|building
+🏯|Japanese castle|building
+🏰|castle|building european
+💒|wedding|chapel hitched nuptials romance
+🗼|Tokyo tower|
+🗽|Statue of Liberty|new ny nyc york
+⛪️|church|bless chapel christian cross religion
+🕌|mosque|islam masjid muslim religion
+🛕|hindu temple||12
+🕍|synagogue|jew jewish judaism religion temple
+⛩️|shinto shrine|religion
+🕋|kaaba|hajj islam muslim religion umrah
+⛲️|fountain|
+⛺️|tent|camping
+🌁|foggy|fog
+🌃|night with stars|star
+🏙️|cityscape|city
+🌄|sunrise over mountains|morning sun
+🌅|sunrise|morning nature sun
+🌆|cityscape at dusk|building city evening landscape sun sunset
+🌇|sunset|building dusk sun
+🌉|bridge at night|
+♨️|hot springs|hotsprings steaming
+🎠|carousel horse|entertainment
+🛝|playground slide|amusement park play playing sliding theme|14
+🎡|ferris wheel|amusement park theme
+🎢|roller coaster|amusement park theme
+💈|barber pole|cut fresh haircut shave
+🎪|circus tent|
+🚂|locomotive|caboose engine railway steam train trains travel
+🚃|railway car|electric train tram travel trolleybus
+🚄|high-speed train|railway shinkansen
+🚅|bullet train|high speed nose railway shinkansen travel
+🚆|train|arrived choo railway
+🚇️|metro|subway travel
+🚈|light rail|arrived monorail railway
+🚉|station|railway train
+🚊|tram|trolleybus
+🚝|monorail|vehicle
+🚞|mountain railway|car trip
+🚋|tram car|bus trolley trolleybus
+🚌|bus|school vehicle
+🚍️|oncoming bus|cars
+🚎|trolleybus|bus tram trolley
+🚐|minibus|bus drive van vehicle
+🚑️|ambulance|emergency vehicle
+🚒|fire engine|truck
+🚓|police car|5 0 cops patrol
+🚔️|oncoming police car|
+🚕|taxi|cab cabbie car drive vehicle yellow
+🚖|oncoming taxi|cab cabbie cars drove hail yellow
+🚗|automobile|car driving vehicle
+🚘️|oncoming automobile|car cars drove vehicle
+🚙|sport utility vehicle|car drive recreational sportutility
+🛻|pickup truck|automobile car flatbed pick up transportation|13
+🚚|delivery truck|car drive vehicle
+🚛|articulated lorry|car drive move semi truck vehicle
+🚜|tractor|vehicle
+🏎️|racing car|zoom
+🏍️|motorcycle|racing
+🛵|motor scooter|
+🦽|manual wheelchair|accessibility|12
+🦼|motorized wheelchair|accessibility|12
+🛺|auto rickshaw|tuk|12
+🚲️|bicycle|bike class cycle cycling cyclist gang ride spin spinning
+🛴|kick scooter|
+🛹|skateboard|board skate skater wheels
+🛼|roller skate|blades skates sport|13
+🚏|bus stop|busstop
+🛣️|motorway|highway road
+🛤️|railway track|train
+🛢️|oil drum|
+⛽️|fuel pump|diesel fuelpump gas gasoline station
+🛞|wheel|car circle tire turn vehicle|14
+🚨|police car light|alarm alert beacon emergency revolving siren
+🚥|horizontal traffic light|intersection signal stop stoplight
+🚦|vertical traffic light|drove intersection signal stop stoplight
+🛑|stop sign|octagonal
+🚧|construction|barrier
+⚓️|anchor|ship tool
+🛟|ring buoy|float life lifesaver preserver rescue safety save saver swim|14
+⛵️|sailboat|boat resort sailing sea yacht
+🛶|canoe|boat
+🚤|speedboat|billionaire boat lake luxury millionaire summer travel
+🛳️|passenger ship|
+⛴️|ferry|boat passenger
+🛥️|motor boat|motorboat
+🚢|ship|boat passenger travel
+✈️|airplane|aeroplane fly flying jet plane travel
+🛩️|small airplane|aeroplane plane
+🛫|airplane departure|aeroplane check in departures plane
+🛬|airplane arrival|aeroplane arrivals arriving landing plane
+🪂|parachute|hang glide parasail skydive|12
+💺|seat|chair
+🚁|helicopter|copter roflcopter travel vehicle
+🚟|suspension railway|
+🚠|mountain cableway|cable gondola lift ski
+🚡|aerial tramway|cable car gondola ropeway
+🛰️|satellite|space
+🚀|rocket|launch rockets space travel
+🛸|flying saucer|aliens extra terrestrial ufo
+🛎️|bellhop bell|hotel
+🧳|luggage|bag packing roller suitcase travel
+⌛️|hourglass done|sand time timer
+⏳️|hourglass not done|flowing hours sand timer waiting yolo
+⌚️|watch|clock time
+⏰️|alarm clock|hours hrs late time waiting
+⏱️|stopwatch|clock time
+⏲️|timer clock|
+🕰️|mantelpiece clock|time
+🕛️|twelve o’clock|12 00 time
+🕧️|twelve-thirty|12 30 clock time
+🕐️|one o’clock|1 00 time
+🕜️|one-thirty|1 30 clock time
+🕑️|two o’clock|2 00 time
+🕝️|two-thirty|2 30 clock time
+🕒️|three o’clock|3 00 time
+🕞️|three-thirty|3 30 clock time
+🕓️|four o’clock|4 00 time
+🕟️|four-thirty|30 4 clock time
+🕔️|five o’clock|5 00 time
+🕠️|five-thirty|30 5 clock time
+🕕️|six o’clock|6 00 time
+🕡️|six-thirty|30 6 clock
+🕖️|seven o’clock|0 7 00
+🕢️|seven-thirty|30 7 clock
+🕗️|eight o’clock|8 00 time
+🕣️|eight-thirty|30 8 clock time
+🕘️|nine o’clock|9 00 time
+🕤️|nine-thirty|30 9 clock time
+🕙️|ten o’clock|0 10 00
+🕥️|ten-thirty|10 30 clock time
+🕚️|eleven o’clock|11 00 time
+🕦️|eleven-thirty|11 30 clock time
+🌑|new moon|dark space
+🌒|waxing crescent moon|dreams space
+🌓|first quarter moon|space
+🌔|waxing gibbous moon|space
+🌕️|full moon|space
+🌖|waning gibbous moon|space
+🌗|last quarter moon|space
+🌘|waning crescent moon|space
+🌙|crescent moon|ramadan space
+🌚|new moon face|space
+🌛|first quarter moon face|space
+🌜️|last quarter moon face|dreams
+🌡️|thermometer|weather
+☀️|sun|bright rays space sunny weather
+🌝|full moon face|bright
+🌞|sun with face|beach bright day heat shine sunny sunshine weather
+🪐|ringed planet|saturn saturnine|12
+⭐️|star|astronomy medium stars white
+🌟|glowing star|glittery glow night shining sparkle win
+🌠|shooting star|falling night space
+🌌|milky way|space
+☁️|cloud|weather
+⛅️|sun behind cloud|cloudy weather
+⛈️|cloud with lightning and rain|thunder thunderstorm
+🌤️|sun behind small cloud|weather
+🌥️|sun behind large cloud|weather
+🌦️|sun behind rain cloud|weather
+🌧️|cloud with rain|weather
+🌨️|cloud with snow|cold weather
+🌩️|cloud with lightning|weather
+🌪️|tornado|cloud weather whirlwind
+🌫️|fog|cloud weather
+🌬️|wind face|blow cloud
+🌀|cyclone|dizzy hurricane twister typhoon weather
+🌈|rainbow|gay genderqueer glbt glbtq lesbian lgbt lgbtq lgbtqia nature pride queer rain trans transgender weather
+🌂|closed umbrella|clothing rain
+☂️|umbrella|clothing rain
+☔️|umbrella with rain drops|clothing drop weather
+⛱️|umbrella on ground|rain sun
+⚡️|high voltage|danger electric electricity lightning nature thunder thunderbolt zap
+❄️|snowflake|cold snow weather
+☃️|snowman|cold man snow
+⛄️|snowman without snow|cold man
+☄️|comet|space
+🔥|fire|af burn flame hot lit litaf tool
+💧|droplet|cold comic drop nature sad sweat tear water weather
+🌊|water wave|nature ocean surf surfer surfing`,
+`👓️|glasses|clothing eye eyeglasses eyewear
+🕶️|sunglasses|dark eye eyewear glasses
+🥽|goggles|dive eye protection scuba swimming welding
+🥼|lab coat|clothes doctor dr experiment jacket scientist white
+🦺|safety vest|emergency|12
+👔|necktie|clothing employed serious shirt tie
+👕|t-shirt|blue casual clothes clothing collar dressed shopping tshirt weekend
+👖|jeans|blue casual clothes clothing denim dressed pants shopping trousers weekend
+🧣|scarf|bundle cold neck up
+🧤|gloves|hand
+🧥|coat|brr bundle cold jacket up
+🧦|socks|stocking
+👗|dress|clothes clothing dressed fancy shopping
+👘|kimono|clothing comfortable
+🥻|sari|clothing dress|12
+🩱|one-piece swimsuit|bathing suit|12
+🩲|briefs|bathing one piece suit swimsuit underwear|12
+🩳|shorts|bathing pants suit swimsuit underwear|12
+👙|bikini|bathing beach clothing pool suit swim
+👚|woman’s clothes|blouse clothing collar dress dressed lady shirt shopping
+🪭|folding hand fan|clack clap cool cooling dance flirt flutter hot shy|15
+👛|purse|clothes clothing coin dress fancy handbag shopping
+👜|handbag|bag clothes clothing dress lady purse shopping
+👝|clutch bag|clothes clothing dress handbag pouch purse
+🛍️|shopping bags|bag hotel
+🎒|backpack|backpacking bag bookbag education rucksack satchel school
+🩴|thong sandal|beach flip flop sandals shoe thongs z ri|13
+👞|man’s shoe|brown clothes clothing feet foot kick shoes shopping
+👟|running shoe|athletic clothes clothing fast kick shoes shopping sneaker tennis
+🥾|hiking boot|backpacking brown camping outdoors shoe
+🥿|flat shoe|ballet comfy flats slip on slipper
+👠|high-heeled shoe|clothes clothing dress fashion heel heels shoes shopping stiletto woman
+👡|woman’s sandal|clothing shoe
+🩰|ballet shoes|dance|12
+👢|woman’s boot|clothes clothing dress shoe shoes shopping
+🪮|hair pick|afro comb groom|15
+👑|crown|clothing family king medieval queen royal royalty win
+👒|woman’s hat|clothes clothing garden hats party
+🎩|top hat|clothes clothing fancy formal magic tophat
+🎓️|graduation cap|celebration clothing education hat scholar
+🧢|billed cap|baseball bent dad hat
+🪖|military helmet|army soldier war warrior|13
+⛑️|rescue worker’s helmet|aid cross face hat
+📿|prayer beads|clothing necklace religion
+💄|lipstick|cosmetics date makeup
+💍|ring|diamond engaged engagement married romance shiny sparkling wedding
+💎|gem stone|diamond engagement jewel money romance wedding
+🔇|muted speaker|mute quiet silent sound
+🔈️|speaker low volume|soft sound
+🔉|speaker medium volume|sound
+🔊|speaker high volume|loud music sound
+📢|loudspeaker|address communication loud public sound
+📣|megaphone|cheering sound
+📯|postal horn|post
+🔔|bell|break church sound
+🔕|bell with slash|forbidden mute no not prohibited quiet silent sound
+🎼|musical score|music note
+🎵|musical note|music sound
+🎶|musical notes|music note sound
+🎙️|studio microphone|mic music
+🎚️|level slider|music
+🎛️|control knobs|music
+🎤|microphone|karaoke mic music sing sound
+🎧️|headphone|earbud sound
+📻️|radio|entertainment tbt video
+🎷|saxophone|instrument music sax
+🎺|trumpet|instrument music
+🪊|trombone|brass instrument jazz music sad slide|17
+🪗|accordion|box concertina instrument music squeeze squeezebox|13
+🎸|guitar|instrument music strat
+🎹|musical keyboard|instrument music piano
+🎻|violin|instrument music
+🪕|banjo|music stringed|12
+🥁|drum|drumsticks music
+🪘|long drum|beat conga instrument rhythm|13
+🪇|maracas|cha dance instrument music party percussion rattle shake shaker|15
+🪈|flute|band fife flautist instrument marching music orchestra piccolo pipe recorder woodwind|15
+🪉|harp|cupid instrument love music orchestra|16
+📱|mobile phone|cell communication telephone
+📲|mobile phone with arrow|build call cell communication receive telephone
+☎️|telephone|phone
+📞|telephone receiver|communication phone voip
+📟️|pager|communication
+📠|fax machine|communication
+🔋|battery|
+🪫|low battery|drained electronic energy power|14
+🔌|electric plug|electricity
+💻️|laptop|computer office pc personal
+🖥️|desktop computer|monitor
+🖨️|printer|computer
+⌨️|keyboard|computer
+🖱️|computer mouse|
+🖲️|trackball|computer
+💽|computer disk|minidisk optical
+💾|floppy disk|computer
+💿️|optical disk|blu ray cd computer dvd
+📀|dvd|blu ray cd computer disk optical
+🧮|abacus|calculation calculator
+🎥|movie camera|bollywood cinema film hollywood record
+🎞️|film frames|cinema movie
+📽️|film projector|cinema movie video
+🎬️|clapper board|action movie
+📺️|television|tv video
+📷️|camera|photo selfie snap tbt trip video
+📸|camera with flash|video
+📹️|video camera|camcorder tbt
+📼|videocassette|old school tape vcr vhs video
+🔍️|magnifying glass tilted left|lab pointing science search tool
+🔎|magnifying glass tilted right|contact lab pointing science search tool
+🕯️|candle|light
+💡|light bulb|comic electric idea
+🔦|flashlight|electric light tool torch
+🏮|red paper lantern|bar light restaurant
+🪔|diya lamp|light oil|12
+📔|notebook with decorative cover|book decorated education school writing
+📕|closed book|education
+📖|open book|education fantasy knowledge library novels reading
+📗|green book|education fantasy library reading
+📘|blue book|education fantasy library reading
+📙|orange book|education fantasy library reading
+📚️|books|book education fantasy knowledge library novels reading school study
+📓|notebook|
+📒|ledger|notebook
+📃|page with curl|document paper
+📜|scroll|paper
+📄|page facing up|document paper
+📰|newspaper|communication news paper
+🗞️|rolled-up newspaper|news paper
+📑|bookmark tabs|mark marker
+🔖|bookmark|mark
+🏷️|label|tag
+🪙|coin|dollar euro gold metal money rich silver treasure|13
+💰️|money bag|bank bet billion cash cost dollar gold million moneybag paid paying pot rich win
+🪎|treasure chest|gem gold jewels loot money prize silver valuables wealth|17
+💴|yen banknote|bank bill currency money note
+💵|dollar banknote|bank bill currency money note
+💶|euro banknote|100 bank bill currency money note rich
+💷|pound banknote|bank bill billion cash currency money note pounds
+💸|money with wings|bank banknote bill billion cash dollar fly million note pay
+💳️|credit card|bank cash charge money pay
+🧾|receipt|accounting bookkeeping evidence invoice proof
+💹|chart increasing with yen|bank currency graph growth market money rise trend upward
+✉️|envelope|e mail email letter
+📧|e-mail|email letter
+📨|incoming envelope|delivering e mail email letter receive sent
+📩|envelope with arrow|communication down e mail email letter outgoing send sent
+📤️|outbox tray|box email letter mail sent
+📥️|inbox tray|box email letter mail receive zero
+📦️|package|box communication delivery parcel shipping
+📫️|closed mailbox with raised flag|communication mail postbox
+📪️|closed mailbox with lowered flag|mail postbox
+📬️|open mailbox with raised flag|mail postbox
+📭️|open mailbox with lowered flag|mail postbox
+📮|postbox|mail mailbox
+🗳️|ballot box with ballot|
+✏️|pencil|
+✒️|black nib|pen
+🖋️|fountain pen|
+🖊️|pen|ballpoint
+🖌️|paintbrush|painting
+🖍️|crayon|
+📝|memo|communication media notes pencil
+💼|briefcase|office
+📁|file folder|
+📂|open file folder|
+🗂️|card index dividers|
+📅|calendar|date
+📆|tear-off calendar|
+🗒️|spiral notepad|note pad
+🗓️|spiral calendar|pad
+📇|card index|old rolodex school
+📈|chart increasing|data graph growth right trend up upward
+📉|chart decreasing|data down downward graph negative trend
+📊|bar chart|data graph
+📋️|clipboard|do list notes
+📌|pushpin|collage pin
+📍|round pushpin|location map pin
+📎|paperclip|
+🖇️|linked paperclips|link paperclip
+📏|straight ruler|angle edge math straightedge
+📐|triangular ruler|angle math rule set slide triangle
+✂️|scissors|cut cutting paper tool
+🗃️|card file box|
+🗄️|file cabinet|filing paper
+🗑️|wastebasket|can garbage trash waste
+🔒️|locked|closed lock private
+🔓️|unlocked|cracked lock open unlock
+🔏|locked with pen|ink lock nib privacy
+🔐|locked with key|bike closed lock secure
+🔑|key|keys lock major password unlock
+🗝️|old key|clue lock
+🔨|hammer|home improvement repairs tool
+🪓|axe|ax chop hatchet split wood|12
+⛏️|pick|hammer mining tool
+⚒️|hammer and pick|tool
+🛠️|hammer and wrench|spanner tool
+🗡️|dagger|knife weapon
+⚔️|crossed swords|weapon
+💣️|bomb|boom comic dangerous explosion hot
+🪃|boomerang|rebound repercussion weapon|13
+🏹|bow and arrow|archer archery sagittarius tool weapon zodiac
+🛡️|shield|weapon
+🪚|carpentry saw|carpenter cut lumber tool trim|13
+🔧|wrench|home improvement spanner tool
+🪛|screwdriver|flathead handy screw tool|13
+🔩|nut and bolt|home improvement tool
+⚙️|gear|cog cogwheel tool
+🗜️|clamp|compress tool vice
+⚖️|balance scale|justice libra scales tool weight zodiac
+🦯|white cane|accessibility blind probing|12
+🔗|link|links
+⛓️‍💥|broken chain|break breaking cuffs freedom|15.1
+⛓️|chains|chain
+🪝|hook|catch crook curve ensnare point selling|13
+🧰|toolbox|box chest mechanic red tool
+🧲|magnet|attraction horseshoe magnetic negative positive shape u
+🪜|ladder|climb rung step|13
+🪏|shovel|bury dig garden hole plant scoop snow spade|16
+⚗️|alembic|chemistry tool
+🧪|test tube|chemist chemistry experiment lab science
+🧫|petri dish|bacteria biologist biology culture lab
+🧬|dna|biologist evolution gene genetics life
+🔬|microscope|experiment lab science tool
+🔭|telescope|contact extraterrestrial science tool
+📡|satellite antenna|aliens contact dish science
+💉|syringe|doctor flu medicine needle shot sick tool vaccination
+🩸|drop of blood|bleed donation injury medicine menstruation|12
+💊|pill|doctor drugs medicated medicine pills sick vitamin
+🩹|adhesive bandage||12
+🩼|crutch|aid cane disability help hurt injured mobility stick|14
+🩺|stethoscope|doctor heart medicine|12
+🩻|x-ray|bones doctor medical skeleton skull xray|14
+🚪|door|back closet front
+🛗|elevator|accessibility hoist lift|13
+🪞|mirror|makeup reflection reflector speculum|13
+🪟|window|air frame fresh opening transparent view|13
+🛏️|bed|hotel sleep
+🛋️|couch and lamp|hotel
+🪑|chair|seat sit|12
+🚽|toilet|bathroom
+🪠|plunger|cup force plumber poop suction toilet|13
+🚿|shower|water
+🛁|bathtub|bath
+🪤|mouse trap|bait cheese lure mousetrap snare|13
+🪒|razor|sharp shave|12
+🧴|lotion bottle|moisturizer shampoo sunscreen
+🧷|safety pin|diaper punk rock
+🧹|broom|cleaning sweeping witch
+🧺|basket|farming laundry picnic
+🧻|roll of paper|toilet towels
+🪣|bucket|cask pail vat|13
+🧼|soap|bar bathing clean cleaning lather soapdish
+🫧|bubbles|bubble burp clean floating pearl soap underwater|14
+🪥|toothbrush|bathroom brush clean dental hygiene teeth toiletry|13
+🧽|sponge|absorbing cleaning porous soak
+🧯|fire extinguisher|extinguish quench
+🛒|shopping cart|trolley
+🚬|cigarette|smoking
+⚰️|coffin|dead death vampire
+🪦|headstone|cemetery dead grave graveyard memorial rip tomb tombstone|13
+⚱️|funeral urn|ashes death
+🧿|nazar amulet|bead blue charm evil eye talisman
+🪬|hamsa|amulet fatima fortune guide hand mary miriam palm protect protection|14
+🗿|moai|face moyai statue stoneface travel
+🪧|placard|card demonstration notice picket plaque protest sign|13
+🪪|identification card|credentials document id license security|14`,
+`🏧|ATM sign|automated bank cash money teller
+🚮|litter in bin sign|litterbin
+🚰|potable water|drinking
+♿️|wheelchair symbol|access handicap
+🚹️|men’s room|bathroom lavatory man restroom toilet wc
+🚺️|women’s room|bathroom lavatory restroom toilet wc woman
+🚻|restroom|bathroom lavatory toilet wc
+🚼️|baby symbol|changing
+🚾|water closet|bathroom lavatory restroom toilet wc
+🛂|passport control|
+🛃|customs|packing
+🛄|baggage claim|arrived bags case checked journey packing plane ready travel trip
+🛅|left luggage|baggage case locker
+⚠️|warning|caution
+🚸|children crossing|child pedestrian traffic
+⛔️|no entry|do fail forbidden not pass prohibited traffic
+🚫|prohibited|entry forbidden no not smoke
+🚳|no bicycles|bicycle bike forbidden not prohibited
+🚭️|no smoking|forbidden not prohibited smoke
+🚯|no littering|forbidden litter not prohibited
+🚱|non-potable water|dry drinking prohibited
+🚷|no pedestrians|forbidden not pedestrian prohibited
+📵|no mobile phones|cell forbidden not phone prohibited telephone
+🔞|no one under eighteen|18 age forbidden not prohibited restriction underage
+☢️|radioactive|sign
+☣️|biohazard|sign
+⬆️|up arrow|cardinal direction north
+↗️|up-right arrow|direction intercardinal northeast
+➡️|right arrow|cardinal direction east
+↘️|down-right arrow|direction intercardinal southeast
+⬇️|down arrow|cardinal direction south
+↙️|down-left arrow|direction intercardinal southwest
+⬅️|left arrow|cardinal direction west
+↖️|up-left arrow|direction intercardinal northwest
+↕️|up-down arrow|
+↔️|left-right arrow|
+↩️|right arrow curving left|
+↪️|left arrow curving right|
+⤴️|right arrow curving up|
+⤵️|right arrow curving down|
+🔃|clockwise vertical arrows|arrow refresh reload
+🔄|counterclockwise arrows button|again anticlockwise arrow deja refresh rewindershins vu
+🔙|BACK arrow|
+🔚|END arrow|
+🔛|ON! arrow|mark
+🔜|SOON arrow|brb omw
+🔝|TOP arrow|homie up
+🛐|place of worship|pray religion
+⚛️|atom symbol|atheist
+🕉️|om|hindu religion
+✡️|star of David|jew jewish judaism religion
+☸️|wheel of dharma|buddhist religion
+☯️|yin yang|difficult lives religion tao taoist total yinyang
+✝️|latin cross|christ christian religion
+☦️|orthodox cross|christian religion
+☪️|star and crescent|islam muslim ramadan religion
+☮️|peace symbol|healing peaceful
+🕎|menorah|candelabrum candlestick hanukkah jewish judaism religion
+🔯|dotted six-pointed star|fortune jewish judaism
+🪯|khanda|deg fateh khalsa religion sikh sikhism tegh|15
+♈️|Aries|horoscope ram zodiac
+♉️|Taurus|bull horoscope ox zodiac
+♊️|Gemini|horoscope twins zodiac
+♋️|Cancer|crab horoscope zodiac
+♌️|Leo|horoscope lion zodiac
+♍️|Virgo|horoscope zodiac
+♎️|Libra|balance horoscope justice scales zodiac
+♏️|Scorpio|horoscope scorpion scorpius zodiac
+♐️|Sagittarius|archer horoscope zodiac
+♑️|Capricorn|goat horoscope zodiac
+♒️|Aquarius|bearer horoscope water zodiac
+♓️|Pisces|fish horoscope zodiac
+⛎️|Ophiuchus|bearer serpent snake zodiac
+🔀|shuffle tracks button|arrow crossed
+🔁|repeat button|arrow clockwise
+🔂|repeat single button|arrow clockwise once
+▶️|play button|arrow right triangle
+⏩️|fast-forward button|arrow double
+⏭️|next track button|arrow scene triangle
+⏯️|play or pause button|arrow right triangle
+◀️|reverse button|arrow left triangle
+⏪️|fast reverse button|arrow double rewind
+⏮️|last track button|arrow previous scene triangle
+🔼|upwards button|arrow red up
+⏫️|fast up button|arrow double
+🔽|downwards button|arrow down red
+⏬️|fast down button|arrow double
+⏸️|pause button|bar double vertical
+⏹️|stop button|square
+⏺️|record button|circle
+⏏️|eject button|
+🎦|cinema|camera film movie
+🔅|dim button|brightness low
+🔆|bright button|brightness light
+📶|antenna bars|bar cell communication mobile phone signal telephone
+🛜|wireless|broadband computer connectivity hotspot internet network router smartphone wi fi wifi wlan|15
+📳|vibration mode|cell communication mobile phone telephone
+📴|mobile phone off|cell telephone
+♀️|female sign|woman
+♂️|male sign|man
+⚧️|transgender symbol||13
+✖️|multiply|cancel multiplication sign x
+➕️|plus|
+➖️|minus|heavy math sign
+➗️|divide|division heavy math sign
+🟰|heavy equals sign|answer equal equality math|14
+♾️|infinity|forever unbounded universal
+‼️|double exclamation mark|bangbang punctuation
+⁉️|exclamation question mark|interrobang punctuation
+❓️|red question mark|punctuation
+❔️|white question mark|outlined punctuation
+❕️|white exclamation mark|outlined punctuation
+❗️|red exclamation mark|punctuation
+〰️|wavy dash|punctuation
+💱|currency exchange|bank money
+💲|heavy dollar sign|billion cash charge currency million money pay
+⚕️|medical symbol|aesculapius medicine staff
+♻️|recycling symbol|recycle
+⚜️|fleur-de-lis|knights
+🔱|trident emblem|anchor poseidon ship tool
+📛|name badge|
+🔰|Japanese symbol for beginner|chevron green leaf tool yellow
+⭕️|hollow red circle|heavy large o
+✅️|check mark button|checked checkmark complete completed done fixed tick
+☑️|check box with check|ballot checked done off tick
+✔️|check mark|checked checkmark done heavy tick
+❌️|cross mark|cancel multiplication multiply x
+❎️|cross mark button|multiplication multiply square x
+➰️|curly loop|curl
+➿️|double curly loop|curl
+〽️|part alternation mark|
+✳️|eight-spoked asterisk|
+✴️|eight-pointed star|
+❇️|sparkle|
+©️|copyright|c
+®️|registered|r
+™️|trade mark|tm trademark
+🫟|splatter|drip holi ink liquid mess paint spill stain|16
+#️⃣|keycap: #|
+*️⃣|keycap: *|
+0️⃣|keycap: 0|zero
+1️⃣|keycap: 1|one
+2️⃣|keycap: 2|two
+3️⃣|keycap: 3|three
+4️⃣|keycap: 4|four
+5️⃣|keycap: 5|five
+6️⃣|keycap: 6|six
+7️⃣|keycap: 7|seven
+8️⃣|keycap: 8|eight
+9️⃣|keycap: 9|nine
+🔟|keycap: 10|
+🔠|input latin uppercase|abcd letters
+🔡|input latin lowercase|abcd letters
+🔢|input numbers|1234
+🔣|input symbols|
+🔤|input latin letters|abc alphabet
+🅰️|A button (blood type)|
+🆎|AB button (blood type)|
+🅱️|B button (blood type)|
+🆑|CL button|
+🆒|COOL button|
+🆓|FREE button|
+ℹ️|information|i
+🆔|ID button|identity
+Ⓜ️|circled M|circle
+🆕|NEW button|
+🆖|NG button|
+🅾️|O button (blood type)|
+🆗|OK button|okay
+🅿️|P button|parking
+🆘|SOS button|help
+🆙|UP! button|mark
+🆚|VS button|versus
+🈁|Japanese “here” button|katakana
+🈂️|Japanese “service charge” button|katakana
+🈷️|Japanese “monthly amount” button|ideograph
+🈶|Japanese “not free of charge” button|ideograph
+🈯️|Japanese “reserved” button|ideograph
+🉐|Japanese “bargain” button|ideograph
+🈹|Japanese “discount” button|ideograph
+🈚️|Japanese “free of charge” button|ideograph
+🈲|Japanese “prohibited” button|ideograph
+🉑|Japanese “acceptable” button|ideograph
+🈸|Japanese “application” button|ideograph
+🈴|Japanese “passing grade” button|ideograph
+🈳|Japanese “vacancy” button|ideograph
+㊗️|Japanese “congratulations” button|ideograph
+㊙️|Japanese “secret” button|ideograph
+🈺|Japanese “open for business” button|ideograph
+🈵|Japanese “no vacancy” button|ideograph
+🔴|red circle|geometric
+🟠|orange circle||12
+🟡|yellow circle||12
+🟢|green circle||12
+🔵|blue circle|geometric
+🟣|purple circle||12
+🟤|brown circle||12
+⚫️|black circle|geometric
+⚪️|white circle|geometric
+🟥|red square|card penalty|12
+🟧|orange square||12
+🟨|yellow square|card penalty|12
+🟩|green square||12
+🟦|blue square||12
+🟪|purple square||12
+🟫|brown square||12
+⬛️|black large square|geometric
+⬜️|white large square|geometric
+◼️|black medium square|geometric
+◻️|white medium square|geometric
+◾️|black medium-small square|geometric
+◽️|white medium-small square|geometric
+▪️|black small square|geometric
+▫️|white small square|geometric
+🔶|large orange diamond|geometric
+🔷|large blue diamond|geometric
+🔸|small orange diamond|geometric
+🔹|small blue diamond|geometric
+🔺|red triangle pointed up|geometric
+🔻|red triangle pointed down|geometric
+💠|diamond with a dot|comic geometric
+🔘|radio button|geometric
+🔳|white square button|geometric outlined
+🔲|black square button|geometric`,
+`🏁|chequered flag|checkered finish flags game race racing sport win
+🚩|triangular flag|construction golf post
+🎌|crossed flags|celebration cross japanese
+🏴|black flag|waving
+🏳️|white flag|waving
+🏳️‍🌈|rainbow flag|bisexual gay genderqueer glbt glbtq lesbian lgbt lgbtq lgbtqia pride queer trans transgender
+🏳️‍⚧️|transgender flag|blue light pink white|13
+🏴‍☠️|pirate flag|jolly plunder roger treasure
+🇦🇨|flag: Ascension Island|ac
+🇦🇩|flag: Andorra|ad
+🇦🇪|flag: United Arab Emirates|ae
+🇦🇫|flag: Afghanistan|af
+🇦🇬|flag: Antigua & Barbuda|ag
+🇦🇮|flag: Anguilla|ai
+🇦🇱|flag: Albania|al
+🇦🇲|flag: Armenia|am
+🇦🇴|flag: Angola|ao
+🇦🇶|flag: Antarctica|aq
+🇦🇷|flag: Argentina|ar
+🇦🇸|flag: American Samoa|as
+🇦🇹|flag: Austria|at
+🇦🇺|flag: Australia|au
+🇦🇼|flag: Aruba|aw
+🇦🇽|flag: Åland Islands|ax
+🇦🇿|flag: Azerbaijan|az
+🇧🇦|flag: Bosnia & Herzegovina|ba
+🇧🇧|flag: Barbados|bb
+🇧🇩|flag: Bangladesh|bd
+🇧🇪|flag: Belgium|be
+🇧🇫|flag: Burkina Faso|bf
+🇧🇬|flag: Bulgaria|bg
+🇧🇭|flag: Bahrain|bh
+🇧🇮|flag: Burundi|bi
+🇧🇯|flag: Benin|bj
+🇧🇱|flag: St. Barthélemy|bl
+🇧🇲|flag: Bermuda|bm
+🇧🇳|flag: Brunei|bn
+🇧🇴|flag: Bolivia|bo
+🇧🇶|flag: Caribbean Netherlands|bq
+🇧🇷|flag: Brazil|br
+🇧🇸|flag: Bahamas|bs
+🇧🇹|flag: Bhutan|bt
+🇧🇻|flag: Bouvet Island|bv
+🇧🇼|flag: Botswana|bw
+🇧🇾|flag: Belarus|by
+🇧🇿|flag: Belize|bz
+🇨🇦|flag: Canada|ca
+🇨🇨|flag: Cocos (Keeling) Islands|cc
+🇨🇩|flag: Congo - Kinshasa|cd
+🇨🇫|flag: Central African Republic|cf
+🇨🇬|flag: Congo - Brazzaville|cg
+🇨🇭|flag: Switzerland|ch
+🇨🇮|flag: Côte d’Ivoire|ci
+🇨🇰|flag: Cook Islands|ck
+🇨🇱|flag: Chile|cl
+🇨🇲|flag: Cameroon|cm
+🇨🇳|flag: China|cn
+🇨🇴|flag: Colombia|co
+🇨🇵|flag: Clipperton Island|cp
+🇨🇶|flag: Sark|cq|16
+🇨🇷|flag: Costa Rica|cr
+🇨🇺|flag: Cuba|cu
+🇨🇻|flag: Cape Verde|cv
+🇨🇼|flag: Curaçao|cw
+🇨🇽|flag: Christmas Island|cx
+🇨🇾|flag: Cyprus|cy
+🇨🇿|flag: Czechia|cz
+🇩🇪|flag: Germany|de
+🇩🇬|flag: Diego Garcia|dg
+🇩🇯|flag: Djibouti|dj
+🇩🇰|flag: Denmark|dk
+🇩🇲|flag: Dominica|dm
+🇩🇴|flag: Dominican Republic|do
+🇩🇿|flag: Algeria|dz
+🇪🇦|flag: Ceuta & Melilla|ea
+🇪🇨|flag: Ecuador|ec
+🇪🇪|flag: Estonia|ee
+🇪🇬|flag: Egypt|eg
+🇪🇭|flag: Western Sahara|eh
+🇪🇷|flag: Eritrea|er
+🇪🇸|flag: Spain|es
+🇪🇹|flag: Ethiopia|et
+🇪🇺|flag: European Union|eu
+🇫🇮|flag: Finland|fi
+🇫🇯|flag: Fiji|fj
+🇫🇰|flag: Falkland Islands|fk
+🇫🇲|flag: Micronesia|fm
+🇫🇴|flag: Faroe Islands|fo
+🇫🇷|flag: France|fr
+🇬🇦|flag: Gabon|ga
+🇬🇧|flag: United Kingdom|gb
+🇬🇩|flag: Grenada|gd
+🇬🇪|flag: Georgia|ge
+🇬🇫|flag: French Guiana|gf
+🇬🇬|flag: Guernsey|gg
+🇬🇭|flag: Ghana|gh
+🇬🇮|flag: Gibraltar|gi
+🇬🇱|flag: Greenland|gl
+🇬🇲|flag: Gambia|gm
+🇬🇳|flag: Guinea|gn
+🇬🇵|flag: Guadeloupe|gp
+🇬🇶|flag: Equatorial Guinea|gq
+🇬🇷|flag: Greece|gr
+🇬🇸|flag: South Georgia & South Sandwich Islands|gs
+🇬🇹|flag: Guatemala|gt
+🇬🇺|flag: Guam|gu
+🇬🇼|flag: Guinea-Bissau|gw
+🇬🇾|flag: Guyana|gy
+🇭🇰|flag: Hong Kong SAR China|hk
+🇭🇲|flag: Heard & McDonald Islands|hm
+🇭🇳|flag: Honduras|hn
+🇭🇷|flag: Croatia|hr
+🇭🇹|flag: Haiti|ht
+🇭🇺|flag: Hungary|hu
+🇮🇨|flag: Canary Islands|ic
+🇮🇩|flag: Indonesia|id
+🇮🇪|flag: Ireland|ie
+🇮🇱|flag: Israel|il
+🇮🇲|flag: Isle of Man|im
+🇮🇳|flag: India|in
+🇮🇴|flag: British Indian Ocean Territory|io
+🇮🇶|flag: Iraq|iq
+🇮🇷|flag: Iran|ir
+🇮🇸|flag: Iceland|is
+🇮🇹|flag: Italy|it
+🇯🇪|flag: Jersey|je
+🇯🇲|flag: Jamaica|jm
+🇯🇴|flag: Jordan|jo
+🇯🇵|flag: Japan|jp
+🇰🇪|flag: Kenya|ke
+🇰🇬|flag: Kyrgyzstan|kg
+🇰🇭|flag: Cambodia|kh
+🇰🇮|flag: Kiribati|ki
+🇰🇲|flag: Comoros|km
+🇰🇳|flag: St. Kitts & Nevis|kn
+🇰🇵|flag: North Korea|kp
+🇰🇷|flag: South Korea|kr
+🇰🇼|flag: Kuwait|kw
+🇰🇾|flag: Cayman Islands|ky
+🇰🇿|flag: Kazakhstan|kz
+🇱🇦|flag: Laos|la
+🇱🇧|flag: Lebanon|lb
+🇱🇨|flag: St. Lucia|lc
+🇱🇮|flag: Liechtenstein|li
+🇱🇰|flag: Sri Lanka|lk
+🇱🇷|flag: Liberia|lr
+🇱🇸|flag: Lesotho|ls
+🇱🇹|flag: Lithuania|lt
+🇱🇺|flag: Luxembourg|lu
+🇱🇻|flag: Latvia|lv
+🇱🇾|flag: Libya|ly
+🇲🇦|flag: Morocco|ma
+🇲🇨|flag: Monaco|mc
+🇲🇩|flag: Moldova|md
+🇲🇪|flag: Montenegro|me
+🇲🇫|flag: St. Martin|mf
+🇲🇬|flag: Madagascar|mg
+🇲🇭|flag: Marshall Islands|mh
+🇲🇰|flag: North Macedonia|mk
+🇲🇱|flag: Mali|ml
+🇲🇲|flag: Myanmar (Burma)|mm
+🇲🇳|flag: Mongolia|mn
+🇲🇴|flag: Macao SAR China|mo
+🇲🇵|flag: Northern Mariana Islands|mp
+🇲🇶|flag: Martinique|mq
+🇲🇷|flag: Mauritania|mr
+🇲🇸|flag: Montserrat|ms
+🇲🇹|flag: Malta|mt
+🇲🇺|flag: Mauritius|mu
+🇲🇻|flag: Maldives|mv
+🇲🇼|flag: Malawi|mw
+🇲🇽|flag: Mexico|mx
+🇲🇾|flag: Malaysia|my
+🇲🇿|flag: Mozambique|mz
+🇳🇦|flag: Namibia|na
+🇳🇨|flag: New Caledonia|nc
+🇳🇪|flag: Niger|ne
+🇳🇫|flag: Norfolk Island|nf
+🇳🇬|flag: Nigeria|ng
+🇳🇮|flag: Nicaragua|ni
+🇳🇱|flag: Netherlands|nl
+🇳🇴|flag: Norway|no
+🇳🇵|flag: Nepal|np
+🇳🇷|flag: Nauru|nr
+🇳🇺|flag: Niue|nu
+🇳🇿|flag: New Zealand|nz
+🇴🇲|flag: Oman|om
+🇵🇦|flag: Panama|pa
+🇵🇪|flag: Peru|pe
+🇵🇫|flag: French Polynesia|pf
+🇵🇬|flag: Papua New Guinea|pg
+🇵🇭|flag: Philippines|ph
+🇵🇰|flag: Pakistan|pk
+🇵🇱|flag: Poland|pl
+🇵🇲|flag: St. Pierre & Miquelon|pm
+🇵🇳|flag: Pitcairn Islands|pn
+🇵🇷|flag: Puerto Rico|pr
+🇵🇸|flag: Palestinian Territories|ps
+🇵🇹|flag: Portugal|pt
+🇵🇼|flag: Palau|pw
+🇵🇾|flag: Paraguay|py
+🇶🇦|flag: Qatar|qa
+🇷🇪|flag: Réunion|re
+🇷🇴|flag: Romania|ro
+🇷🇸|flag: Serbia|rs
+🇷🇺|flag: Russia|ru
+🇷🇼|flag: Rwanda|rw
+🇸🇦|flag: Saudi Arabia|sa
+🇸🇧|flag: Solomon Islands|sb
+🇸🇨|flag: Seychelles|sc
+🇸🇩|flag: Sudan|sd
+🇸🇪|flag: Sweden|se
+🇸🇬|flag: Singapore|sg
+🇸🇭|flag: St. Helena|sh
+🇸🇮|flag: Slovenia|si
+🇸🇯|flag: Svalbard & Jan Mayen|sj
+🇸🇰|flag: Slovakia|sk
+🇸🇱|flag: Sierra Leone|sl
+🇸🇲|flag: San Marino|sm
+🇸🇳|flag: Senegal|sn
+🇸🇴|flag: Somalia|so
+🇸🇷|flag: Suriname|sr
+🇸🇸|flag: South Sudan|ss
+🇸🇹|flag: São Tomé & Príncipe|st
+🇸🇻|flag: El Salvador|sv
+🇸🇽|flag: Sint Maarten|sx
+🇸🇾|flag: Syria|sy
+🇸🇿|flag: Eswatini|sz
+🇹🇦|flag: Tristan da Cunha|ta
+🇹🇨|flag: Turks & Caicos Islands|tc
+🇹🇩|flag: Chad|td
+🇹🇫|flag: French Southern Territories|tf
+🇹🇬|flag: Togo|tg
+🇹🇭|flag: Thailand|th
+🇹🇯|flag: Tajikistan|tj
+🇹🇰|flag: Tokelau|tk
+🇹🇱|flag: Timor-Leste|tl
+🇹🇲|flag: Turkmenistan|tm
+🇹🇳|flag: Tunisia|tn
+🇹🇴|flag: Tonga|to
+🇹🇷|flag: Türkiye|tr
+🇹🇹|flag: Trinidad & Tobago|tt
+🇹🇻|flag: Tuvalu|tv
+🇹🇼|flag: Taiwan|tw
+🇹🇿|flag: Tanzania|tz
+🇺🇦|flag: Ukraine|ua
+🇺🇬|flag: Uganda|ug
+🇺🇲|flag: U.S. Outlying Islands|um
+🇺🇳|flag: United Nations|un
+🇺🇸|flag: United States|us
+🇺🇾|flag: Uruguay|uy
+🇺🇿|flag: Uzbekistan|uz
+🇻🇦|flag: Vatican City|va
+🇻🇨|flag: St. Vincent & Grenadines|vc
+🇻🇪|flag: Venezuela|ve
+🇻🇬|flag: British Virgin Islands|vg
+🇻🇮|flag: U.S. Virgin Islands|vi
+🇻🇳|flag: Vietnam|vn
+🇻🇺|flag: Vanuatu|vu
+🇼🇫|flag: Wallis & Futuna|wf
+🇼🇸|flag: Samoa|ws
+🇽🇰|flag: Kosovo|xk
+🇾🇪|flag: Yemen|ye
+🇾🇹|flag: Mayotte|yt
+🇿🇦|flag: South Africa|za
+🇿🇲|flag: Zambia|zm
+🇿🇼|flag: Zimbabwe|zw
+🏴󠁧󠁢󠁥󠁮󠁧󠁿|flag: England|gbeng
+🏴󠁧󠁢󠁳󠁣󠁴󠁿|flag: Scotland|gbsct
+🏴󠁧󠁢󠁷󠁬󠁳󠁿|flag: Wales|gbwls`];
+const EMOJI_GROUPS = [['😀', 'Smileys'], ['👋', 'People'], ['🐻', 'Animals & Nature'], ['🍔', 'Food & Drink'], ['⚽', 'Activities'],
+  ['🚗', 'Travel & Places'], ['💡', 'Objects'], ['🔣', 'Symbols'], ['🏳️', 'Flags']];
+const EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+const emGrid = $('#emGrid'), emFind = $('#emFind'), emMode = $('#emMode'), emCats = $('#emCats'), emNone = $('#emNone');
+const EM = { built: false, sticker: load('fw.emMode', 'word') === 'sticker', at: null, raf: 0 };
+/* the newest emoji this device can draw. One of each kind is drawn: it has to come out in colour, as one picture (a
+   device that does not know it draws an empty box, or the parts side by side). */
+function emojiReach() {
+  try {
+    const c = document.createElement('canvas'); c.width = 48; c.height = 40; const x = c.getContext('2d', { willReadFrequently: true });
+    x.font = '28px ' + EMOJI_FONT; x.textBaseline = 'top';
+    const one = x.measureText('😀').width;
+    const can = (e) => {
+      if (x.measureText(e).width > one * 1.4) return false;
+      x.clearRect(0, 0, 48, 40); x.fillText(e, 2, 4); const d = x.getImageData(0, 0, 48, 40).data;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 128 && Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) > 60) return true;
+      return false;
+    };
+    if (!can('😀')) return { v: 99, flags: true }; /* nothing to tell by: all of them */
+    let v = 11;
+    for (const [n, e] of [[12, '🥱'], [12.1, '🧑‍🦰'], [13, '🥲'], [13.1, '😮‍💨'], [14, '🫠'], [15, '🫨'], [15.1, '🙂‍↔️'], [16, '🫩'], [17, '🫪']]) { if (!can(e)) break; v = n; }
+    return { v, flags: can('🇫🇷') }; /* (Windows draws flags as two letters) */
+  } catch (e) { return { v: 99, flags: true }; }
+}
+function buildEmojiPicker() {
+  const key = (sym, act) => { const b = mkTile('em key', ''); b.dataset.act = act; b.append(tileEmoji(sym)); return b; };
+  emGrid.prepend(key('⌫', 'back'), key('🧹', 'clear'));
+  EMOJI_GROUPS.forEach(([icon, name], g) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'em-cat'; b.dataset.sec = g; b.textContent = icon;
+    b.setAttribute('aria-label', name); b.title = name; emCats.append(b);
+  });
+  emMark();
+  const later = window.requestIdleCallback || ((f) => setTimeout(f, 600));
+  later(() => emojiBuild()); /* every emoji: once the page is up, or when the tab opens, whichever is first */
+}
+function emShow() { emojiBuild(); requestAnimationFrame(() => emCat()); } /* the tab opens */
+function emojiBuild() {
+  if (EM.built) return; EM.built = true;
+  const can = emojiReach(), flag = /[\u{1F1E6}-\u{1F1FF}\u{E0020}-\u{E007F}]/u, frag = document.createDocumentFragment();
+  EMOJI_DATA.forEach((list, g) => {
+    const h = document.createElement('h3'); h.className = 'em-h'; h.dataset.sec = g; h.textContent = EMOJI_GROUPS[g][1]; frag.append(h);
+    let first = true;
+    for (const line of list.split('\n')) {
+      const [e, name, more, ver] = line.split('|');
+      if ((ver && +ver > can.v) || (!can.flags && flag.test(e))) continue; /* this device would show an empty box */
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'et'; b.tabIndex = -1; b.dataset.emoji = e; b.textContent = e;
+      b.setAttribute('aria-label', name); b.title = name; b.words = ' ' + name.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ') + ' ' + more + ' ';
+      if (first) { b.dataset.first = g; first = false; }
+      frag.append(b);
+    }
+  });
+  emGrid.insertBefore(frag, emNone);
+  const b0 = emGrid.querySelector('.et'); if (b0) { b0.tabIndex = 0; EM.at = b0; }
+  emCat(); requestAnimationFrame(() => stripEdges.forEach((f) => f()));
+}
+/* the word or the stage: the bar's first button says which, and so do the ⌫ and 🧹 keys */
+function emMark() {
+  const st = EM.sticker; emMode.setAttribute('aria-pressed', String(st));
+  emMode.querySelector('.em-mi').textContent = st ? '🌟' : '✍️'; emMode.querySelector('.em-ml').textContent = st ? 'Sticker' : 'Word';
+  emMode.title = st ? 'Emoji become stickers on the stage. Tap to put them in the word instead' : 'Emoji go into the word. Tap to make stickers instead';
+  for (const k of emGrid.querySelectorAll('.tile.key')) {
+    const label = k.dataset.act === 'back' ? (st ? 'Remove the last sticker' : 'Delete the last letter') : (st ? 'Remove all the stickers' : 'Clear the word');
+    k.setAttribute('aria-label', label); k.title = label;
+  }
+}
+const emDown = () => getComputedStyle(emGrid).gridAutoFlow.indexOf('column') < 0; /* the side panel's grid goes down, a phone's goes sideways */
+/* a group's place in the grid: its heading going down, its first emoji going sideways */
+function emStart(g) { const el = emGrid.querySelector((emDown() ? '.em-h' : '.et') + '[data-' + (emDown() ? 'sec' : 'first') + '="' + g + '"]'); return el && !el.hidden ? el : null; }
+function emJump(g) {
+  if (emFind.value) { emFind.value = ''; emSearch(); }
+  emojiBuild(); const el = emStart(g); if (!el) return;
+  if (emDown()) emGrid.scrollTo({ top: el.offsetTop - 2 }); else emGrid.scrollTo({ left: el.offsetLeft - 8 });
+  emCat(g);
+}
+/* the group in view is lit in the bar */
+function emCat(g) {
+  if (!emGrid.clientWidth) return; /* (out of sight: nothing has a place yet) */
+  if (g == null) {
+    g = 0; const down = emDown(), at = (down ? emGrid.scrollTop : emGrid.scrollLeft) + 12;
+    for (let k = 0; k < EMOJI_GROUPS.length; k++) { const el = emStart(k); if (el && (down ? el.offsetTop : el.offsetLeft) <= at) g = k; }
+  }
+  const finding = !!emFind.value.trim();
+  for (const b of emCats.children) { const on = !finding && +b.dataset.sec === g; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); }
+}
+emGrid.addEventListener('scroll', () => { if (!EM.raf) EM.raf = requestAnimationFrame(() => { EM.raf = 0; emCat(); }); }, { passive: true });
+/* the search: every word typed is the start of a word of the emoji's name or of its other words */
+function emSearch() {
+  emojiBuild();
+  const q = emFind.value.toLowerCase().split(/[^a-z0-9']+/).filter(Boolean); let n = 0;
+  emGrid.classList.toggle('finding', q.length > 0); emFind.parentNode.classList.toggle('has', !!emFind.value);
+  for (const b of emGrid.querySelectorAll('.et')) { const on = !q.length || q.every((w) => b.words.indexOf(' ' + w) >= 0); b.hidden = !on; if (on) n++; }
+  emNone.hidden = n > 0 || !q.length;
+  emGrid.scrollTo({ left: 0, top: 0 }); emCat();
+  const b0 = emGrid.querySelector('.et:not([hidden])'); emRove(b0, false);
+  requestAnimationFrame(() => stripEdges.forEach((f) => f()));
+}
+emFind.addEventListener('input', emSearch);
+emFind.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); const b = emGrid.querySelector('.et:not([hidden])'); if (b) b.click(); } /* the first one found */
+  else if (e.key === 'Escape' && emFind.value) { e.preventDefault(); emFind.value = ''; emSearch(); }
+});
+/* one emoji of the grid takes the Tab key; the arrows move from there */
+function emRove(b, focus) {
+  if (!b) return; if (EM.at && EM.at !== b) EM.at.tabIndex = -1; EM.at = b; b.tabIndex = 0;
+  if (focus) { try { b.focus({ preventScroll: false }); } catch (e) { /* ignore */ } }
+}
+const emNext = (b, dir) => { let el = b; do { el = dir > 0 ? el.nextElementSibling : el.previousElementSibling; } while (el && !(el.classList.contains('et') && !el.hidden)); return el; };
+/* the emoji in the next row or column: the nearest one further on that lines up with this one */
+function emAcross(b, dir) {
+  const down = emDown(), lin = (el) => (down ? el.offsetLeft : el.offsetTop), far = (el) => (down ? el.offsetTop : el.offsetLeft);
+  let el = b, line = null, best = null;
+  for (let k = 0; k < 40 && (el = emNext(el, dir)); k++) {
+    const f = far(el); if (f === far(b)) continue;
+    if (line === null) line = f; else if (f !== line) break; /* only the very next row (or column) */
+    if (!best || Math.abs(lin(el) - lin(b)) < Math.abs(lin(best) - lin(b))) best = el;
+  }
+  return best;
+}
+emGrid.addEventListener('keydown', (e) => {
+  const b = e.target.closest && e.target.closest('.et'); if (!b) return;
+  const down = emDown(), go = { ArrowRight: down ? emNext(b, 1) : emAcross(b, 1), ArrowLeft: down ? emNext(b, -1) : emAcross(b, -1),
+    ArrowDown: down ? emAcross(b, 1) : emNext(b, 1), ArrowUp: down ? emAcross(b, -1) : emNext(b, -1) }[e.key];
+  if (go === undefined) return; e.preventDefault(); emRove(go, true);
+});
+emojiEl.addEventListener('click', (e) => {
+  if (e.target.closest('#emMode')) {
+    EM.sticker = !EM.sticker; save('fw.emMode', EM.sticker ? 'sticker' : 'word'); emMark(); sound.pop();
+    toast(EM.sticker ? '🌟 Tap an emoji to stick it on the stage' : '✍️ Tap an emoji to put it in your word', 2200); return;
+  }
+  const c = e.target.closest('.em-cat'); if (c) { emJump(+c.dataset.sec); sound.pop(); return; }
+  const b = e.target.closest('.et, .tile'); if (!b || !emGrid.contains(b)) return;
+  hideHint();
+  if (b.classList.contains('et')) emRove(b, false);
+  if (EM.sticker) {
+    if (b.dataset.act === 'back') { if (stickers.length) removeSticker(stickers[stickers.length - 1].id); }
+    else if (b.dataset.act === 'clear') { for (const s of stickers.slice()) removeSticker(s.id); }
+    else if (b.dataset.emoji) addSticker(b.dataset.emoji);
+  } else {
+    if (b.dataset.act === 'back') backspaceInput();
+    else if (b.dataset.act === 'clear') input.value = '';
+    else if (b.dataset.emoji) insertText(b.dataset.emoji);
+    bump(input, 'pulse');
+  }
+  sound.pop();
+  if (e.detail > 0 && !emFind.value) refocus();
+});
+
+/* ---------- emoji stickers: an emoji on the stage, picked up, moved and pinched like a cut-out from the photo booth.
+   They are kept as their emoji (fw.stickers) with their places among the cut-outs (fw.cuts); taken off the stage,
+   they are gone. ---------- */
+let stickers = [];
+const STICKER_MAX = 24;
+/* the emoji drawn big, cut to its own size */
+function stickerCanvas(e) {
+  const S = 192, W = S * 3, H = Math.round(S * 1.6), c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.font = S + 'px ' + EMOJI_FONT; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(e, W / 2, H / 2);
+  const d = x.getImageData(0, 0, W, H).data; let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let i = y * W, xx = 0; xx < W; xx++, i++) if (d[i * 4 + 3] > 8) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return null;
+  const o = document.createElement('canvas'); o.width = x1 - x0 + 5; o.height = y1 - y0 + 5; o.getContext('2d').drawImage(c, x0 - 2, y0 - 2, o.width, o.height, 0, 0, o.width, o.height);
+  return o;
+}
+const stickerRec = (id, emo, cv) => ({ id, emo, cut: true, cv, small: cv, x: .5, y: .5, h: .26 });
+const saveStickers = () => save('fw.stickers', stickers.map((s) => [s.id, s.emo]));
+function addSticker(e) {
+  if (stickers.length >= STICKER_MAX) { toast('🌟 That is a lot of stickers! Tap one and press ✕ to make room', 3000); return null; }
+  const cv = stickerCanvas(e); if (!cv) return null;
+  if (cam.on && !cam.booth) stopCamera();
+  const n = stickers.length, rec = stickerRec('emo-' + Date.now().toString(36) + '-' + n, e, cv);
+  rec.x = .5 + [0, 1, -1, 2, -2][n % 5] * .19; rec.y = .42 + [0, 1, -1][Math.floor(n / 5) % 3] * .2; /* the first in the middle, the next ones beside it */
+  stickers.push(rec); saveStickers(); setCut(rec.id, true); pick(rec.id);
+  if (n === 0) toast('🌟 Drag your sticker, pinch it bigger, ✕ takes it away', 3200);
+  return rec.id;
+}
+function removeSticker(id) {
+  if (!stickers.some((s) => s.id === id)) return;
+  stickers = stickers.filter((s) => s.id !== id); saveStickers(); if (sel === id) pick(''); setCut(id, false);
+}
+/* the stickers that were on the stage come back, each to its place */
+function restoreStickers() {
+  for (const q of [].concat(load('fw.stickers', []))) {
+    if (!Array.isArray(q) || typeof q[0] !== 'string' || typeof q[1] !== 'string' || stickers.length >= STICKER_MAX || stickers.some((s) => s.id === q[0])) continue;
+    const cv = stickerCanvas(q[1]); if (cv) stickers.push(stickerRec(q[0], q[1], cv));
+  }
+  for (const q of [].concat(load('fw.cuts', []))) {
+    const r = Array.isArray(q) && q.length > 3 && q.slice(1, 4).every(Number.isFinite) ? stickers.find((s) => s.id === q[0]) : null;
+    if (r && !cutOn(r.id)) { r.x = q[1]; r.y = q[2]; r.h = q[3]; state.cuts.push(r.id); }
+  }
+  stickers = stickers.filter((s) => cutOn(s.id));
+  if (stickers.length) drawCut();
 }
 function buildLogo() {
   const holder = document.querySelector('.tb-head .logo'); if (!holder) return;
@@ -2817,7 +4993,7 @@ let stripEdges = [];
 function setTab(name, focusIt) {
   if (TABS.indexOf(name) < 0) name = 'styles';
   if (name === 'show' && wideMq.matches) name = 'styles'; /* the show controls are always in view there */
-  toyEl.dataset.tab = name;
+  toyEl.dataset.tab = name; if (name === 'emoji') emShow();
   for (const t of tabBtns) {
     const on = t.dataset.tab === name;
     t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1;
@@ -3012,15 +5188,6 @@ styleEl.addEventListener('click', (e) => {
       if (repeat) go(currentText()); else relook(LOOKS[id]); /* a second tap on the same style plays the word again */
     }
   }
-  if (e.detail > 0) refocus();
-});
-emojiEl.addEventListener('click', (e) => {
-  const b = e.target.closest('.tile'); if (!b) return;
-  hideHint();
-  if (b.dataset.act === 'back') backspaceInput();
-  else if (b.dataset.act === 'clear') input.value = '';
-  else if (b.dataset.emoji) insertText(b.dataset.emoji);
-  bump(input, 'pulse'); sound.pop();
   if (e.detail > 0) refocus();
 });
 badgeEl.addEventListener('click', (e) => { surprise(); if (e.detail > 0) refocus(); });
@@ -7400,7 +9567,7 @@ const cam = { on: false, stream: null, devices: [], deviceId: '', mirror: true, 
    "Just me" finds the person in the picture, and "Green screen" takes away a cloth of one colour behind them.
    Either way the kid is seen standing in the scene, live, and Snap! saves that cut-out. A cut-out is not a
    scene: it stands in front of whichever scene is picked, behind the word, until it is switched off. ---------- */
-const meCv = $('#me'), meCx = meCv.getContext('2d'), meBox = $('#meBox'), meGrip = $('#meGrip'), boothBar = $('#boothBar'), boothPick = $('#boothPick'), boothMe = boothBar.querySelector('[data-mode="me"]');
+const meCv = $('#me'), meCx = meCv.getContext('2d'), meBox = $('#meBox'), meGrip = $('#meGrip'), meDel = $('#meDel'), boothBar = $('#boothBar'), boothPick = $('#boothPick'), boothMe = boothBar.querySelector('[data-mode="me"]');
 const cx2 = (cv) => cv.getContext('2d', { willReadFrequently: true });
 const within = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const tell = (text, ms) => { toast(text, ms); announceEl.textContent = text; }; /* said out loud too: these are things a kid has to know */
@@ -7408,7 +9575,7 @@ const tell = (text, ms) => { toast(text, ms); announceEl.textContent = text; }; 
    knows its place as parts of the stage (x, y: its middle; h: its height), so it sits the same in any size of stage
    and in every shape of kept picture. */
 let cutTouched = false, sel = '', selT = 0;
-const cutRec = (id) => photos.find((p) => p.cut && p.id === id) || null;
+const cutRec = (id) => photos.find((p) => p.cut && p.id === id) || stickers.find((p) => p.id === id) || null; /* (an emoji sticker counts as a cut-out) */
 const cutOn = (id) => state.cuts.indexOf(id) >= 0;
 /* where a cut-out lies on a stage of w by h: [left, top, width, height] */
 const cutBox = (r, w, h) => { const dh = r.h * h, dw = dh * r.small.width / r.small.height; return [r.x * w - dw / 2, r.y * h - dh / 2, dw, dh]; };
@@ -7738,10 +9905,11 @@ function cutAt(px, py) {
 }
 /* the frame and its grip, around the picked cut-out; the grip stays inside the stage however big the cut-out is */
 function placeBox() {
-  const r = !cam.on && cutOn(sel) ? cutRec(sel) : null; meBox.hidden = meGrip.hidden = !r; if (!r) return;
+  const r = !cam.on && cutOn(sel) ? cutRec(sel) : null; meBox.hidden = meGrip.hidden = !r; meDel.hidden = !(r && r.emo); if (!r) return;
   const w = stage.clientWidth, h = stage.clientHeight, b = cutBox(r, w, h), rows = Math.min(92, h / 2); /* the top and bottom rows belong to the stage's own buttons */
   meBox.style.cssText = 'left:' + b[0] + 'px;top:' + b[1] + 'px;width:' + b[2] + 'px;height:' + b[3] + 'px';
   meGrip.style.cssText = 'left:' + (within(b[0] + b[2], 26, w - 26) - 22) + 'px;top:' + (within(b[1] + b[3], rows, h - rows) - 22) + 'px';
+  if (r.emo) meDel.style.cssText = 'left:' + (within(b[0] + b[2], 26, w - 26) - 20) + 'px;top:' + (within(b[1], rows, h - rows) - 20) + 'px'; /* a sticker's ✕, at the top corner */
 }
 /* the frame shows for three seconds after the last touch, then gets out of the way */
 function pick(id) {
@@ -7799,6 +9967,8 @@ meGrip.addEventListener('pointermove', (e) => {
   r.h = within(grip.h0 * Math.hypot(x - r.x * w, y - r.y * h) / grip.d0, .08, 3); drawCut();
 });
 for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) meGrip.addEventListener(ev, () => { if (!grip) return; grip = null; saveCuts(); pick(sel); });
+meDel.addEventListener('mousedown', (e) => e.preventDefault()); /* the word box keeps the keyboard */
+meDel.addEventListener('click', () => { if (sel) { removeSticker(sel); sound.pop(); } });
 
 /* --- finding the person: MediaPipe's image segmenter with its "selfie multiclass" model, which tells hair, skin,
    clothes and worn things from the room. It is fetched when "Just me" is switched on. Every file of it is checked
@@ -8550,6 +10720,11 @@ window.FW = {
   setTab(name) { setTab(name); },
   setScene(id) { setScene(id); },
   scenes: SCENE_ORDER.slice(),
+  emoji: {
+    build: () => emojiBuild(), mode: () => (EM.sticker ? 'sticker' : 'word'), count: () => emGrid.querySelectorAll('.et').length,
+    shown: () => [...emGrid.querySelectorAll('.et:not([hidden])')].map((b) => b.dataset.emoji), stickers: () => stickers.map((s) => ({ id: s.id, emo: s.emo, on: cutOn(s.id) })),
+    sticker: (e) => addSticker(e), remove: (id) => removeSticker(id)
+  },
   booth: {
     mode: () => cam.mode, set: (m) => setBooth(m, true), on: () => !!cam.booth, live: () => !!cam.cutOK, seg: () => SEG.state,
     key: () => (cam.key ? { rgb: [cam.key.r, cam.key.g, cam.key.b].map(Math.round), weak: !!cam.key.weak } : null),
@@ -8600,12 +10775,12 @@ function buildEvery() {
 buildLogo();
 buildStyleTiles();
 buildChips();
-buildEmojiTiles();
+buildEmojiPicker();
 buildSceneTiles();
 placeActTiles();
 buildEvery();
 /* after the tiles and options exist, so the widths are real */
-stripEdges = [styleEl, chipsEl, scenesEl, emojiEl, showEl].map(makeStrip);
+stripEdges = [styleEl, chipsEl, scenesEl, emGrid, showEl].map(makeStrip);
 setTab(load('fw.tab', 'styles'));
 try { const onWide = () => { if (wideMq.matches && toyEl.dataset.tab === 'show') setTab('styles', document.activeElement === $('#tab-show')); }; if (wideMq.addEventListener) wideMq.addEventListener('change', onWide); else if (wideMq.addListener) wideMq.addListener(onWide); } catch (e) { /* ignore */ }
 renderSeen();
@@ -8613,6 +10788,7 @@ setShuffle(load('fw.shuffle', true) !== false);
 setEvery(load('fw.every', 2000)); /* the show itself always starts off: nothing moves until a kid asks */
 setCalm(load('fw.calm', false) === true);
 setScene(load('fw.scene', 'mix'), true);
+restoreStickers(); /* the emoji stickers first: they need no pictures loaded */
 restorePhotos(); /* a saved photo scene comes back once its picture has loaded */
 if (load('fw.sound', false) === true) { state.sound = true; showSound(); }
 if (!load('fw.hinted', false)) hintEl.hidden = false;
